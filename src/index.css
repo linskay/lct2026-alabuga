@@ -2,9 +2,45 @@
 
 @layer base {
   :root {
-    --bg-graphite: #0d0e12;
-    --card-graphite: #14161f;
-    --card-border: #232736;
+    /* Material Design 3 (M3) Dark Theme Color Roles (Alabuga Purple Key #7B2CBF) */
+    --md-sys-color-primary: #d0bcff;
+    --md-sys-color-on-primary: #381e72;
+    --md-sys-color-primary-container: #4f378b;
+    --md-sys-color-on-primary-container: #eaddff;
+    
+    --md-sys-color-secondary: #ccc2dc;
+    --md-sys-color-on-secondary: #332d41;
+    --md-sys-color-secondary-container: #4a4458;
+    --md-sys-color-on-secondary-container: #e8def8;
+    
+    --md-sys-color-tertiary: #00f0ff;
+    --md-sys-color-on-tertiary: #00363d;
+    --md-sys-color-tertiary-container: #004f58;
+    --md-sys-color-on-tertiary-container: #9eeffd;
+    
+    --md-sys-color-error: #f2b8b5;
+    --md-sys-color-on-error: #601410;
+    --md-sys-color-error-container: #8c1d18;
+    --md-sys-color-on-error-container: #f9dedc;
+
+    --md-sys-color-surface: #141218;
+    --md-sys-color-surface-dim: #141218;
+    --md-sys-color-surface-bright: #3b383e;
+    --md-sys-color-surface-container-lowest: #0f0d13;
+    --md-sys-color-surface-container-low: #1d1b20;
+    --md-sys-color-surface-container: #211f26;
+    --md-sys-color-surface-container-high: #2b2930;
+    --md-sys-color-surface-container-highest: #36343b;
+
+    --md-sys-color-on-surface: #e6e0e9;
+    --md-sys-color-on-surface-variant: #cac4d0;
+    --md-sys-color-outline: #938f99;
+    --md-sys-color-outline-variant: #49454f;
+
+    /* Legacy Brand Variables for backward compatibility */
+    --bg-graphite: #141218;
+    --card-graphite: #211f26;
+    --card-border: #49454f;
     --alabuga-purple: #7b2cbf;
     --alabuga-purple-light: #9d4edd;
     --alabuga-glow: rgba(123, 44, 191, 0.35);
@@ -15,8 +51,8 @@
   }
 
   body {
-    background-color: var(--bg-graphite);
-    color: #e2e8f0;
+    background-color: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     overflow-x: hidden;
   }
