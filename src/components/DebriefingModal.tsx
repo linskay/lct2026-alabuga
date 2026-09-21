@@ -92,13 +92,28 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
           </div>
         </div>
 
+        {/* Hurried Warning Banner if user closed prematurely */}
+        {analytics.hurriedWarning && (
+          <div className="mb-4 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/50 flex items-start gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <div className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+                Замечание наставника: поспешная сделка
+              </div>
+              <p className="text-xs text-amber-200 mt-0.5 leading-relaxed">
+                {analytics.hurriedWarning}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Scores */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="p-3 rounded-xl bg-[#1a1d29]/70 border border-[#232736]">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
               <span className="flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#00f0ff]" />
-                Защита BATNA
+                Защита BATNA (460 ₽/м²)
               </span>
               <span className="font-bold text-[#00f0ff] font-mono">{analytics.batnaScore}%</span>
             </div>
@@ -120,6 +135,50 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
                 className="bg-[#10b981] h-full rounded-full transition-all duration-500"
                 style={{ width: `${analytics.stressManagementScore}%` }}
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Advanced Criteria for Rank S Verification */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="p-2.5 rounded-xl bg-[#12141d] border border-[#232736] text-center">
+            <div className="text-[10px] text-slate-400 uppercase font-mono">Скрытая боль (Q3)</div>
+            <div className="text-xs font-bold mt-1">
+              {analytics.hiddenNeedsDiscovered ? (
+                <span className="text-emerald-400 flex items-center justify-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Вскрыта
+                </span>
+              ) : (
+                <span className="text-slate-500">Не выявлена</span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-[#12141d] border border-[#232736] text-center">
+            <div className="text-[10px] text-slate-400 uppercase font-mono">Манипуляции</div>
+            <div className="text-xs font-bold mt-1">
+              {analytics.manipulationsHandledCount >= 2 ? (
+                <span className="text-[#00f0ff] flex items-center justify-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {analytics.manipulationsHandledCount}/3 парировано
+                </span>
+              ) : (
+                <span className="text-amber-400">
+                  {analytics.manipulationsHandledCount}/3 парировано
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-[#12141d] border border-[#232736] text-center">
+            <div className="text-[10px] text-slate-400 uppercase font-mono">Размен уступок</div>
+            <div className="text-xs font-bold mt-1">
+              {analytics.mutualTradeOffsEnforced ? (
+                <span className="text-emerald-400 flex items-center justify-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Соблюден
+                </span>
+              ) : (
+                <span className="text-amber-400">Частичный</span>
+              )}
             </div>
           </div>
         </div>

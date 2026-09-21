@@ -62,6 +62,9 @@ export interface GeminiResponse {
   is_deal_closed: boolean;
   is_deal_failed: boolean;
   agenda?: NegotiationAgenda;
+  manipulation_type?: "none" | "bluff" | "authority_press" | "hurry_trap";
+  hidden_need_revealed?: boolean;
+  active_counter_offer?: number;
 }
 
 export type AgendaItemStatus = "agreed" | "in_progress" | "disputed";
@@ -92,6 +95,10 @@ export interface DebriefingAnalytics {
   barsExecutiveSummary: string;
   keyStrengths: string[];
   areasForGrowth: string[];
+  hurriedWarning?: string;
+  manipulationsHandledCount: number;
+  hiddenNeedsDiscovered: boolean;
+  mutualTradeOffsEnforced: boolean;
 }
 
 declare global {

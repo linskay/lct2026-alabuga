@@ -103,6 +103,8 @@ export default function App() {
     },
   ]);
   const [timeTravelRollbacksCount, setTimeTravelRollbacksCount] = useState<number>(0);
+  const [hiddenNeedsDiscovered, setHiddenNeedsDiscovered] = useState<boolean>(false);
+  const [activeCounterOffer, setActiveCounterOffer] = useState<number>(300);
 
   // Modals
   const [isCaseInfoOpen, setIsCaseInfoOpen] = useState(false);
@@ -139,6 +141,8 @@ export default function App() {
             ...config,
             currentMetrics: metrics,
             agenda,
+            hiddenNeedsDiscovered,
+            activeCounterOffer,
           },
         }),
       });
@@ -148,6 +152,13 @@ export default function App() {
       }
 
       const data = await response.json();
+
+      if (data.hidden_need_revealed) {
+        setHiddenNeedsDiscovered(true);
+      }
+      if (data.active_counter_offer) {
+        setActiveCounterOffer(data.active_counter_offer);
+      }
 
       const opponentMessage: Message = {
         id: `msg_opp_${Date.now()}`,
@@ -233,6 +244,8 @@ export default function App() {
   // Restart session
   const handleRestart = () => {
     setTimerSeconds(258);
+    setHiddenNeedsDiscovered(false);
+    setActiveCounterOffer(300);
     const welcomeBars: Message = {
       id: `init_bars_${Date.now()}`,
       actor: "BARS",
@@ -278,18 +291,119 @@ export default function App() {
     handleRestart();
   };
 
-  // Calculate Debriefing
+  // Calculate Debriefing with strict realistic evaluation
   const calculateDebriefing = (): DebriefingAnalytics => {
+    const userMessages = messages.filter((m) => m.actor === "USER");
+    const userStepCount = userMessages.length;
+    const opponentMessages = messages.filter((m) => m.actor === "OPPONENT");
+
     const tensionAvg =
       messages.reduce((acc, m) => acc + m.snapshotMetrics.tension, 0) / (messages.length || 1);
     const stressScore = Math.max(0, Math.min(100, Math.round(100 - tensionAvg)));
-    const batnaScore = isDealFailed ? 45 : metrics.trust >= 60 ? 95 : 75;
 
+    // Count deflected manipulations
+    let manipulationsCount = 0;
+    const allOpponentText = opponentMessages.map((m) => m.text).join(" ");
+    if (allOpponentText.includes("осведомлены о проблемах с мощностями в Калужской")) {
+      manipulationsCount += 1;
+    }
+    if (allOpponentText.includes("вижу, что вы держите удар и уполномочены")) {
+      manipulationsCount += 1;
+    }
+    if (allOpponentText.includes("в спешке завод на 12 000 м² не проектируют")) {
+      manipulationsCount += 1;
+    }
+
+    // Check if true pain was discovered
+    const painDiscovered =
+      hiddenNeedsDiscovered ||
+      allOpponentText.includes("совет директоров зажал меня в тиски") ||
+      allOpponentText.includes("кровь из носу нужно запуститься в 3 квартале");
+
+    // Check if mutual trade-offs were applied
+    const tradeOffsEnforced =
+      agenda.rate.status === "agreed" &&
+      agenda.grace_period.status === "agreed" &&
+      agenda.power_capex.status === "agreed";
+
+    // BATNA Score calculation
+    let batnaScore = 50;
+    if (isDealClosed) {
+      batnaScore = 95;
+    } else if (agenda.rate.status === "agreed") {
+      batnaScore = 80;
+    } else if (metrics.deal_readiness >= 60) {
+      batnaScore = 70;
+    } else if (isDealFailed) {
+      batnaScore = 35;
+    }
+
+    // Hurried closing warning
+    let hurriedWarning: string | undefined;
+    if (isDealClosed && userStepCount < 6) {
+      hurriedWarning =
+        "Сделка закрыта слишком поспешно: вы не проверили платежеспособность инвестора и не заложили штрафные санкции за срыв сроков пусконаладки.";
+    }
+
+    // Strict rating calculation
     let rating: "S" | "A" | "B" | "C" | "F" = "C";
-    if (isDealClosed && timeTravelRollbacksCount === 0) rating = "S";
-    else if (isDealClosed) rating = "A";
-    else if (metrics.deal_readiness >= 60) rating = "B";
-    else if (isDealFailed) rating = "F";
+    if (isDealFailed) {
+      rating = "F";
+    } else if (isDealClosed) {
+      if (
+        userStepCount >= 6 &&
+        painDiscovered &&
+        manipulationsCount >= 2 &&
+        timeTravelRollbacksCount <= 1
+      ) {
+        rating = "S";
+      } else if (userStepCount >= 5 && (painDiscovered || manipulationsCount >= 1)) {
+        rating = "A";
+      } else {
+        rating = "B";
+      }
+    } else if (metrics.deal_readiness >= 60) {
+      rating = "B";
+    }
+
+    // Summary text
+    let summary = "";
+    if (rating === "S") {
+      summary =
+        "ИДЕАЛЬНЫЙ ТАКТИЧЕСКИЙ РАУНД (Ранг S): Вы провели полноценные 6-8 раундов жестких B2B-переговоров, вскрыли истинную BATNA инвестора (критичность ввода к 3 кварталу из-за контрактов на станки), успешно парировали манипуляции оппонента и добились взаимного размена уступок (460 ₽/м² и 8 МВт под гарантии 1.2 млрд ₽ и кадры «Алабуга Политех»).";
+    } else if (hurriedWarning) {
+      summary =
+        "ПРЕДОСТЕРЕЖЕНИЕ НАСТАВНИКА: " +
+        hurriedWarning +
+        " В жестких промышленных переговорах поспешное согласие на 4 шагах снижает рейтинг надежности контракта.";
+    } else if (rating === "A") {
+      summary =
+        "УСПЕШНОЕ СОГЛАСОВАНИЕ (Ранг A): Основные красные линии ОЭЗ защищены, однако оппонент несколько раз пытался навязать свою повестку. Рекомендуется глубже зондировать скрытые риски партнера.";
+    } else {
+      summary =
+        "В ходе сессии зафиксирована потеря инициативы или срыв критических требований BATNA. Воспользуйтесь рекомендациями Б.А.Р.С. и попробуйте альтернативную ветку диалога.";
+    }
+
+    const keyStrengths: string[] = [];
+    if (painDiscovered) keyStrengths.push("Вскрыта скрытая боль: дедлайн запуска оборудования к Q3");
+    if (manipulationsCount > 0) keyStrengths.push(`Отражено манипуляций и стресс-тестов: ${manipulationsCount}`);
+    if (agenda.rate.status === "agreed") keyStrengths.push("Ставка зафиксирована на уровне BATNA (460 ₽/м²)");
+    if (tradeOffsEnforced) keyStrengths.push("Взаимный размен уступок без бесплатной сдачи позиций");
+    if (keyStrengths.length === 0) keyStrengths.push("Сохранение базовой линии диалога");
+
+    const areasForGrowth: string[] = [];
+    if (userStepCount < 6) {
+      areasForGrowth.push("Не спешить с закрытием: генеральный директор требует 6–8 раундов проработки");
+    }
+    if (!painDiscovered) {
+      areasForGrowth.push("Задавать открытые калибровочные вопросы о сроках и структуре окупаемости");
+    }
+    if (manipulationsCount < 2) {
+      areasForGrowth.push("Хладнокровно разбивать блеф конкурентов (Калуга, дефицит 110 кВ)");
+    }
+    if (timeTravelRollbacksCount > 2) {
+      areasForGrowth.push("Снизить количество откатов назад: вырабатывайте интуицию с первого дубля");
+    }
 
     return {
       finalOutcome: isDealClosed ? "WON" : isDealFailed ? "FAILED" : "IN_PROGRESS",
@@ -301,17 +415,13 @@ export default function App() {
       batnaScore,
       stressManagementScore: stressScore,
       overallRating: rating,
-      barsExecutiveSummary:
-        "В ходе раунда продемонстрировано строгое удержание красной линии по арендной ставке ОЭЗ. Аргументация через энергомощности 110 кВ и кадровый ресурс «Алабуга Политех» позволила перехватить инициативу.",
-      keyStrengths: [
-        "Ставка удержана выше порога BATNA (460 ₽/м²)",
-        "Отказ от односторонних уступок по каникулам",
-        "Своевременная фиксация инвестиционных обязательств",
-      ],
-      areasForGrowth: [
-        "Не затягивать стадию выяснения скрытых мотивов оппонента",
-        "Четче формулировать дедлайны подписания протокола",
-      ],
+      barsExecutiveSummary: summary,
+      keyStrengths,
+      areasForGrowth,
+      hurriedWarning,
+      manipulationsHandledCount: manipulationsCount,
+      hiddenNeedsDiscovered: painDiscovered,
+      mutualTradeOffsEnforced: tradeOffsEnforced,
     };
   };
 
