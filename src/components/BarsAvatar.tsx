@@ -3,7 +3,7 @@ import { BarsAnimationState } from "../types";
 
 interface BarsAvatarProps {
   animation: BarsAnimationState;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   className?: string;
   showStatusBadge?: boolean;
 }
@@ -58,6 +58,7 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
 
   // Dimensions based on size
   const sizeClasses = {
+    xs: "w-9 h-9 min-w-[36px] min-h-[36px]",
     sm: "w-14 h-14 min-w-[56px] min-h-[56px]",
     md: "w-20 h-20 min-w-[80px] min-h-[80px]",
     lg: "w-28 h-28 min-w-[112px] min-h-[112px]",

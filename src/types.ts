@@ -33,13 +33,21 @@ export interface BatnaConfig {
 export interface AdminScenarioConfig {
   id: string;
   title: string;
+  sphere: "B2B / Инвесторы ОЭЗ" | "Закупки и тендеры" | "HR / Наем топов" | "Внутренний спор";
   opponentRole: string;
   opponentName: string;
   opponentCompany: string;
   opponentPersonality: string;
+  personalityTone: "Агрессивный / Прессинг" | "Скрытный манипулятор" | "Бюрократ / Регламент" | "Эмоциональный / Шантаж";
+  hiddenGoal: string;
+  opponentBatna: string;
+  toughnessLevel: number; // 0..100
+  bluffTendency: number;  // 0..100
   difficulty: DifficultyLevel;
   zoneCluster: string;
   initialContext: string;
+  initialOpponentUtterance?: string;
+  initialBarsAdvice?: string;
   targetKpis: string[];
   batna: BatnaConfig;
 }

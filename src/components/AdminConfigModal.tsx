@@ -84,28 +84,34 @@ export const AdminConfigModal: React.FC<AdminConfigModalProps> = ({
         {/* Presets Selector */}
         <div className="my-5">
           <label className="block text-xs font-semibold uppercase tracking-wider text-[#9d4edd] mb-2">
-            Готовые сценарии ОЭЗ «Алабуга»
+            Готовые сценарии ОЭЗ «Алабуга» (4 пресета для демо жюри)
           </label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             {PRESET_SCENARIOS.map((preset) => {
               const isSelected = preset.id === config.id;
               return (
                 <button
                   key={preset.id}
                   onClick={() => handleSelectPreset(preset)}
-                  className={`p-3 rounded-xl text-left border transition-all ${
+                  className={`p-3 rounded-xl text-left border transition-all flex flex-col justify-between ${
                     isSelected
-                      ? "border-[#7b2cbf] bg-[#7b2cbf]/15 text-white shadow-[0_0_15px_rgba(123,44,191,0.3)]"
+                      ? "border-[#7b2cbf] bg-[#7b2cbf]/20 text-white shadow-[0_0_15px_rgba(123,44,191,0.3)]"
                       : "border-[#232736] bg-[#1a1d29]/60 text-slate-300 hover:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold truncate">{preset.title}</span>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-[#00f0ff]" />}
+                  <div>
+                    <div className="text-[10px] font-mono text-[#00f0ff] uppercase tracking-wider mb-1">
+                      {preset.sphere}
+                    </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold truncate">{preset.title}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#00f0ff]" />}
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-1">{preset.opponentName} ({preset.opponentCompany})</div>
                   </div>
-                  <div className="text-[11px] text-slate-400 truncate">{preset.opponentRole}</div>
-                  <div className="mt-2 inline-block text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-[#ffb703] border border-amber-500/20">
-                    {preset.difficulty}
+                  <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+                    <span>{preset.personalityTone.split("/")[0]}</span>
+                    <span className="text-[#ffb703] font-mono">{preset.toughnessLevel}%</span>
                   </div>
                 </button>
               );
@@ -115,14 +121,27 @@ export const AdminConfigModal: React.FC<AdminConfigModalProps> = ({
 
         {/* Scenario Fields */}
         <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Сфера / Индустрия</label>
+              <select
+                value={config.sphere}
+                onChange={(e) => setConfig({ ...config, sphere: e.target.value as any })}
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
+              >
+                <option value="B2B / Инвесторы ОЭЗ">B2B / Инвесторы ОЭЗ</option>
+                <option value="Закупки и тендеры">Закупки и тендеры</option>
+                <option value="HR / Наем топов">HR / Наем топов</option>
+                <option value="Внутренний спор">Внутренний спор</option>
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">Название кейса</label>
               <input
                 type="text"
                 value={config.title}
                 onChange={(e) => setConfig({ ...config, title: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-sm text-white focus:outline-none focus:border-[#7b2cbf]"
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
               />
             </div>
             <div>
@@ -131,39 +150,107 @@ export const AdminConfigModal: React.FC<AdminConfigModalProps> = ({
                 type="text"
                 value={config.zoneCluster}
                 onChange={(e) => setConfig({ ...config, zoneCluster: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-sm text-white focus:outline-none focus:border-[#7b2cbf]"
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Роль оппонента</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">ФИО оппонента</label>
+              <input
+                type="text"
+                value={config.opponentName}
+                onChange={(e) => setConfig({ ...config, opponentName: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Организация</label>
+              <input
+                type="text"
+                value={config.opponentCompany}
+                onChange={(e) => setConfig({ ...config, opponentCompany: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Должность / Статус</label>
               <input
                 type="text"
                 value={config.opponentRole}
                 onChange={(e) => setConfig({ ...config, opponentRole: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-sm text-white focus:outline-none focus:border-[#7b2cbf]"
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Психотип / Тон</label>
+              <select
+                value={config.personalityTone}
+                onChange={(e) => setConfig({ ...config, personalityTone: e.target.value as any })}
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
+              >
+                <option value="Агрессивный / Прессинг">Агрессивный / Прессинг</option>
+                <option value="Скрытный манипулятор">Скрытный манипулятор</option>
+                <option value="Бюрократ / Регламент">Бюрократ / Регламент</option>
+                <option value="Эмоциональный / Шантаж">Эмоциональный / Шантаж</option>
+              </select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-slate-300 font-medium">Жесткость торга:</span>
+                <span className="font-mono text-[#00f0ff] font-bold">{config.toughnessLevel}%</span>
+              </div>
+              <input
+                type="range"
+                min="30"
+                max="100"
+                value={config.toughnessLevel}
+                onChange={(e) => setConfig({ ...config, toughnessLevel: Number(e.target.value) })}
+                className="w-full accent-[#00f0ff] mt-2 cursor-pointer"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Сложность ИИ оппонента</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["Новичок ОЭЗ", "Прожжённый закупщик", "Гендиректор Алабуги"] as DifficultyLevel[]).map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setConfig({ ...config, difficulty: level })}
-                    className={`py-2 px-1 rounded-lg text-xs font-medium border text-center transition-all ${
-                      config.difficulty === level
-                        ? "border-[#7b2cbf] bg-[#7b2cbf] text-white shadow-[0_0_10px_rgba(123,44,191,0.5)]"
-                        : "border-[#282c3c] bg-[#0d0e12] text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-slate-300 font-medium">Склонность к блефу:</span>
+                <span className="font-mono text-[#9d4edd] font-bold">{config.bluffTendency}%</span>
               </div>
+              <input
+                type="range"
+                min="20"
+                max="100"
+                value={config.bluffTendency}
+                onChange={(e) => setConfig({ ...config, bluffTendency: Number(e.target.value) })}
+                className="w-full accent-[#9d4edd] mt-2 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Скрытая цель оппонента (pain / hidden agenda)
+              </label>
+              <textarea
+                rows={2}
+                value={config.hiddenGoal}
+                onChange={(e) => setConfig({ ...config, hiddenGoal: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Альтернатива оппонента (BATNA оппонента)
+              </label>
+              <textarea
+                rows={2}
+                value={config.opponentBatna}
+                onChange={(e) => setConfig({ ...config, opponentBatna: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg bg-[#0d0e12] border border-[#282c3c] text-xs text-white focus:outline-none focus:border-[#7b2cbf]"
+              />
             </div>
           </div>
 

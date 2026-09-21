@@ -14,10 +14,12 @@ import { AdminConfigModal } from "./components/AdminConfigModal";
 import { TimeTravelTree } from "./components/TimeTravelTree";
 import { DebriefingModal } from "./components/DebriefingModal";
 import { CaseInfoModal } from "./components/CaseInfoModal";
+import { ScenarioConfiguratorScreen } from "./components/ScenarioConfiguratorScreen";
 
 export default function App() {
   // Scenario Config (defaults to first preset: Индустриальный парк «Синергия»)
   const [config, setConfig] = useState<AdminScenarioConfig>(PRESET_SCENARIOS[0]);
+  const [isConfiguratorView, setIsConfiguratorView] = useState<boolean>(false);
 
   // Round Timer: default 4 minutes 18 seconds (258s)
   const [timerSeconds, setTimerSeconds] = useState<number>(258);
@@ -242,14 +244,16 @@ export default function App() {
   };
 
   // Restart session
-  const handleRestart = () => {
+  const handleRestart = (targetConfig?: AdminScenarioConfig) => {
+    const activeCfg = targetConfig || config;
     setTimerSeconds(258);
     setHiddenNeedsDiscovered(false);
-    setActiveCounterOffer(300);
+    setActiveCounterOffer(activeCfg.batna.minPricePerSqm ? activeCfg.batna.minPricePerSqm - 100 : 300);
+
     const welcomeBars: Message = {
       id: `init_bars_${Date.now()}`,
       actor: "BARS",
-      text: `Приветствую на новом раунде по кейсу «${config.title}»! Я на связи. Сложность оппонента: ${config.difficulty}. Слежу за твоей BATNA. Поехали!`,
+      text: activeCfg.initialBarsAdvice || `Приветствую на новом раунде по кейсу «${activeCfg.title}»! Я на связи. Сложность оппонента: ${activeCfg.difficulty}. Слежу за твоей BATNA. Поехали!`,
       timestamp: Date.now(),
       stepIndex: 0,
       snapshotMetrics: { ...initialMetrics },
@@ -259,7 +263,7 @@ export default function App() {
     const resetOpponentMsg: Message = {
       id: `init_opp_${Date.now() + 1}`,
       actor: "OPPONENT",
-      text: `Приветствую. Давайте сразу к делу по площадке «${config.zoneCluster}». Каковы ваши встречные предложения по льготной ставке?`,
+      text: activeCfg.initialOpponentUtterance || `Приветствую. Давайте сразу к делу по площадке «${activeCfg.zoneCluster}». Каковы ваши встречные предложения по льготной ставке?`,
       timestamp: Date.now() + 1,
       stepIndex: 0,
       snapshotMetrics: { ...initialMetrics },
@@ -268,7 +272,7 @@ export default function App() {
     setMessages([welcomeBars, resetOpponentMsg]);
     setMetrics({ ...initialMetrics });
     setAgenda(initialAgenda);
-    setBarsFeedback("Сессия перезапущена. Б.А.Р.С. готов к тактическому анализу.");
+    setBarsFeedback(activeCfg.initialBarsAdvice || "Сессия перезапущена. Б.А.Р.С. готов к тактическому анализу.");
     setBarsAnimation("idle");
     setIsDealClosed(false);
     setIsDealFailed(false);
@@ -288,7 +292,7 @@ export default function App() {
   // Save new scenario config
   const handleSaveConfig = (newConfig: AdminScenarioConfig) => {
     setConfig(newConfig);
-    handleRestart();
+    handleRestart(newConfig);
   };
 
   // Calculate Debriefing with strict realistic evaluation
@@ -427,26 +431,37 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0a0c12] text-slate-100 select-none">
-      {/* ARENA COMBAT INTERFACE */}
-      <ArenaScreenView
-        config={config}
-        messages={messages}
-        metrics={metrics}
-        agenda={agenda}
-        barsFeedback={barsFeedback}
-        barsAnimation={barsAnimation}
-        isLoading={isLoading}
-        isDealClosed={isDealClosed}
-        isDealFailed={isDealFailed}
-        timerSeconds={timerSeconds}
-        onSendMessage={handleSendMessage}
-        onRollback={handleRollback}
-        onOpenCaseInfo={() => setIsCaseInfoOpen(true)}
-        onOpenAdmin={() => setIsAdminOpen(true)}
-        onOpenTimeTravel={() => setIsTimeTravelOpen(true)}
-        onOpenDebriefing={() => setIsDebriefingOpen(true)}
-        onRestart={handleRestart}
-      />
+      {isConfiguratorView ? (
+        <ScenarioConfiguratorScreen
+          onStartSimulation={(newConfig) => {
+            setConfig(newConfig);
+            setIsConfiguratorView(false);
+            handleRestart(newConfig);
+          }}
+        />
+      ) : (
+        /* ARENA COMBAT INTERFACE */
+        <ArenaScreenView
+          config={config}
+          messages={messages}
+          metrics={metrics}
+          agenda={agenda}
+          barsFeedback={barsFeedback}
+          barsAnimation={barsAnimation}
+          isLoading={isLoading}
+          isDealClosed={isDealClosed}
+          isDealFailed={isDealFailed}
+          timerSeconds={timerSeconds}
+          onSendMessage={handleSendMessage}
+          onRollback={handleRollback}
+          onOpenCaseInfo={() => setIsCaseInfoOpen(true)}
+          onOpenAdmin={() => setIsAdminOpen(true)}
+          onOpenTimeTravel={() => setIsTimeTravelOpen(true)}
+          onOpenDebriefing={() => setIsDebriefingOpen(true)}
+          onRestart={() => handleRestart()}
+          onOpenConfigurator={() => setIsConfiguratorView(true)}
+        />
+      )}
 
       {/* MODALS */}
       <CaseInfoModal
