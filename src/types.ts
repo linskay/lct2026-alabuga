@@ -1,0 +1,115 @@
+export type ActorRole = "USER" | "OPPONENT" | "BARS";
+
+export type BarsAnimationState = "idle" | "talk" | "warn" | "win";
+
+export type DifficultyLevel = "Новичок ОЭЗ" | "Прожжённый закупщик" | "Гендиректор Алабуги";
+
+export interface NegotiationMetrics {
+  trust: number;       // 0..100
+  tension: number;     // 0..100
+  deal_readiness: number; // 0..100
+}
+
+export interface Message {
+  id: string;
+  actor: ActorRole;
+  text: string;
+  timestamp: number;
+  stepIndex: number;
+  snapshotMetrics: NegotiationMetrics;
+  tacticalNote?: string;
+  barsAnimation?: BarsAnimationState;
+}
+
+export interface BatnaConfig {
+  minPricePerSqm: number;
+  maxGracePeriodMonths: number;
+  taxHolidayYears: number;
+  minJobCreation: number;
+  minCapexMillionRub: number;
+  redLines: string[];
+}
+
+export interface AdminScenarioConfig {
+  id: string;
+  title: string;
+  opponentRole: string;
+  opponentName: string;
+  opponentCompany: string;
+  opponentPersonality: string;
+  difficulty: DifficultyLevel;
+  zoneCluster: string;
+  initialContext: string;
+  targetKpis: string[];
+  batna: BatnaConfig;
+}
+
+export interface NegotiationSessionSnapshot {
+  step: number;
+  messages: Message[];
+  metrics: NegotiationMetrics;
+  lastBarsFeedback: string;
+  lastBarsAnimation: BarsAnimationState;
+  agenda?: NegotiationAgenda;
+  timestamp: number;
+}
+
+export interface GeminiResponse {
+  opponent_reply: string;
+  bars_feedback: string;
+  bars_animation: BarsAnimationState;
+  metrics: NegotiationMetrics;
+  is_deal_closed: boolean;
+  is_deal_failed: boolean;
+  agenda?: NegotiationAgenda;
+}
+
+export type AgendaItemStatus = "agreed" | "in_progress" | "disputed";
+
+export interface AgendaItem {
+  id: "rate" | "grace_period" | "power_capex";
+  title: string;
+  status: AgendaItemStatus;
+  detail: string;
+}
+
+export interface NegotiationAgenda {
+  rate: AgendaItem;
+  grace_period: AgendaItem;
+  power_capex: AgendaItem;
+}
+
+export interface DebriefingAnalytics {
+  finalOutcome: "WON" | "FAILED" | "IN_PROGRESS";
+  totalSteps: number;
+  timeTravelUsedCount: number;
+  trustProgression: number[];
+  tensionProgression: number[];
+  readinessProgression: number[];
+  batnaScore: number; // 0..100%
+  stressManagementScore: number; // 0..100%
+  overallRating: "S" | "A" | "B" | "C" | "F";
+  barsExecutiveSummary: string;
+  keyStrengths: string[];
+  areasForGrowth: string[];
+}
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      "model-viewer": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        src?: string;
+        alt?: string;
+        autoplay?: boolean;
+        "animation-name"?: string;
+        "camera-controls"?: boolean;
+        "disable-zoom"?: boolean;
+        "auto-rotate"?: boolean;
+        "rotation-per-second"?: string;
+        "shadow-intensity"?: string;
+        "exposure"?: string;
+        style?: React.CSSProperties & { [key: string]: any };
+      };
+    }
+  }
+}

@@ -1,0 +1,178 @@
+import React from "react";
+import { DebriefingAnalytics } from "../types";
+import { Award, CheckCircle2, AlertTriangle, TrendingUp, RefreshCw, X, ShieldCheck } from "lucide-react";
+
+interface DebriefingModalProps {
+  analytics: DebriefingAnalytics;
+  isOpen: boolean;
+  onClose: () => void;
+  onRestart: () => void;
+}
+
+export const DebriefingModal: React.FC<DebriefingModalProps> = ({
+  analytics,
+  isOpen,
+  onClose,
+  onRestart,
+}) => {
+  if (!isOpen) return null;
+
+  const getGradeColor = (grade: string) => {
+    switch (grade) {
+      case "S":
+        return "text-[#00f0ff] border-[#00f0ff] bg-[#00f0ff]/10 shadow-[0_0_25px_rgba(0,240,255,0.4)]";
+      case "A":
+        return "text-[#10b981] border-[#10b981] bg-[#10b981]/10 shadow-[0_0_25px_rgba(16,185,129,0.4)]";
+      case "B":
+        return "text-[#ffb703] border-[#ffb703] bg-[#ffb703]/10";
+      default:
+        return "text-[#ff3366] border-[#ff3366] bg-[#ff3366]/10";
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+      <div className="relative w-full max-w-2xl rounded-2xl border border-[#7b2cbf]/50 bg-[#14161f] p-6 shadow-2xl text-slate-200">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-[#232736]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#7b2cbf]/20 border border-[#7b2cbf] flex items-center justify-center text-[#9d4edd]">
+              <Award className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                Итоговый дебрифинг переговоров
+              </h2>
+              <p className="text-xs text-slate-400">
+                Аналитический отчет робота-наставника «Б.А.Р.С.» (ОЭЗ «Алабуга»)
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Grade & Outcome Banner */}
+        <div className="my-5 p-4 rounded-xl bg-[#0d0e12] border border-[#282c3c] flex items-center justify-between">
+          <div>
+            <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Итог переговорной сессии</div>
+            <div className="text-base font-bold text-white flex items-center gap-2">
+              {analytics.finalOutcome === "WON" ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-[#10b981]" />
+                  Сделка успешно закрыта в пользу ОЭЗ
+                </>
+              ) : analytics.finalOutcome === "FAILED" ? (
+                <>
+                  <AlertTriangle className="w-5 h-5 text-[#ff3366]" />
+                  Переговоры сорваны закупщиком
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="w-5 h-5 text-[#00f0ff]" />
+                  Промежуточный результат сессии
+                </>
+              )}
+            </div>
+            <div className="text-xs text-slate-400 mt-1">
+              Пройдено шагов: <span className="font-mono text-white font-bold">{analytics.totalSteps}</span> |
+              Откатов машины времени: <span className="font-mono text-[#00f0ff] font-bold">{analytics.timeTravelUsedCount}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <div className="text-[10px] text-slate-400 font-mono uppercase mb-1">Рейтинг тактики</div>
+            <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center text-2xl font-black font-mono ${getGradeColor(analytics.overallRating)}`}>
+              {analytics.overallRating}
+            </div>
+          </div>
+        </div>
+
+        {/* Scores */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="p-3 rounded-xl bg-[#1a1d29]/70 border border-[#232736]">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+              <span className="flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#00f0ff]" />
+                Защита BATNA
+              </span>
+              <span className="font-bold text-[#00f0ff] font-mono">{analytics.batnaScore}%</span>
+            </div>
+            <div className="w-full bg-[#0d0e12] h-2 rounded-full overflow-hidden border border-[#282c3c]">
+              <div
+                className="bg-[#00f0ff] h-full rounded-full transition-all duration-500"
+                style={{ width: `${analytics.batnaScore}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-[#1a1d29]/70 border border-[#232736]">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+              <span>Стресс-менеджмент</span>
+              <span className="font-bold text-[#10b981] font-mono">{analytics.stressManagementScore}%</span>
+            </div>
+            <div className="w-full bg-[#0d0e12] h-2 rounded-full overflow-hidden border border-[#282c3c]">
+              <div
+                className="bg-[#10b981] h-full rounded-full transition-all duration-500"
+                style={{ width: `${analytics.stressManagementScore}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* BARS Analysis */}
+        <div className="p-4 rounded-xl bg-[#7b2cbf]/10 border border-[#7b2cbf]/40 space-y-3 mb-5">
+          <div className="text-xs font-semibold uppercase tracking-wider text-[#9d4edd] flex items-center gap-1.5">
+            Заключение наставника «Б.А.Р.С.»:
+          </div>
+          <p className="text-xs text-slate-200 leading-relaxed">
+            {analytics.barsExecutiveSummary}
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-[#10b981] uppercase tracking-wider">Сильные маневры:</span>
+              {analytics.keyStrengths.map((s, idx) => (
+                <div key={idx} className="text-xs text-slate-300 flex items-start gap-1.5">
+                  <span className="text-[#10b981]">✓</span> {s}
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-[#ffb703] uppercase tracking-wider">Точки роста:</span>
+              {analytics.areasForGrowth.map((g, idx) => (
+                <div key={idx} className="text-xs text-slate-300 flex items-start gap-1.5">
+                  <span className="text-[#ffb703]">▲</span> {g}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+          >
+            Вернуться в арену
+          </button>
+          <button
+            onClick={() => {
+              onRestart();
+              onClose();
+            }}
+            className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#7b2cbf] hover:bg-[#9d4edd] text-white shadow-[0_0_15px_rgba(123,44,191,0.5)] flex items-center gap-2"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Начать новый раунд
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
