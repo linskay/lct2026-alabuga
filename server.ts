@@ -11,6 +11,65 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Multi-provider LLM Configuration (OpenRouter, Gemini, Local Docker LLM, Fallback)
+export type LlmProvider = "openrouter" | "gemini" | "local" | "fallback";
+
+export function getActiveProvider(): LlmProvider {
+  const explicit = (process.env.LLM_PROVIDER || "").toLowerCase().trim();
+  if (explicit === "openrouter" || explicit === "gemini" || explicit === "local" || explicit === "fallback") {
+    return explicit as LlmProvider;
+  }
+  if (process.env.OPENROUTER_API_KEY) return "openrouter";
+  if (process.env.GEMINI_API_KEY) return "gemini";
+  if (process.env.LOCAL_LLM_URL) return "local";
+  return "fallback";
+}
+
+async function callOpenAICompatible(options: {
+  url: string;
+  apiKey?: string;
+  model: string;
+  systemPrompt: string;
+  userPrompt: string;
+  extraHeaders?: Record<string, string>;
+}): Promise<any> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.extraHeaders || {}),
+  };
+  if (options.apiKey) {
+    headers["Authorization"] = `Bearer ${options.apiKey}`;
+  }
+
+  const res = await fetch(options.url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: options.model,
+      messages: [
+        { role: "system", content: options.systemPrompt },
+        { role: "user", content: options.userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Model API call to ${options.url} failed (${res.status}): ${errText}`);
+  }
+
+  const data: any = await res.json();
+  const rawContent = data.choices?.[0]?.message?.content?.trim();
+  if (!rawContent) {
+    throw new Error("Empty message content returned by model");
+  }
+
+  const sanitized = rawContent.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+  return JSON.parse(sanitized);
+}
+
 // Lazy-initialized Gemini AI client
 let aiClient: GoogleGenAI | null = null;
 function getGenAI(): GoogleGenAI | null {
@@ -430,27 +489,24 @@ function generateFallbackResponse(body: any) {
 
 // API endpoint for negotiation turn
 app.post("/api/negotiate", async (req, res) => {
-  try {
-    const { history, context } = req.body;
-    const ai = getGenAI();
+  const provider = getActiveProvider();
+  if (provider === "fallback") {
+    return res.json(generateFallbackResponse(req.body));
+  }
 
-    if (!ai) {
-      const fallback = generateFallbackResponse(req.body);
-      return res.json(fallback);
-    }
+  const { history, context } = req.body;
+  const sphere = context?.sphere || "B2B / Инвесторы ОЭЗ";
+  const opponentRole = context?.opponentRole || "Генеральный директор";
+  const opponentName = context?.opponentName || "Валерий Строганов";
+  const opponentCompany = context?.opponentCompany || "ООО «ТехноПром Инжиниринг»";
+  const personalityTone = context?.personalityTone || "Агрессивный / Прессинг";
+  const toughnessLevel = context?.toughnessLevel || 80;
+  const bluffTendency = context?.bluffTendency || 85;
+  const hiddenGoal = context?.hiddenGoal || "Сбить цену любой ценой и скрыть дедлайн запуска к Q3";
+  const opponentBatna = context?.opponentBatna || "Уход на другую площадку";
+  const redLines = context?.batna?.redLines || ["Не сдавать базовые параметры соглашения"];
 
-    const sphere = context?.sphere || "B2B / Инвесторы ОЭЗ";
-    const opponentRole = context?.opponentRole || "Генеральный директор";
-    const opponentName = context?.opponentName || "Валерий Строганов";
-    const opponentCompany = context?.opponentCompany || "ООО «ТехноПром Инжиниринг»";
-    const personalityTone = context?.personalityTone || "Агрессивный / Прессинг";
-    const toughnessLevel = context?.toughnessLevel || 80;
-    const bluffTendency = context?.bluffTendency || 85;
-    const hiddenGoal = context?.hiddenGoal || "Сбить цену любой ценой и скрыть дедлайн запуска к Q3";
-    const opponentBatna = context?.opponentBatna || "Уход на другую площадку";
-    const redLines = context?.batna?.redLines || ["Не сдавать базовые параметры соглашения"];
-
-    const dynamicSystemPrompt = `Ты — оппонент на «Арене переговоров» ОЭЗ «Алабуга».
+  const dynamicSystemPrompt = `Ты — оппонент на «Арене переговоров» ОЭЗ «Алабуга».
 Контекст встречи: ${sphere}
 Твоя роль: ${opponentRole} (${opponentName}, ${opponentCompany})
 Твой характер и стиль: ${personalityTone} (Уровень жесткости: ${toughnessLevel}/100, склонность к блефу: ${bluffTendency}/100)
@@ -473,105 +529,154 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
 5. Держи сделку открытой: переговоры должны длиться минимум 6–8 раундов перед финальным решением.
 6. Если игрок пытается закрыть сделку слишком быстро (до 6 шага), осади его и укажи на непроработанные риски.
 
-Формат вывода строго в JSON.`;
+Верни ответ СТРОГО в JSON формате со следующими полями:
+{
+  "opponent_reply": "Реплика оппонента",
+  "bars_feedback": "Тактический совет и разбор Б.А.Р.С.",
+  "bars_animation": "idle | talk | warn | win",
+  "metrics": {
+    "trust": 0..100,
+    "tension": 0..100,
+    "deal_readiness": 0..100
+  },
+  "agenda": {
+    "rate": { "status": "agreed|in_progress|disputed", "detail": "..." },
+    "grace_period": { "status": "agreed|in_progress|disputed", "detail": "..." },
+    "power_capex": { "status": "agreed|in_progress|disputed", "detail": "..." }
+  },
+  "is_deal_closed": false,
+  "is_deal_failed": false,
+  "manipulation_type": "none|bluff|authority_press|hurry_trap",
+  "hidden_need_revealed": false,
+  "active_counter_offer": 300
+}`;
 
-    const formattedHistory = (history || []).map((m: any) => `${m.actor}: ${m.text}`).join("\n");
+  const formattedHistory = (history || []).map((m: any) => `${m.actor}: ${m.text}`).join("\n");
+  const userPrompt = `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`,
-      config: {
-        systemInstruction: dynamicSystemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            opponent_reply: { type: Type.STRING },
-            bars_feedback: { type: Type.STRING },
-            bars_animation: { type: Type.STRING },
-            metrics: {
-              type: Type.OBJECT,
-              properties: {
-                trust: { type: Type.INTEGER },
-                tension: { type: Type.INTEGER },
-                deal_readiness: { type: Type.INTEGER },
-              },
-              required: ["trust", "tension", "deal_readiness"],
-            },
-            agenda: {
-              type: Type.OBJECT,
-              properties: {
-                rate: {
-                  type: Type.OBJECT,
-                  properties: {
-                    status: { type: Type.STRING },
-                    detail: { type: Type.STRING },
-                  },
-                  required: ["status", "detail"],
-                },
-                grace_period: {
-                  type: Type.OBJECT,
-                  properties: {
-                    status: { type: Type.STRING },
-                    detail: { type: Type.STRING },
-                  },
-                  required: ["status", "detail"],
-                },
-                power_capex: {
-                  type: Type.OBJECT,
-                  properties: {
-                    status: { type: Type.STRING },
-                    detail: { type: Type.STRING },
-                  },
-                  required: ["status", "detail"],
-                },
-              },
-              required: ["rate", "grace_period", "power_capex"],
-            },
-            is_deal_closed: { type: Type.BOOLEAN },
-            is_deal_failed: { type: Type.BOOLEAN },
-            manipulation_type: { type: Type.STRING },
-            hidden_need_revealed: { type: Type.BOOLEAN },
-            active_counter_offer: { type: Type.INTEGER },
-          },
-          required: [
-            "opponent_reply",
-            "bars_feedback",
-            "bars_animation",
-            "metrics",
-            "agenda",
-            "is_deal_closed",
-            "is_deal_failed",
-          ],
+  try {
+    if (provider === "openrouter") {
+      const openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
+      const model = process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet";
+      const parsed = await callOpenAICompatible({
+        url: openRouterUrl,
+        apiKey: process.env.OPENROUTER_API_KEY,
+        model,
+        systemPrompt: dynamicSystemPrompt,
+        userPrompt,
+        extraHeaders: {
+          "HTTP-Referer": "https://alabuga.ru",
+          "X-Title": "Alabuga Negotiation Arena",
         },
-      },
-    });
-
-    const text = response.text?.trim();
-    if (!text) {
-      throw new Error("Empty response from Gemini");
+      });
+      return res.json(parsed);
     }
 
-    const parsed = JSON.parse(text);
-    return res.json(parsed);
+    if (provider === "local") {
+      const baseUrl = (process.env.LOCAL_LLM_URL || "http://127.0.0.1:11434").replace(/\/+$/, "");
+      const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/v1/chat/completions`;
+      const model = process.env.LOCAL_LLM_MODEL || "llama3.2";
+      const parsed = await callOpenAICompatible({
+        url: endpoint,
+        model,
+        systemPrompt: dynamicSystemPrompt,
+        userPrompt,
+      });
+      return res.json(parsed);
+    }
+
+    if (provider === "gemini") {
+      const ai = getGenAI();
+      if (!ai) throw new Error("Gemini AI client not initialized (GEMINI_API_KEY missing)");
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`,
+        config: {
+          systemInstruction: dynamicSystemPrompt,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              opponent_reply: { type: Type.STRING },
+              bars_feedback: { type: Type.STRING },
+              bars_animation: { type: Type.STRING },
+              metrics: {
+                type: Type.OBJECT,
+                properties: {
+                  trust: { type: Type.INTEGER },
+                  tension: { type: Type.INTEGER },
+                  deal_readiness: { type: Type.INTEGER },
+                },
+                required: ["trust", "tension", "deal_readiness"],
+              },
+              agenda: {
+                type: Type.OBJECT,
+                properties: {
+                  rate: {
+                    type: Type.OBJECT,
+                    properties: {
+                      status: { type: Type.STRING },
+                      detail: { type: Type.STRING },
+                    },
+                    required: ["status", "detail"],
+                  },
+                  grace_period: {
+                    type: Type.OBJECT,
+                    properties: {
+                      status: { type: Type.STRING },
+                      detail: { type: Type.STRING },
+                    },
+                    required: ["status", "detail"],
+                  },
+                  power_capex: {
+                    type: Type.OBJECT,
+                    properties: {
+                      status: { type: Type.STRING },
+                      detail: { type: Type.STRING },
+                    },
+                    required: ["status", "detail"],
+                  },
+                },
+                required: ["rate", "grace_period", "power_capex"],
+              },
+              is_deal_closed: { type: Type.BOOLEAN },
+              is_deal_failed: { type: Type.BOOLEAN },
+              manipulation_type: { type: Type.STRING },
+              hidden_need_revealed: { type: Type.BOOLEAN },
+              active_counter_offer: { type: Type.INTEGER },
+            },
+            required: [
+              "opponent_reply",
+              "bars_feedback",
+              "bars_animation",
+              "metrics",
+              "agenda",
+              "is_deal_closed",
+              "is_deal_failed",
+            ],
+          },
+        },
+      });
+
+      const text = response.text?.trim();
+      if (!text) throw new Error("Empty response from Gemini");
+      return res.json(JSON.parse(text));
+    }
   } catch (error) {
-    console.warn("Gemini API call fallback to deterministic state engine:", error);
-    const fallback = generateFallbackResponse(req.body);
-    return res.json(fallback);
+    console.warn(`[${provider.toUpperCase()}] Provider failed, fallback to state engine:`, error);
+    return res.json(generateFallbackResponse(req.body));
   }
+
+  return res.json(generateFallbackResponse(req.body));
 });
 
-// API endpoint to generate complete scenario using Gemini
+// API endpoint to generate complete scenario using active LLM provider
 app.post("/api/generate-case", async (req, res) => {
-  try {
-    const { sphere, personalityTone, toughnessLevel } = req.body;
-    const ai = getGenAI();
+  const provider = getActiveProvider();
+  const { sphere, personalityTone, toughnessLevel } = req.body;
 
-    if (!ai) {
-      return res.status(503).json({ error: "Gemini API unavailable for generation" });
-    }
-
-    const prompt = `Сгенерируй новый реалистичный кейс для тренировки жестких переговоров в Особой Экономической Зоне «Алабуга».
+  const prompt = `Сгенерируй новый реалистичный кейс для тренировки жестких переговоров в Особой Экономической Зоне «Алабуга».
 Параметры:
 - Сфера: ${sphere || "B2B / Инвесторы ОЭЗ"}
 - Психотип оппонента: ${personalityTone || "Агрессивный / Прессинг"}
@@ -607,32 +712,106 @@ app.post("/api/generate-case", async (req, res) => {
   }
 }`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    const text = response.text?.trim();
-    if (!text) {
-      throw new Error("Empty response");
+  try {
+    if (provider === "openrouter") {
+      const openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
+      const model = process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet";
+      const parsed = await callOpenAICompatible({
+        url: openRouterUrl,
+        apiKey: process.env.OPENROUTER_API_KEY,
+        model,
+        systemPrompt: "Ты — генератор индустриальных переговорных сценариев для ОЭЗ «Алабуга». Выводи строго JSON.",
+        userPrompt: prompt,
+        extraHeaders: {
+          "HTTP-Referer": "https://alabuga.ru",
+          "X-Title": "Alabuga Negotiation Arena",
+        },
+      });
+      return res.json(parsed);
     }
 
-    return res.json(JSON.parse(text));
+    if (provider === "local") {
+      const baseUrl = (process.env.LOCAL_LLM_URL || "http://127.0.0.1:11434").replace(/\/+$/, "");
+      const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/v1/chat/completions`;
+      const model = process.env.LOCAL_LLM_MODEL || "llama3.2";
+      const parsed = await callOpenAICompatible({
+        url: endpoint,
+        model,
+        systemPrompt: "Ты — генератор индустриальных переговорных сценариев для ОЭЗ «Алабуга». Выводи строго JSON.",
+        userPrompt: prompt,
+      });
+      return res.json(parsed);
+    }
+
+    if (provider === "gemini") {
+      const ai = getGenAI();
+      if (!ai) throw new Error("Gemini API key not configured");
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      const text = response.text?.trim();
+      if (!text) throw new Error("Empty response");
+      return res.json(JSON.parse(text));
+    }
   } catch (err) {
-    console.error("Error generating case via AI:", err);
-    return res.status(500).json({ error: "Generation failed" });
+    console.warn(`[${provider.toUpperCase()}] Case generation fallback:`, err);
   }
+
+  // Fallback case generation
+  return res.json({
+    id: `ai_gen_${Date.now()}`,
+    title: `Спецпроект: ${sphere || "B2B Инвестиции"}`,
+    sphere: sphere || "B2B / Инвесторы ОЭЗ",
+    opponentRole: "Генеральный директор",
+    opponentName: "Виктор Чернов",
+    opponentCompany: "АО «ПромХолдинг Волга»",
+    opponentPersonality: "Напористый переговорщик с завышенными требованиями к субсидиям",
+    personalityTone: personalityTone || "Агрессивный / Прессинг",
+    hiddenGoal: "Согласовать скидку до одобрения кредита банком к концу квартала",
+    opponentBatna: "Рассмотрение других индустриальных парков ПФО",
+    toughnessLevel: toughnessLevel || 80,
+    bluffTendency: 75,
+    difficulty: "Прожжённый закупщик",
+    zoneCluster: "Индустриальный парк «Синергия»",
+    initialContext: "Крупный производитель планирует развернуть сборочный цех. Требует максимальных льгот и заниженную ставку.",
+    initialOpponentUtterance: "Добрый день. Мы готовы стать резидентами «Алабуги», но ваши текущие условия неконкурентны. Дайте нам скидку 40% и 10 месяцев каникул, иначе мы уходим к конкурентам.",
+    initialBarsAdvice: "Внимание: оппонент блефует и прощупывает почву. Не уступайте базовую ставку, требуйте встречный объем инвестиций!",
+    targetKpis: ["Защитить ставку BATNA", "Ограничить каникулы до 4 месяцев", "Зафиксировать создание 150 рабочих мест"],
+    batna: {
+      minPricePerSqm: 460,
+      maxGracePeriodMonths: 4,
+      taxHolidayYears: 10,
+      minJobCreation: 150,
+      minCapexMillionRub: 800,
+      redLines: ["Не опускать ставку ниже 460 ₽/м²", "Каникулы строго до 4 месяцев"],
+    },
+  });
 });
 
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
+  const active = getActiveProvider();
   res.json({
     status: "ok",
     app: "Alabuga Negotiation Arena KMP Backend",
-    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+    activeProvider: active,
+    configuredProviders: {
+      openrouter: !!process.env.OPENROUTER_API_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+      local: !!process.env.LOCAL_LLM_URL,
+      fallback: true,
+    },
+    models: {
+      openrouter: process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
+      gemini: "gemini-3.8-flash",
+      local: process.env.LOCAL_LLM_MODEL || "llama3.2",
+    },
   });
 });
 
