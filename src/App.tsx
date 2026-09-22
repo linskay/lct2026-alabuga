@@ -7,6 +7,7 @@ import {
   NegotiationSessionSnapshot,
   DebriefingAnalytics,
   NegotiationAgenda,
+  Achievement,
 } from "./types";
 import { PRESET_SCENARIOS } from "./data/scenarios";
 import { ArenaScreenView } from "./components/ArenaScreenView";
@@ -409,6 +410,59 @@ export default function App() {
       areasForGrowth.push("Снизить количество откатов назад: вырабатывайте интуицию с первого дубля");
     }
 
+    const achievements: Achievement[] = [
+      {
+        id: "batna_shield",
+        title: "Железная BATNA",
+        subtitle: "Несокрушимая защита ОЭЗ",
+        description: "Удержал базовую ставку не ниже 460 ₽/м² и лимит каникул, не сдав красные линии ОЭЗ «Алабуга».",
+        imageUrl: "/achievements/batna_shield.jpg",
+        isUnlocked: agenda.rate.status === "agreed" || batnaScore >= 80,
+        tier: "epic",
+        conditionText: "Зафиксировать ставку от 460 ₽/м² (BATNA)",
+      },
+      {
+        id: "bluff_buster",
+        title: "Детектор лжи",
+        subtitle: "Калужский блеф-бастер",
+        description: "Хладнокровно парировал блеф оппонента о конкурентах, используя факты о дефиците мощностей 110 кВ.",
+        imageUrl: "/achievements/bluff_buster.jpg",
+        isUnlocked: manipulationsCount >= 1,
+        tier: "rare",
+        conditionText: "Отразить минимум 1 манипуляцию или блеф",
+      },
+      {
+        id: "hidden_pain",
+        title: "Рентген потребностей",
+        subtitle: "Истинная цель раскрыта",
+        description: "Вскрыл скрытую боль инвестора: критическую зависимость от сроков ввода оборудования к 3-му кварталу.",
+        imageUrl: "/achievements/hidden_pain.jpg",
+        isUnlocked: painDiscovered,
+        tier: "rare",
+        conditionText: "Выявить скрытую боль и истинный дедлайн",
+      },
+      {
+        id: "power_capex",
+        title: "Энергетический барон",
+        subtitle: "8 МВт под 1.2 млрд ₽",
+        description: "Не уступил бесплатные энергомощности, а разменял подключение 8 МВт на встречные инвестиции 1.2 млрд ₽.",
+        imageUrl: "/achievements/power_capex.jpg",
+        isUnlocked: agenda.power_capex.status === "agreed",
+        tier: "epic",
+        conditionText: "Связать 8 МВт с обязательством CAPEX 1.2 млрд ₽",
+      },
+      {
+        id: "grandmaster_s",
+        title: "Гроссмейстер Алабуги",
+        subtitle: "Безупречный ранг S",
+        description: "Провел глубокие жесткие переговоры (6+ раундов), раскрыл боли, парировал атаки и закрыл идеальную сделку.",
+        imageUrl: "/achievements/grandmaster_s.jpg",
+        isUnlocked: rating === "S",
+        tier: "legendary",
+        conditionText: "Получить высший ранг S (6+ раундов без спешки)",
+      },
+    ];
+
     return {
       finalOutcome: isDealClosed ? "WON" : isDealFailed ? "FAILED" : "IN_PROGRESS",
       totalSteps: messages[messages.length - 1]?.stepIndex || 0,
@@ -426,6 +480,7 @@ export default function App() {
       manipulationsHandledCount: manipulationsCount,
       hiddenNeedsDiscovered: painDiscovered,
       mutualTradeOffsEnforced: tradeOffsEnforced,
+      achievements,
     };
   };
 

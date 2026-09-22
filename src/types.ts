@@ -90,6 +90,17 @@ export interface NegotiationAgenda {
   power_capex: AgendaItem;
 }
 
+export interface Achievement {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  imageUrl: string;
+  isUnlocked: boolean;
+  tier: "legendary" | "epic" | "rare";
+  conditionText: string;
+}
+
 export interface DebriefingAnalytics {
   finalOutcome: "WON" | "FAILED" | "IN_PROGRESS";
   totalSteps: number;
@@ -107,6 +118,7 @@ export interface DebriefingAnalytics {
   manipulationsHandledCount: number;
   hiddenNeedsDiscovered: boolean;
   mutualTradeOffsEnforced: boolean;
+  achievements: Achievement[];
 }
 
 declare global {
