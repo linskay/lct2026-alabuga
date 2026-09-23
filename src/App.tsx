@@ -134,26 +134,63 @@ export default function App() {
     setBarsAnimation("talk");
 
     try {
-      const response = await fetch("/api/negotiate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          history: updatedMessages,
-          context: {
-            ...config,
-            currentMetrics: metrics,
-            agenda,
-            hiddenNeedsDiscovered,
-            activeCounterOffer,
-          },
-        }),
-      });
+      let data: any = null;
+      try {
+        const response = await fetch("/api/negotiate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            history: updatedMessages,
+            context: {
+              ...config,
+              currentMetrics: metrics,
+              agenda,
+              hiddenNeedsDiscovered,
+              activeCounterOffer,
+            },
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const contentType = response.headers.get("content-type") || "";
+        if (response.ok && contentType.includes("application/json")) {
+          data = await response.json();
+        }
+      } catch (fetchErr) {
+        console.warn("API request failed, switching to local state engine:", fetchErr);
       }
 
-      const data = await response.json();
+      // If network or server didn't return valid JSON, compute deterministic local fallback
+      if (!data || !data.opponent_reply) {
+        const lower = text.toLowerCase();
+        let fallbackReply = "Ваше предложение требует дополнительного анализа. 400 ₽ за квадратный метр — наш ориентир, но назовите конкретные встречные уступки по срокам и сетям.";
+        let fallbackFeedback = "Оппонент держит оборону. Удерживайте ставку 460 ₽/м² и проверьте его скрытую потребность по срокам запуска.";
+        let fallbackAnimation = "talk";
+        let newTrust = metrics.trust;
+        let newTension = metrics.tension;
+        let newReadiness = metrics.deal_readiness;
+
+        if (lower.includes("460")) {
+          fallbackReply = "460 ₽/м² — это серьезная планка. Чем вы обоснуете такую цену по сравнению с предложениями в других регионах?";
+          fallbackFeedback = "Позиция по ставке обозначена. Подкрепите 460 ₽ надежностью подстанций ОЭЗ и гарантией ввода корпуса!";
+          newTrust = Math.min(100, newTrust + 5);
+          newReadiness = Math.min(100, newReadiness + 5);
+        } else if (lower.includes("каникул") || lower.includes("срок")) {
+          fallbackReply = "По каникулам мы готовы обсуждать оптимизацию графика, если вы гарантируете шеф-монтаж без задержек.";
+          fallbackFeedback = "Диалог перешел в конструктивное русло. Фиксируйте каникулы не более 4 месяцев.";
+          newTrust = Math.min(100, newTrust + 8);
+          newTension = Math.max(0, newTension - 5);
+        }
+
+        data = {
+          opponent_reply: fallbackReply,
+          bars_feedback: fallbackFeedback,
+          bars_animation: fallbackAnimation,
+          metrics: { trust: newTrust, tension: newTension, deal_readiness: newReadiness },
+          agenda,
+          is_deal_closed: false,
+          is_deal_failed: false,
+        };
+      }
 
       if (data.hidden_need_revealed) {
         setHiddenNeedsDiscovered(true);

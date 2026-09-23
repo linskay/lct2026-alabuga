@@ -61,12 +61,17 @@ export const ScenarioConfiguratorScreen: React.FC<ScenarioConfiguratorScreenProp
         }),
       });
 
-      if (response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      if (response.ok && contentType.includes("application/json")) {
         const generated = await response.json();
-        setConfig(generated);
-        setSelectedPresetId("custom_ai");
-      } else {
-        // AI fallback synthesis
+        if (generated && generated.title) {
+          setConfig(generated);
+          setSelectedPresetId("custom_ai");
+          return;
+        }
+      }
+
+      // AI fallback synthesis
         const randomizedToughness = Math.floor(65 + Math.random() * 30);
         setConfig({
           id: `ai_case_${Date.now()}`,
@@ -98,20 +103,19 @@ export const ScenarioConfiguratorScreen: React.FC<ScenarioConfiguratorScreenProp
             "Зафиксировать обязательства по объемам",
             "Исключить односторонние риски",
           ],
-          batna: {
-            minPricePerSqm: 460,
-            maxGracePeriodMonths: 4,
-            taxHolidayYears: 10,
-            minJobCreation: 150,
-            minCapexMillionRub: 800,
-            redLines: [
-              "Не опускать порог доходности контракта",
-              "Встречные гарантии на каждый пункт уступок",
-            ],
-          },
-        });
-        setSelectedPresetId("custom_ai");
-      }
+        batna: {
+          minPricePerSqm: 460,
+          maxGracePeriodMonths: 4,
+          taxHolidayYears: 10,
+          minJobCreation: 150,
+          minCapexMillionRub: 800,
+          redLines: [
+            "Не опускать порог доходности контракта",
+            "Встречные гарантии на каждый пункт уступок",
+          ],
+        },
+      });
+      setSelectedPresetId("custom_ai");
     } catch (e) {
       console.error(e);
     } finally {
@@ -132,8 +136,16 @@ ${config.batna.redLines.map((r) => `• ${r}`).join("\n")}
 Веди переговоры строго в рамках указанного характера. Не выходи из роли. Реагируй на давление и аргументы соответственно твоему психотипу.`;
 
   return (
-    <div className="flex-1 w-full h-full overflow-y-auto bg-[#0a0c12] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto w-full space-y-6">
+    <div className="relative flex-1 w-full h-full overflow-y-auto bg-[#07080e] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
+      {/* Ambient Radial Glow Background Spheres */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="ambient-glow-spot w-[600px] h-[600px] -top-40 -left-40 bg-purple-600/20" />
+        <div className="ambient-glow-spot w-[500px] h-[500px] top-[30%] -right-40 bg-cyan-500/18" style={{ animationDelay: "-6s" }} />
+        <div className="ambient-glow-spot w-[450px] h-[450px] -bottom-32 left-[25%] bg-indigo-600/15" style={{ animationDelay: "-10s" }} />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none opacity-30" />
+      </div>
+
+      <div className="relative z-10 max-w-6xl mx-auto w-full space-y-6">
         {/* TOP HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#202538]">
           <div className="flex items-center gap-3.5">

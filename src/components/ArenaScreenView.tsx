@@ -6,13 +6,11 @@ import {
   BarsAnimationState,
   NegotiationAgenda,
 } from "../types";
-import { BarsAvatar } from "./BarsAvatar";
-import { BarsSpeakingSpotlight } from "./BarsSpeakingSpotlight";
+import { OpponentVideoWindow } from "./OpponentVideoWindow";
 import {
   Send,
   RotateCcw,
   Sparkles,
-  Zap,
   CheckCircle2,
   AlertTriangle,
   Info,
@@ -21,13 +19,10 @@ import {
   Clock,
   ShieldCheck,
   ArrowLeft,
-  ChevronDown,
-  ChevronUp,
   X,
   Activity,
   Mic,
-  SlidersHorizontal,
-  Check,
+  ArrowDownRight,
 } from "lucide-react";
 
 interface ArenaScreenViewProps {
@@ -74,28 +69,12 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   const [inputText, setInputText] = useState("");
   const [showTelemetrySheet, setShowTelemetrySheet] = useState(false);
   const [telemetryTab, setTelemetryTab] = useState<"metrics" | "batna" | "agenda">("metrics");
-  const [isBarsHudExpanded, setIsBarsHudExpanded] = useState(false);
-  const [isBarsSpotlightOpen, setIsBarsSpotlightOpen] = useState(false);
-  const prevBarsFeedbackRef = useRef(barsFeedback);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
-
-  // When B.A.R.S. speaks a fresh insight, automatically show him enlarged with typewriter animation
-  useEffect(() => {
-    if (
-      barsFeedback &&
-      barsFeedback !== prevBarsFeedbackRef.current &&
-      barsFeedback !== "Ожидаем реплику оппонента..." &&
-      !isLoading
-    ) {
-      prevBarsFeedbackRef.current = barsFeedback;
-      setIsBarsSpotlightOpen(true);
-    }
-  }, [barsFeedback, isLoading]);
 
   const handleSend = () => {
     if (!inputText.trim() || isLoading || isDealClosed || isDealFailed) return;
@@ -117,7 +96,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
       .slice(0, 2)
       .toUpperCase() || "ОП";
 
-  // Dynamic SuggestionChips tailored to selected case (Material 3 SuggestionChips)
   const getSuggestionChips = () => {
     if (config.id === "robotics_procurement") {
       return [
@@ -143,7 +121,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
         { label: "Премия сменам", text: "Мы выделяем целевой фонд премирования подрядчикам за работу в 2 смены без нарушения технологических пауз бетонирования." },
       ];
     }
-    // Synergy tenant
     return [
       { label: "Предложить 460 ₽", text: "Мы готовы зафиксировать базовую ставку 460 ₽/м² в обмен на резерв 250 рабочих мест через «Алабуга Политех»." },
       { label: "Каникулы до 4 мес", text: "12 месяцев каникул исключены регламентом ОЭЗ. Мы согласовываем 4 месяца с приоритетным допуском шеф-монтажа станков." },
@@ -158,346 +135,204 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   return (
     <div
       id="m3-scaffold"
-      className="flex flex-col h-full w-full overflow-hidden bg-[#141218] text-[#e6e0e9] select-none font-sans"
+      className="relative flex flex-col h-full w-full overflow-hidden bg-[#07080e] text-[#f8fafc] select-none font-sans"
     >
       {/* ========================================================================= */}
-      {/* 1. M3 TOPAPPBAR (Compact, Tonal SurfaceContainer, 8dp Grid)              */}
+      {/* 1. AMBIENT RADIAL GLOW BACKGROUND SPHERES (Modern Apple / Awwwards UI)   */}
+      {/* ========================================================================= */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="ambient-glow-spot w-[650px] h-[650px] -top-48 -left-48 bg-purple-600/20" />
+        <div
+          className="ambient-glow-spot w-[550px] h-[550px] top-[22%] -right-36 bg-cyan-500/15"
+          style={{ animationDelay: "-5s" }}
+        />
+        <div
+          className="ambient-glow-spot w-[500px] h-[500px] -bottom-36 left-[18%] bg-rose-600/12"
+          style={{ animationDelay: "-9s" }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none opacity-25" />
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. TOP APP BAR                                                           */}
       {/* ========================================================================= */}
       <header
         id="m3-top-app-bar"
-        className="sticky top-0 z-30 bg-[#211f26] border-b border-[#49454f]/30 px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between min-h-[56px] shrink-0 shadow-sm"
+        className="sticky top-0 z-30 glass-panel px-3 sm:px-5 py-2 flex items-center justify-between min-h-[56px] shrink-0 border-b border-white/[0.08]"
       >
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-          {/* Navigation Icon [<-] */}
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Navigation Back Button */}
           <button
             id="m3-nav-back-button"
             onClick={onOpenConfigurator}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-[#cac4d0] hover:text-[#d0bcff] hover:bg-[#36343b]/60 active:bg-[#49454f] transition-all shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all shrink-0 cursor-pointer"
             title="Назад в Конфигуратор"
           >
-            <ArrowLeft className="w-5 h-5 text-[#d0bcff]" />
+            <ArrowLeft className="w-4 h-4 text-cyan-400" />
           </button>
 
-          {/* Opponent Avatar with Online Indicator */}
+          {/* Opponent Avatar with Glowing Status */}
           <div className="relative shrink-0">
-            <div className="w-10 h-10 rounded-full bg-[#4f378b]/40 border border-[#d0bcff]/40 flex items-center justify-center font-bold text-[#d0bcff] text-xs shadow-inner">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-900 to-indigo-700 border border-cyan-400/50 flex items-center justify-center font-bold text-white text-xs shadow-[0_0_15px_rgba(0,240,255,0.3)]">
               {opponentInitials}
             </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#00f0ff] border-2 border-[#211f26] shadow-[0_0_6px_#00f0ff]" />
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-[#07080e] shadow-[0_0_8px_#00f0ff] animate-pulse" />
           </div>
 
-          {/* Title & Subtitle Column */}
+          {/* Title & Context */}
           <div className="min-w-0 flex flex-col justify-center">
             <div className="flex items-center gap-2">
-              <span className="text-sm sm:text-base font-semibold text-[#e6e0e9] truncate max-w-[150px] sm:max-w-[260px]">
+              <span className="text-sm sm:text-base font-bold text-white truncate max-w-[160px] sm:max-w-[280px]">
                 {config.opponentName}
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#4f378b]/30 text-[#d0bcff] border border-[#d0bcff]/20 font-medium whitespace-nowrap hidden xs:inline-block">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 font-medium whitespace-nowrap hidden xs:inline-block">
                 {config.personalityTone.split("/")[0].trim()}
               </span>
             </div>
-            <div className="text-[11px] sm:text-xs text-[#cac4d0] font-sans truncate">
-              {agenda.rate.status === "agreed" ? "460 ₽/м²" : "300 ₽/м²"} •{" "}
-              {agenda.grace_period.status === "agreed" ? "4 мес." : "12 мес."} •{" "}
-              <span className="text-[#00f0ff] font-medium">Trust: {metrics.trust}%</span>
+            <div className="text-[10px] sm:text-[11px] text-slate-400 font-sans truncate">
+              {config.opponentRole} • <span className="text-slate-300">{config.opponentCompany}</span>
             </div>
           </div>
         </div>
 
-        {/* Actions Row */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* B.A.R.S. Mentor Spotlight Trigger */}
-          <button
-            id="m3-bars-spotlight-button"
-            onClick={() => setIsBarsSpotlightOpen(true)}
-            className="h-9 px-2.5 sm:px-3 rounded-full bg-[#4f378b]/40 hover:bg-[#4f378b] border border-[#d0bcff]/40 text-[#d0bcff] text-xs font-semibold flex items-center gap-1.5 transition-colors active:scale-95 shadow-sm"
-            title="Вызвать наставника Б.А.Р.С. (3D и тактика)"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#00f0ff]" />
-            <span className="hidden xs:inline">Б.А.Р.С.</span>
-          </button>
-
-          {/* Mobile Telemetry Status Pill (Linear Indicator Hint) */}
+        {/* Actions Row (Cleaned up: No redundant buttons) */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Telemetry Badge Button (Mobile and Quick Glance) */}
           <button
             id="m3-telemetry-badge-button"
             onClick={() => setShowTelemetrySheet(true)}
-            className="h-9 px-2.5 rounded-full bg-[#2b2930] hover:bg-[#36343b] border border-[#49454f] text-[#d0bcff] text-xs font-medium flex items-center gap-1.5 transition-colors active:scale-95 shadow-sm"
-            title="Открыть телеметрию и BATNA"
+            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            title="Открыть полную телеметрию"
           >
-            <Activity className="w-3.5 h-3.5 text-[#00f0ff]" />
-            <span className="font-semibold">{metrics.trust}%</span>
+            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="font-bold text-cyan-300 font-mono">{metrics.trust}%</span>
           </button>
 
-          {/* Case Info Dialog Trigger */}
+          {/* Case Disposition Trigger */}
           <button
             id="m3-info-button"
             onClick={onOpenCaseInfo}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[#cac4d0] hover:text-[#e6e0e9] hover:bg-[#36343b]/60 active:bg-[#49454f] transition-all"
+            className="w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all"
             title="Диспозиция кейса"
           >
-            <Info className="w-4 h-4 text-[#d0bcff]" />
+            <Info className="w-4 h-4 text-purple-300" />
           </button>
 
-          {/* Desktop Actions */}
+          {/* Desktop Direct Actions */}
           <div className="hidden md:flex items-center gap-1.5">
             <button
               onClick={onOpenTimeTravel}
-              className="h-9 px-3 rounded-full bg-[#2b2930] hover:bg-[#36343b] border border-[#49454f]/50 text-[#e6e0e9] text-xs font-medium flex items-center gap-1.5 transition-all"
-              title="Машина времени"
+              className="h-9 px-3 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Машина времени (Откат)"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-[#ffb703]" />
+              <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
               <span>Откат</span>
             </button>
 
             <button
               onClick={onOpenDebriefing}
-              className="h-9 px-3 rounded-full bg-[#2b2930] hover:bg-[#36343b] border border-[#49454f]/50 text-[#e6e0e9] text-xs font-medium flex items-center gap-1.5 transition-all"
+              className="h-9 px-3 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
               title="Итоговый дебрифинг"
             >
-              <Award className="w-3.5 h-3.5 text-[#10b981]" />
+              <Award className="w-3.5 h-3.5 text-emerald-400" />
               <span>Дебрифинг</span>
             </button>
 
             <button
               onClick={onOpenConfigurator}
-              className="h-9 px-3 rounded-full bg-[#4f378b] hover:bg-[#5a189a] text-[#eaddff] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+              className="h-9 px-3 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(123,44,191,0.4)] cursor-pointer"
               title="Конфигуратор"
             >
-              <Sliders className="w-3.5 h-3.5 text-[#d0bcff]" />
-              <span>Конфигуратор</span>
+              <Sliders className="w-3.5 h-3.5 text-cyan-300" />
+              <span>Кейсы</span>
             </button>
           </div>
 
-          {/* Timer Pill */}
-          <div className="h-9 px-3 rounded-full bg-[#1d1b20] border border-[#49454f]/40 flex items-center gap-1.5 text-xs font-mono text-[#00f0ff]">
-            <Clock className="w-3 h-3 text-[#00f0ff] animate-pulse" />
+          {/* Timer Display */}
+          <div className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full glass-pill border border-cyan-500/30 flex items-center gap-1.5 text-xs font-mono text-cyan-300">
+            <Clock className="w-3 h-3 text-cyan-400 animate-pulse" />
             <span>{formatTimer(timerSeconds)}</span>
           </div>
         </div>
       </header>
 
       {/* ========================================================================= */}
-      {/* 1.1 PERSISTENT TELEMETRY HUD RIBBON (Always visible at top, never at bottom) */}
+      {/* 3. MAIN ARENA VIEWPORT (Strict 2-Column: Video Call + Chat | Telemetry)   */}
       {/* ========================================================================= */}
-      <section
-        id="m3-telemetry-ribbon"
-        className="bg-[#1d1b20] border-b border-[#49454f]/40 px-3 sm:px-4 py-2 flex items-center justify-between gap-3 text-xs shrink-0 overflow-x-auto select-none"
-      >
-        <div className="flex items-center gap-4 sm:gap-6 min-w-max">
-          {/* Trust Meter */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#cac4d0]">Доверие:</span>
-            <div className="w-16 sm:w-20 bg-[#36343b] h-2 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[#d0bcff] transition-all duration-300"
-                style={{ width: `${metrics.trust}%` }}
-              />
-            </div>
-            <span className="font-bold text-[#d0bcff] text-[11px]">{metrics.trust}%</span>
+      <main className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4 p-2 sm:p-3 lg:p-4 min-h-0 overflow-hidden">
+        {/* ================= LEFT / MAIN COLUMN (~70%): VIDEO CALL & DIALOGUE ================= */}
+        <section className="lg:col-span-8 xl:col-span-8 flex flex-col h-full min-h-0 overflow-hidden glass-panel rounded-3xl border border-white/[0.08]">
+          {/* 3D СОБЕСЕДНИК НАПРОТИВ (Интерактивное окно видеосвязи) */}
+          <div className="p-2 sm:p-3 pb-0 shrink-0">
+            <OpponentVideoWindow
+              config={config}
+              metrics={metrics}
+              barsAnimation={barsAnimation}
+              isLoading={isLoading}
+              isDealClosed={isDealClosed}
+              isDealFailed={isDealFailed}
+            />
           </div>
 
-          {/* Tension Meter */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#cac4d0]">Стресс:</span>
-            <div className="w-16 sm:w-20 bg-[#36343b] h-2 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[#f2b8b5] transition-all duration-300"
-                style={{ width: `${metrics.tension}%` }}
-              />
-            </div>
-            <span className="font-bold text-[#f2b8b5] text-[11px]">{metrics.tension}%</span>
-          </div>
-
-          {/* Deal Readiness Meter */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#cac4d0]">Готовность:</span>
-            <div className="w-16 sm:w-20 bg-[#36343b] h-2 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[#00f0ff] transition-all duration-300"
-                style={{ width: `${metrics.deal_readiness}%` }}
-              />
-            </div>
-            <span className="font-bold text-[#00f0ff] text-[11px]">{metrics.deal_readiness}%</span>
-          </div>
-
-          {/* Quick Agenda Status Chips */}
-          <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-[#49454f]/40">
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-md font-medium border ${
-                agenda.rate.status === "agreed"
-                  ? "bg-[#004f58]/40 border-[#00f0ff]/40 text-[#00f0ff]"
-                  : "bg-[#2b2930] border-[#49454f]/40 text-[#cac4d0]"
-              }`}
-            >
-              Ставка: {agenda.rate.status === "agreed" ? "✓ 460 ₽" : "В процессе"}
-            </span>
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-md font-medium border ${
-                agenda.grace_period.status === "agreed"
-                  ? "bg-[#004f58]/40 border-[#00f0ff]/40 text-[#00f0ff]"
-                  : "bg-[#2b2930] border-[#49454f]/40 text-[#cac4d0]"
-              }`}
-            >
-              Каникулы: {agenda.grace_period.status === "agreed" ? "✓ 4 мес." : "В процессе"}
-            </span>
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-md font-medium border ${
-                agenda.power_capex.status === "agreed"
-                  ? "bg-[#004f58]/40 border-[#00f0ff]/40 text-[#00f0ff]"
-                  : "bg-[#2b2930] border-[#49454f]/40 text-[#cac4d0]"
-              }`}
-            >
-              Сети CAPEX: {agenda.power_capex.status === "agreed" ? "✓ Согласовано" : "В процессе"}
-            </span>
-          </div>
-        </div>
-
-        {/* Expand / Details Button */}
-        <button
-          id="m3-telemetry-expand-btn"
-          onClick={() => setShowTelemetrySheet(true)}
-          className="px-2.5 py-1 rounded-lg bg-[#2b2930] hover:bg-[#36343b] text-[#d0bcff] hover:text-white border border-[#49454f]/50 text-[11px] font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer active:scale-95"
-          title="Открыть полный тактический центр и BATNA"
-        >
-          <Activity className="w-3.5 h-3.5 text-[#00f0ff]" />
-          <span>BATNA и Анализ</span>
-        </button>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 2. BODY CONTENT (Material 3 LazyColumn & Dual-Pane on Desktop)            */}
-      {/* ========================================================================= */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-4 p-0 lg:p-4 overflow-hidden">
-        {/* ================= LEFT / PRIMARY CHAT COLUMN (M3 Scaffold Content) ================= */}
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col h-full overflow-hidden bg-[#141218]">
-          {/* M3 ELEVATEDCARD: HUD наставника Б.А.Р.С. / 3D Viewer (160dp / Adaptive) */}
-          <div className="px-3 sm:px-4 pt-2.5 pb-1 shrink-0">
-            <div
-              id="m3-bars-elevated-card"
-              className="rounded-2xl bg-[#2b2930] border border-[#49454f]/40 p-3 sm:p-3.5 shadow-md transition-all flex flex-col justify-between"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div
-                  onClick={() => setIsBarsSpotlightOpen(true)}
-                  className="flex items-center gap-2.5 min-w-0 cursor-pointer group flex-1"
-                  title="Нажмите, чтобы развернуть Б.А.Р.С. в полный рост с анимацией"
-                >
-                  <div className="shrink-0 group-hover:scale-105 transition-transform">
-                    <BarsAvatar animation={barsAnimation} size="xs" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#d0bcff] group-hover:text-[#00f0ff] transition-colors">Б.А.Р.С.</span>
-                      <span className="text-[10px] text-[#cac4d0]">| Наставник ОЭЗ</span>
-                      <span className="text-[10px] text-[#00f0ff] font-mono opacity-80 group-hover:opacity-100 transition-opacity">↗ 3D</span>
-                    </div>
-                    <p className="text-xs text-[#e6e0e9] font-sans truncate max-w-sm sm:max-w-md group-hover:text-white transition-colors">
-                      «{barsFeedback}»
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      barsAnimation === "warn"
-                        ? "bg-[#8c1d18] text-[#f9dedc]"
-                        : barsAnimation === "win"
-                        ? "bg-[#004f58] text-[#9eeffd]"
-                        : "bg-[#4f378b] text-[#eaddff]"
-                    }`}
-                  >
-                    {barsAnimation === "warn" ? "Опасность" : barsAnimation === "win" ? "Успех" : "Анализ"}
-                  </span>
-                  <button
-                    onClick={() => setIsBarsHudExpanded(!isBarsHudExpanded)}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-[#cac4d0] hover:text-white hover:bg-[#36343b]"
-                    title="Подробнее"
-                  >
-                    {isBarsHudExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Expanded Advice & Prompt Hint */}
-              {isBarsHudExpanded && (
-                <div className="mt-2.5 pt-2.5 border-t border-[#49454f]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
-                  <span className="text-[#cac4d0]">
-                    Тактический совет: <strong className="text-[#e6e0e9]">{barsFeedback}</strong>
-                  </span>
-                  <button
-                    onClick={() => setInputText(suggestionChips[0].text)}
-                    className="px-2.5 py-1 rounded-full bg-[#4f378b]/40 hover:bg-[#4f378b] text-[#d0bcff] text-[11px] font-medium border border-[#d0bcff]/30 shrink-0 transition-colors"
-                  >
-                    Использовать контраргумент
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* M3 CHAT LAZYCOLUMN: Messages List */}
+          {/* СТЕНОГРАММА / СУБТИТРЫ ПЕРЕГОВОРОВ (Чат диалога) */}
           <div
             id="m3-chat-list"
-            className="flex-1 px-3 sm:px-4 py-2 overflow-y-auto space-y-3 sm:space-y-4 flex flex-col"
+            className="flex-1 px-3 sm:px-4 py-3 min-h-0 overflow-y-auto space-y-3 flex flex-col"
           >
             {messages.map((msg) => {
               const isUser = msg.actor === "USER";
               const isBars = msg.actor === "BARS";
 
+              // B.A.R.S. Tactical Whisper (Sleek, unobtrusive coaching note)
               if (isBars) {
                 return (
                   <div
                     key={msg.id}
-                    className="flex gap-2.5 sm:gap-3 items-start my-1 max-w-[95%] sm:max-w-[85%]"
+                    className="animate-message-in my-1 w-full flex justify-center"
                   >
-                    <div
-                      onClick={() => setIsBarsSpotlightOpen(true)}
-                      className="cursor-pointer hover:scale-110 transition-transform"
-                      title="Развернуть 3D робота крупно"
-                    >
-                      <BarsAvatar animation={msg.barsAnimation || barsAnimation} size="xs" />
-                    </div>
-                    <div
-                      onClick={() => setIsBarsSpotlightOpen(true)}
-                      className="flex-1 rounded-2xl p-3 sm:p-3.5 bg-[#332d41] border border-[#49454f]/40 text-[#e8def8] shadow-sm cursor-pointer hover:border-[#00f0ff]/50 transition-colors"
-                      title="Нажмите, чтобы развернуть Б.А.Р.С. в 3D с анимацией"
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-1 text-[11px]">
-                        <span className="font-semibold text-[#d0bcff] flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5 text-[#00f0ff]" />
-                          Б.А.Р.С. (Тактический разбор)
-                        </span>
-                        <span className="text-[10px] text-[#00f0ff] font-mono">3D Робот ↗</span>
+                    <div className="max-w-[92%] px-3.5 py-2.5 rounded-2xl bg-[#14162a]/90 border border-cyan-500/30 backdrop-blur-md flex items-start gap-2.5 text-xs text-slate-200 shadow-md">
+                      <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="font-mono text-[10px] text-cyan-300 font-bold uppercase tracking-wider">
+                            Совет наставника Б.А.Р.С.
+                          </span>
+                        </div>
+                        <p className="font-sans text-slate-200 leading-relaxed text-[11px] sm:text-xs">
+                          {msg.text}
+                        </p>
                       </div>
-                      <p className="text-xs sm:text-sm leading-relaxed text-[#e6e0e9] font-sans">
-                        {msg.text}
-                      </p>
                     </div>
                   </div>
                 );
               }
 
+              // Human-to-Opponent Negotiation Dialogue
               return (
                 <div
                   key={msg.id}
-                  className={`flex flex-col group ${isUser ? "items-end" : "items-start"}`}
+                  className={`animate-message-in flex flex-col group ${isUser ? "items-end" : "items-start"}`}
                 >
-                  {/* Sender Name */}
+                  {/* Sender Label */}
                   <div
-                    className={`text-[11px] font-medium mb-1 px-1 ${
-                      isUser ? "text-[#d0bcff]" : "text-[#cac4d0]"
+                    className={`text-[11px] font-medium mb-1 px-1 flex items-center gap-1.5 ${
+                      isUser ? "text-cyan-300" : "text-slate-400"
                     }`}
                   >
-                    {isUser ? "Вы (ОЭЗ «Алабуга»)" : config.opponentName}
+                    <span>{isUser ? "Вы (ОЭЗ «Алабуга»)" : config.opponentName}</span>
+                    {!isUser && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-white/5 border border-white/10 text-slate-400">
+                        {config.opponentCompany}
+                      </span>
+                    )}
                   </div>
 
-                  {/* M3 Message Bubbles: SurfaceVariant vs PrimaryContainer */}
+                  {/* Message Bubble */}
                   <div
-                    className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed max-w-[88%] sm:max-w-[80%] shadow-sm ${
+                    className={`p-3 sm:p-3.5 rounded-3xl text-xs sm:text-sm leading-relaxed max-w-[90%] sm:max-w-[85%] transition-all ${
                       isUser
-                        ? "bg-[#4f378b] text-[#eaddff] rounded-tr-xs" // PrimaryContainer
-                        : "bg-[#2b2930] text-[#e6e0e9] rounded-tl-xs border border-[#49454f]/30" // SurfaceContainerHigh
+                        ? "bg-gradient-to-br from-indigo-600/90 via-purple-700/90 to-purple-900/90 text-white rounded-tr-xs border border-cyan-400/30 shadow-[0_6px_25px_rgba(99,102,241,0.25)] backdrop-blur-md"
+                        : "bg-[#141624]/90 text-slate-100 rounded-tl-xs border border-white/[0.09] shadow-[0_4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md"
                     }`}
                   >
                     <p className="font-sans whitespace-pre-wrap">{msg.text}</p>
@@ -506,48 +341,48 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               );
             })}
 
-            {/* M3 Typing State */}
+            {/* Live Typing State */}
             {isLoading && (
-              <div className="flex items-center gap-2 p-2.5 rounded-2xl bg-[#2b2930] border border-[#49454f]/30 text-[#cac4d0] text-xs w-fit animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-[#d0bcff] animate-ping" />
-                <span>{config.opponentName} обдумывает позицию...</span>
+              <div className="animate-message-in flex items-center gap-2.5 p-3 rounded-2xl glass-panel text-slate-300 text-xs w-fit border border-cyan-500/30 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+                <span className="font-mono text-cyan-300">{config.opponentName} обдумывает ответ...</span>
               </div>
             )}
 
-            {/* Outcome Cards */}
+            {/* Deal Outcome Banners */}
             {isDealClosed && (
-              <div className="p-4 rounded-2xl bg-[#004f58]/80 border border-[#00f0ff]/50 text-center space-y-2 shadow-lg my-2">
-                <CheckCircle2 className="w-8 h-8 text-[#00f0ff] mx-auto" />
-                <div className="text-sm font-bold text-[#9eeffd] uppercase tracking-wide">
+              <div className="animate-message-in p-5 rounded-3xl bg-gradient-to-b from-emerald-950/80 to-[#071d15]/90 border border-emerald-400/50 text-center space-y-2.5 shadow-[0_0_40px_rgba(16,185,129,0.3)] my-2 backdrop-blur-xl">
+                <CheckCircle2 className="w-9 h-9 text-emerald-400 mx-auto animate-bounce" />
+                <div className="text-base font-bold text-emerald-200 uppercase tracking-wide">
                   Сделка успешно согласована!
                 </div>
-                <p className="text-xs text-[#e6e0e9]">
-                  Вы удержали ключевые показатели ОЭЗ и защитили экономическую эффективность.
+                <p className="text-xs text-slate-300 max-w-sm mx-auto">
+                  Вы защитили экономические интересы ОЭЗ «Алабуга», удержали ключевые показатели и закрыли партнерство.
                 </p>
                 <button
                   onClick={onOpenDebriefing}
-                  className="mt-2 h-10 px-5 rounded-full bg-[#00f0ff] text-[#00363d] font-bold text-xs hover:brightness-110 active:scale-95 transition-all shadow-md"
+                  className="mt-2 h-9 px-6 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs active:scale-95 transition-all shadow-[0_0_20px_rgba(16,185,129,0.5)] cursor-pointer"
                 >
-                  Открыть дебрифинг
+                  Открыть итоговый дебрифинг
                 </button>
               </div>
             )}
 
             {isDealFailed && (
-              <div className="p-4 rounded-2xl bg-[#8c1d18]/80 border border-[#f2b8b5]/50 text-center space-y-2 shadow-lg my-2">
-                <AlertTriangle className="w-8 h-8 text-[#f2b8b5] mx-auto" />
-                <div className="text-sm font-bold text-[#f9dedc] uppercase tracking-wide">
+              <div className="animate-message-in p-5 rounded-3xl bg-gradient-to-b from-rose-950/80 to-[#200910]/90 border border-rose-500/50 text-center space-y-2.5 shadow-[0_0_40px_rgba(244,63,94,0.3)] my-2 backdrop-blur-xl">
+                <AlertTriangle className="w-9 h-9 text-rose-400 mx-auto animate-pulse" />
+                <div className="text-base font-bold text-rose-200 uppercase tracking-wide">
                   Переговоры зашли в тупик
                 </div>
-                <p className="text-xs text-[#e6e0e9]">
-                  Оппонент прервал раунд из-за критического давления или нарушения условий.
+                <p className="text-xs text-slate-300 max-w-sm mx-auto">
+                  Оппонент прервал диалог из-за превышения порога жесткости или срыва критических условий.
                 </p>
                 <button
                   onClick={onOpenTimeTravel}
-                  className="mt-2 h-10 px-5 rounded-full bg-[#d0bcff] text-[#381e72] font-bold text-xs hover:brightness-110 active:scale-95 transition-all shadow-md flex items-center gap-1.5 mx-auto"
+                  className="mt-2 h-9 px-6 rounded-full bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs active:scale-95 transition-all shadow-[0_0_20px_rgba(168,85,247,0.5)] flex items-center gap-1.5 mx-auto cursor-pointer"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  Откатить ход назад
+                  <RotateCcw className="w-4 h-4 text-amber-300" />
+                  <span>Откатить ход назад</span>
                 </button>
               </div>
             )}
@@ -555,31 +390,52 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ================= 3. M3 BOTTOM BAR: Surface(tonalElevation = 3.dp) ================= */}
+          {/* BOTTOM CONTROLS & INPUT DOCK */}
           <footer
             id="m3-bottom-bar"
-            className="sticky bottom-0 z-20 bg-[#211f26] border-t border-[#49454f]/30 p-2.5 sm:p-3 pb-safe shrink-0 shadow-lg"
+            className="sticky bottom-0 z-20 glass-panel-elevated border-t border-white/[0.08] p-3 pb-safe shrink-0 shadow-2xl"
           >
-            {/* Horizontal SuggestionChips Carousel (LazyRow M3) */}
+            {/* Тонкая плашка подсказки Б.А.Р.С. прямо над вводом (Без визуального мусора) */}
+            {barsFeedback && barsFeedback !== "Ожидаем реплику оппонента..." && !isDealClosed && !isDealFailed && (
+              <div className="mb-2 px-3 py-1.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span className="text-[10px] font-mono font-bold text-cyan-300 shrink-0 uppercase">
+                    Совет наставника:
+                  </span>
+                  <span className="text-slate-200 truncate">{barsFeedback}</span>
+                </div>
+                <button
+                  onClick={() => setInputText(barsFeedback)}
+                  className="text-[10px] font-medium text-cyan-300 hover:text-white shrink-0 px-2 py-0.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Подставить совет в поле ввода"
+                >
+                  <span>Вставить</span>
+                  <ArrowDownRight className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* Быстрые переговорные чипсы */}
             {!isDealClosed && !isDealFailed && (
               <div
                 id="m3-suggestion-chips-row"
-                className="overflow-x-auto flex items-center gap-2 pb-2 scrollbar-none"
+                className="overflow-x-auto flex items-center gap-2 pb-2.5 scrollbar-none"
               >
                 {suggestionChips.map((chip, idx) => (
                   <button
                     key={idx}
                     onClick={() => setInputText(chip.text)}
-                    className="shrink-0 h-8 px-3 rounded-lg bg-[#2b2930] hover:bg-[#36343b] active:bg-[#49454f] border border-[#49454f] text-[#e6e0e9] hover:text-white text-xs font-medium transition-all whitespace-nowrap active:scale-95 shadow-xs flex items-center gap-1.5"
+                    className="shrink-0 h-7 sm:h-8 px-3 rounded-full glass-pill hover:bg-white/10 active:bg-white/15 text-slate-200 hover:text-white text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap active:scale-95 shadow-sm flex items-center gap-1.5 border border-white/10 hover:border-cyan-400/40 cursor-pointer"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#d0bcff]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f0ff]" />
                     <span>{chip.label}</span>
                   </button>
                 ))}
               </div>
             )}
 
-            {/* OutlinedTextField + FilledIconButton Row */}
+            {/* Input Row */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <input
@@ -588,13 +444,13 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                   placeholder={
                     isDealClosed || isDealFailed
                       ? "Раунд переговоров завершен"
-                      : "Введите аргумент или встречное предложение..."
+                      : "Введите аргумент или предложение по условиям..."
                   }
                   disabled={isLoading || isDealClosed || isDealFailed}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  className="w-full h-12 px-4 rounded-full bg-[#1d1b20] border border-[#938f99]/50 focus:border-[#d0bcff] focus:ring-1 focus:ring-[#d0bcff] text-sm text-[#e6e0e9] placeholder-[#cac4d0] transition-colors outline-none disabled:opacity-50"
+                  className="w-full h-11 sm:h-12 px-4 rounded-full bg-[#0c0e18]/80 border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 text-xs sm:text-sm text-white placeholder-slate-400 transition-all outline-none disabled:opacity-50 shadow-inner"
                 />
               </div>
 
@@ -606,54 +462,56 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                   setInputText(rnd);
                 }}
                 disabled={isLoading || isDealClosed || isDealFailed}
-                className="w-12 h-12 rounded-full bg-[#2b2930] hover:bg-[#36343b] border border-[#49454f]/50 text-[#cac4d0] hover:text-[#d0bcff] flex items-center justify-center shrink-0 active:scale-95 transition-all"
-                title="Сгенерировать реплику"
+                className="w-11 sm:w-12 h-11 sm:h-12 rounded-full glass-pill hover:bg-white/15 text-slate-300 hover:text-cyan-300 flex items-center justify-center shrink-0 active:scale-95 transition-all border border-white/10 cursor-pointer"
+                title="Подставить реплику"
               >
-                <Mic className="w-5 h-5 text-[#d0bcff]" />
+                <Mic className="w-4 sm:w-5 h-4 sm:h-5 text-cyan-400" />
               </button>
 
-              {/* M3 FilledIconButton (Send) */}
+              {/* Send Button */}
               <button
                 id="m3-filled-icon-button"
                 onClick={handleSend}
                 disabled={!inputText.trim() || isLoading || isDealClosed || isDealFailed}
-                className="w-12 h-12 rounded-full bg-[#d0bcff] hover:bg-[#eaddff] active:scale-95 disabled:opacity-40 text-[#381e72] flex items-center justify-center shrink-0 shadow-md transition-all cursor-pointer disabled:cursor-not-allowed"
+                className="w-11 sm:w-12 h-11 sm:h-12 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 active:scale-95 disabled:opacity-35 text-slate-950 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all cursor-pointer disabled:cursor-not-allowed font-bold"
                 title="Отправить аргумент"
               >
-                <Send className="w-5 h-5 text-[#381e72]" />
+                <Send className="w-4 sm:w-5 h-4 sm:h-5 text-slate-950" />
               </button>
             </div>
           </footer>
-        </div>
+        </section>
 
-        {/* ================= RIGHT / DESKTOP TACTICAL CENTER (>= lg) ================= */}
-        <aside className="hidden lg:flex lg:col-span-5 xl:col-span-4 flex-col rounded-2xl bg-[#211f26] border border-[#49454f]/40 p-4 space-y-4 overflow-y-auto shadow-md">
+        {/* ================= RIGHT COLUMN (~30%): ТАКТИЧЕСКИЙ ЦЕНТР И BATNA ================= */}
+        <aside className="hidden lg:flex lg:col-span-4 xl:col-span-4 flex-col glass-panel rounded-3xl p-4 space-y-4 overflow-y-auto min-h-0 border border-white/[0.08] shadow-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-[#49454f]/30 pb-3">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#00f0ff] animate-pulse" />
-              <h2 className="text-sm font-bold text-[#e6e0e9]">ТАКТИЧЕСКИЙ ЦЕНТР</h2>
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff] animate-pulse" />
+              <h2 className="text-xs font-bold tracking-wider text-white font-mono uppercase">
+                ТАКТИЧЕСКИЙ ЦЕНТР
+              </h2>
             </div>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#4f378b]/40 text-[#d0bcff] border border-[#d0bcff]/30">
-              M3 Telemetry
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
+              HUD LIVE
             </span>
           </div>
 
-          {/* M3 Progress Indicators */}
-          <div className="p-4 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40 space-y-4 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-wider text-[#cac4d0]">
-              Шкалы взаимодействия
+          {/* Индикаторы встречи (Телеметрия с неоновыми шкалами) */}
+          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3.5 shadow-inner">
+            <div className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
+              Индикаторы встречи
             </div>
 
             {/* Trust Progress */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#cac4d0]">Доверие оппонента:</span>
-                <span className="text-[#d0bcff] font-bold">{metrics.trust}%</span>
+                <span className="text-slate-300">Доверие оппонента:</span>
+                <span className="text-cyan-300 font-bold font-mono">{metrics.trust}%</span>
               </div>
-              <div className="w-full bg-[#36343b] h-2 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden p-[1px] border border-white/10">
                 <div
-                  className="h-full rounded-full bg-[#d0bcff] transition-all duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 via-indigo-400 to-cyan-400 transition-all duration-500 shadow-[0_0_8px_#00f0ff]"
                   style={{ width: `${metrics.trust}%` }}
                 />
               </div>
@@ -662,12 +520,12 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             {/* Tension Progress */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#cac4d0]">Напряжение / Стресс:</span>
-                <span className="text-[#f2b8b5] font-bold">{metrics.tension}%</span>
+                <span className="text-slate-300">Напряжение / Стресс:</span>
+                <span className="text-rose-400 font-bold font-mono">{metrics.tension}%</span>
               </div>
-              <div className="w-full bg-[#36343b] h-2 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden p-[1px] border border-white/10">
                 <div
-                  className="h-full rounded-full bg-[#f2b8b5] transition-all duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 via-rose-500 to-red-600 transition-all duration-500 shadow-[0_0_8px_#ff3366]"
                   style={{ width: `${metrics.tension}%` }}
                 />
               </div>
@@ -676,180 +534,196 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             {/* Deal Readiness */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#cac4d0]">Готовность к соглашению:</span>
-                <span className="text-[#00f0ff] font-bold">{metrics.deal_readiness}%</span>
+                <span className="text-slate-300">Готовность к сделке:</span>
+                <span className="text-emerald-300 font-bold font-mono">{metrics.deal_readiness}%</span>
               </div>
-              <div className="w-full bg-[#36343b] h-2 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden p-[1px] border border-white/10">
                 <div
-                  className="h-full rounded-full bg-[#00f0ff] transition-all duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-teal-400 via-emerald-400 to-green-300 transition-all duration-500 shadow-[0_0_8px_#10b981]"
                   style={{ width: `${metrics.deal_readiness}%` }}
                 />
               </div>
             </div>
           </div>
 
-          {/* BATNA Card */}
-          <div className="p-4 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between text-xs font-bold text-[#e6e0e9]">
+          {/* Красные линии BATNA (Шпаргалка переговорщика) */}
+          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3 shadow-inner">
+            <div className="flex items-center justify-between text-xs font-bold text-white">
               <span className="flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-[#00f0ff]" />
-                Красные линии BATNA
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                Красные линии (BATNA)
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#4f378b]/30 text-[#d0bcff]">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30 font-mono">
                 ОЭЗ
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2.5 rounded-xl bg-[#2b2930] border border-[#49454f]/30">
-                <span className="text-[10px] text-[#cac4d0] block">МИН. СТАВКА:</span>
-                <span className="font-bold text-white">{config.batna.minPricePerSqm} ₽/м²</span>
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
+                <span className="text-[10px] text-slate-400 block font-mono">МИН. СТАВКА:</span>
+                <span className="font-bold text-white text-sm">{config.batna.minPricePerSqm} ₽/м²</span>
               </div>
-              <div className="p-2.5 rounded-xl bg-[#2b2930] border border-[#49454f]/30">
-                <span className="text-[10px] text-[#cac4d0] block">МАКС. КАНИКУЛЫ:</span>
-                <span className="font-bold text-white">{config.batna.maxGracePeriodMonths} мес.</span>
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
+                <span className="text-[10px] text-slate-400 block font-mono">МАКС. КАНИКУЛЫ:</span>
+                <span className="font-bold text-white text-sm">{config.batna.maxGracePeriodMonths} мес.</span>
               </div>
             </div>
 
-            <div className="space-y-1.5 pt-2 border-t border-[#49454f]/30 text-xs">
+            <div className="space-y-1.5 pt-2 border-t border-white/[0.06] text-xs">
               {config.batna.redLines.map((line, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-[#cac4d0]">
-                  <span className="text-[#f2b8b5] font-bold">✕</span>
+                <div key={idx} className="flex items-start gap-2 text-slate-300 text-[11px]">
+                  <span className="text-rose-400 font-bold shrink-0">✕</span>
                   <span>{line}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Agenda Checklist */}
-          <div className="p-4 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40 space-y-2.5 shadow-sm flex-1">
-            <div className="text-xs font-bold text-[#e6e0e9]">Повестка встречи:</div>
+          {/* Повестка встречи (Agenda Checklist) */}
+          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-2.5 shadow-inner">
+            <div className="text-xs font-bold text-white font-mono uppercase tracking-wider">
+              Повестка встречи:
+            </div>
             <div className="space-y-2 text-xs">
-              <div className="p-2.5 rounded-xl bg-[#2b2930] border border-[#49454f]/30 flex items-center justify-between">
-                <span>Ставка: 460 ₽/м²</span>
-                <span className={agenda.rate.status === "agreed" ? "text-[#00f0ff] font-bold" : "text-[#ffb703]"}>
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+                <span className="text-slate-200">Ставка: 460 ₽/м²</span>
+                <span className={agenda.rate.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                   {agenda.rate.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                 </span>
               </div>
-              <div className="p-2.5 rounded-xl bg-[#2b2930] border border-[#49454f]/30 flex items-center justify-between">
-                <span>Каникулы: 4 мес.</span>
-                <span className={agenda.grace_period.status === "agreed" ? "text-[#00f0ff] font-bold" : "text-[#ffb703]"}>
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+                <span className="text-slate-200">Каникулы: 4 мес.</span>
+                <span className={agenda.grace_period.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                   {agenda.grace_period.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                 </span>
               </div>
-              <div className="p-2.5 rounded-xl bg-[#2b2930] border border-[#49454f]/30 flex items-center justify-between">
-                <span>Сети под CAPEX</span>
-                <span className={agenda.power_capex.status === "agreed" ? "text-[#00f0ff] font-bold" : "text-[#ffb703]"}>
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+                <span className="text-slate-200">Сети под CAPEX 1.2 млрд</span>
+                <span className={agenda.power_capex.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                   {agenda.power_capex.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                 </span>
               </div>
             </div>
           </div>
+
+          {/* Компактный тактический модуль Б.А.Р.С. */}
+          {barsFeedback && (
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-950/40 via-purple-950/30 to-slate-900/60 border border-cyan-500/30 space-y-2 shadow-inner">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5 font-mono uppercase">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  Тактический совет Б.А.Р.С.
+                </span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-mono">
+                  LIVE
+                </span>
+              </div>
+              <p className="text-xs text-slate-200 leading-relaxed font-sans italic">
+                «{barsFeedback}»
+              </p>
+            </div>
+          )}
         </aside>
       </main>
 
       {/* ========================================================================= */}
-      {/* 4. M3 TELEMETRY DIALOG (Centered, On-Demand, Never Stuck to Bottom)         */}
+      {/* 4. TELEMETRY DIALOG MODAL (On-Demand / Mobile)                            */}
       {/* ========================================================================= */}
       {showTelemetrySheet && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
           onClick={() => setShowTelemetrySheet(false)}
         >
-          {/* Dialog Container (Centered Material 3 Dialog) */}
           <div
             id="m3-telemetry-dialog"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xl mx-auto rounded-3xl bg-[#211f26] border border-[#49454f]/60 p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+            className="w-full max-w-xl mx-auto rounded-3xl glass-panel-elevated p-5 sm:p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border border-white/15"
           >
-            <div className="flex items-center justify-between border-b border-[#49454f]/30 pb-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <h3 className="text-lg font-bold text-[#e6e0e9]">Телеметрия встречи</h3>
-                <p className="text-xs text-[#cac4d0]">Кейс: {config.title}</p>
+                <h3 className="text-lg font-bold text-white">Телеметрия встречи</h3>
+                <p className="text-xs text-slate-400">Кейс: {config.title}</p>
               </div>
               <button
                 onClick={() => setShowTelemetrySheet(false)}
-                className="w-9 h-9 rounded-full bg-[#2b2930] hover:bg-[#36343b] text-[#cac4d0] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="w-9 h-9 rounded-full glass-pill hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                 title="Закрыть окно"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* M3 Tabs: Metrics / BATNA / Agenda */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-full bg-[#1d1b20]">
+            {/* Tabs */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-full bg-black/50 border border-white/10">
               <button
                 onClick={() => setTelemetryTab("metrics")}
-                className={`py-2 rounded-full text-xs font-semibold transition-all ${
+                className={`py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   telemetryTab === "metrics"
-                    ? "bg-[#4f378b] text-[#eaddff] shadow-sm"
-                    : "text-[#cac4d0] hover:text-white"
+                    ? "bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 shadow-sm"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Метрики
               </button>
               <button
                 onClick={() => setTelemetryTab("batna")}
-                className={`py-2 rounded-full text-xs font-semibold transition-all ${
+                className={`py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   telemetryTab === "batna"
-                    ? "bg-[#4f378b] text-[#eaddff] shadow-sm"
-                    : "text-[#cac4d0] hover:text-white"
+                    ? "bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 shadow-sm"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 BATNA
               </button>
               <button
                 onClick={() => setTelemetryTab("agenda")}
-                className={`py-2 rounded-full text-xs font-semibold transition-all ${
+                className={`py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   telemetryTab === "agenda"
-                    ? "bg-[#4f378b] text-[#eaddff] shadow-sm"
-                    : "text-[#cac4d0] hover:text-white"
+                    ? "bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 shadow-sm"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Повестка
               </button>
             </div>
 
-            {/* Content Area */}
+            {/* Content */}
             {telemetryTab === "metrics" && (
               <div className="space-y-4 pt-1">
-                {/* LinearProgressIndicator: Trust */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs">
-                    <span className="text-[#cac4d0]">Доверие оппонента ({metrics.trust}%)</span>
-                    <span className="text-[#d0bcff] font-bold">{metrics.trust}%</span>
+                    <span className="text-slate-300">Доверие оппонента</span>
+                    <span className="text-cyan-300 font-bold font-mono">{metrics.trust}%</span>
                   </div>
-                  <div className="w-full bg-[#36343b] h-2.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/10 p-[1px]">
                     <div
-                      className="h-full rounded-full bg-[#d0bcff] transition-all duration-500"
+                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-500 shadow-[0_0_10px_#00f0ff]"
                       style={{ width: `${metrics.trust}%` }}
                     />
                   </div>
                 </div>
 
-                {/* LinearProgressIndicator: Tension */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs">
-                    <span className="text-[#cac4d0]">Стресс / Напряжение ({metrics.tension}%)</span>
-                    <span className="text-[#f2b8b5] font-bold">{metrics.tension}%</span>
+                    <span className="text-slate-300">Стресс / Напряжение</span>
+                    <span className="text-rose-400 font-bold font-mono">{metrics.tension}%</span>
                   </div>
-                  <div className="w-full bg-[#36343b] h-2.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/10 p-[1px]">
                     <div
-                      className="h-full rounded-full bg-[#f2b8b5] transition-all duration-500"
+                      className="h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-600 transition-all duration-500 shadow-[0_0_10px_#ff3366]"
                       style={{ width: `${metrics.tension}%` }}
                     />
                   </div>
                 </div>
 
-                {/* LinearProgressIndicator: Readiness */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs">
-                    <span className="text-[#cac4d0]">Готовность к сделке ({metrics.deal_readiness}%)</span>
-                    <span className="text-[#00f0ff] font-bold">{metrics.deal_readiness}%</span>
+                    <span className="text-slate-300">Готовность к сделке</span>
+                    <span className="text-emerald-300 font-bold font-mono">{metrics.deal_readiness}%</span>
                   </div>
-                  <div className="w-full bg-[#36343b] h-2.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/10 p-[1px]">
                     <div
-                      className="h-full rounded-full bg-[#00f0ff] transition-all duration-500"
+                      className="h-full rounded-full bg-gradient-to-r from-teal-400 to-green-300 transition-all duration-500 shadow-[0_0_10px_#10b981]"
                       style={{ width: `${metrics.deal_readiness}%` }}
                     />
                   </div>
@@ -860,21 +734,21 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             {telemetryTab === "batna" && (
               <div className="space-y-3 pt-1">
                 <div className="grid grid-cols-2 gap-2.5 text-xs">
-                  <div className="p-3 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40">
-                    <span className="text-[10px] text-[#cac4d0] block">МИНИМАЛЬНАЯ СТАВКА</span>
-                    <span className="text-base font-bold text-white">{config.batna.minPricePerSqm} ₽/м²</span>
+                  <div className="p-3 rounded-2xl bg-black/40 border border-white/10">
+                    <span className="text-[10px] text-slate-400 block font-mono">МИНИМАЛЬНАЯ СТАВКА</span>
+                    <span className="text-base font-bold text-white font-mono">{config.batna.minPricePerSqm} ₽/м²</span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40">
-                    <span className="text-[10px] text-[#cac4d0] block">МАКС. КАНИКУЛЫ</span>
-                    <span className="text-base font-bold text-white">{config.batna.maxGracePeriodMonths} мес.</span>
+                  <div className="p-3 rounded-2xl bg-black/40 border border-white/10">
+                    <span className="text-[10px] text-slate-400 block font-mono">МАКС. КАНИКУЛЫ</span>
+                    <span className="text-base font-bold text-white font-mono">{config.batna.maxGracePeriodMonths} мес.</span>
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-2 border-t border-[#49454f]/30">
-                  <div className="text-xs font-semibold text-[#f2b8b5]">Красные линии ОЭЗ (Табу):</div>
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <div className="text-xs font-semibold text-rose-400">Красные линии ОЭЗ (Табу):</div>
                   {config.batna.redLines.map((line, idx) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-[#2b2930] border border-[#49454f]/30 text-xs text-[#e6e0e9] flex items-start gap-2">
-                      <span className="text-[#f2b8b5] font-bold shrink-0">✕</span>
+                    <div key={idx} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-xs text-slate-200 flex items-start gap-2">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
                       <span>{line}</span>
                     </div>
                   ))}
@@ -883,81 +757,30 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             )}
 
             {telemetryTab === "agenda" && (
-              <div className="space-y-2 pt-1">
-                <div className="p-3 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="font-bold text-white">Ставка аренды</div>
-                    <div className="text-[11px] text-[#cac4d0]">{agenda.rate.detail}</div>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${
-                    agenda.rate.status === "agreed" ? "bg-[#004f58] text-[#9eeffd]" : "bg-[#4f378b]/40 text-[#d0bcff]"
-                  }`}>
-                    {agenda.rate.status === "agreed" ? "Согласовано" : "В процессе"}
+              <div className="space-y-2.5 pt-1 text-xs">
+                <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-300">Ставка: 460 ₽/м²</span>
+                  <span className={agenda.rate.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                    {agenda.rate.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                   </span>
                 </div>
-
-                <div className="p-3 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="font-bold text-white">Арендные каникулы</div>
-                    <div className="text-[11px] text-[#cac4d0]">{agenda.grace_period.detail}</div>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${
-                    agenda.grace_period.status === "agreed" ? "bg-[#004f58] text-[#9eeffd]" : "bg-[#4f378b]/40 text-[#d0bcff]"
-                  }`}>
-                    {agenda.grace_period.status === "agreed" ? "Согласовано" : "В процессе"}
+                <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-300">Каникулы: 4 мес.</span>
+                  <span className={agenda.grace_period.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                    {agenda.grace_period.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                   </span>
                 </div>
-
-                <div className="p-3 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="font-bold text-white">Сети 8 МВт и CAPEX</div>
-                    <div className="text-[11px] text-[#cac4d0]">{agenda.power_capex.detail}</div>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${
-                    agenda.power_capex.status === "agreed" ? "bg-[#004f58] text-[#9eeffd]" : "bg-[#4f378b]/40 text-[#d0bcff]"
-                  }`}>
-                    {agenda.power_capex.status === "agreed" ? "Согласовано" : "В процессе"}
+                <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-300">Сети под CAPEX 1.2 млрд</span>
+                  <span className={agenda.power_capex.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                    {agenda.power_capex.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                   </span>
                 </div>
               </div>
             )}
-
-            {/* Actions Inside Bottom Sheet */}
-            <div className="pt-3 border-t border-[#49454f]/30 flex gap-2">
-              <button
-                onClick={() => {
-                  setShowTelemetrySheet(false);
-                  onOpenDebriefing();
-                }}
-                className="flex-1 h-11 rounded-full bg-[#d0bcff] hover:bg-[#eaddff] text-[#381e72] font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-md"
-              >
-                <Award className="w-4 h-4" />
-                <span>Итоговый дебрифинг</span>
-              </button>
-              <button
-                onClick={() => {
-                  setShowTelemetrySheet(false);
-                  onOpenTimeTravel();
-                }}
-                className="h-11 px-4 rounded-full bg-[#2b2930] hover:bg-[#36343b] border border-[#49454f] text-[#e6e0e9] font-medium text-xs flex items-center gap-1.5 transition-all active:scale-95"
-              >
-                <RotateCcw className="w-4 h-4 text-[#ffb703]" />
-                <span>Откат</span>
-              </button>
-            </div>
           </div>
         </div>
       )}
-
-      {/* 5. B.A.R.S. LARGE SPEAKING SPOTLIGHT WITH TYPEWRITER EFFECT */}
-      <BarsSpeakingSpotlight
-        isOpen={isBarsSpotlightOpen}
-        adviceText={barsFeedback}
-        recommendedAction={suggestionChips[0]?.text}
-        animation={barsAnimation === "idle" ? "talk" : barsAnimation}
-        onClose={() => setIsBarsSpotlightOpen(false)}
-        onApplyAction={(actionText) => setInputText(actionText)}
-      />
     </div>
   );
 };

@@ -428,6 +428,63 @@ function generateFallbackResponse(body: any) {
   return buildResponse();
 }
 
+// Helper for timeout
+function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMsg)), ms)),
+  ]);
+}
+
+// Fallback scenario generator
+function generateFallbackCase(sphere?: string, personalityTone?: string, toughnessLevel?: number) {
+  const chosenSphere = sphere || "B2B / Инвесторы ОЭЗ";
+  const chosenToughness = toughnessLevel || 80;
+  return {
+    id: `case_${Date.now()}`,
+    title: `Переговоры с инвестором: «${chosenSphere}»`,
+    sphere: chosenSphere,
+    opponentRole:
+      chosenSphere === "B2B / Инвесторы ОЭЗ"
+        ? "Генеральный директор агрохолдинга"
+        : chosenSphere === "Закупки и тендеры"
+        ? "Коммерческий директор поставщика"
+        : chosenSphere === "HR / Наем топов"
+        ? "Главный инженер производства"
+        : "Руководитель дивизиона",
+    opponentName: "Валерий Строганов",
+    opponentCompany: "ООО «ТехноПром Инжиниринг»",
+    opponentPersonality: "Хладнокровный прагматик, прессингует альтернативными площадками",
+    personalityTone: personalityTone || "Агрессивный / Прессинг",
+    hiddenGoal: "Срочный дедлайн запуска производства к 3 кварталу (подписаны контракты на станки)",
+    opponentBatna: "Уход в индустриальный парк «Север» с готовым складом",
+    toughnessLevel: chosenToughness,
+    bluffTendency: 80,
+    difficulty: "Прожжённый закупщик",
+    zoneCluster: "Индустриальный парк «Синергия»",
+    initialContext: "Крупный производитель оборудования выбирает между ОЭЗ «Алабуга» и альтернативной площадкой. Оппонент требует скидку на аренду и бесплатное технологическое присоединение.",
+    initialOpponentUtterance: "Добрый день. Наше предложение: 400 ₽/м² и 6 месяцев каникул, плюс 8 МВт электросетей полностью за ваш счет. Иначе мы подписываем договор с Калугой.",
+    initialBarsAdvice: "Внимание: оппонент сразу открывает встречу жестким блефом по Калуге. Парируйте дефицитом свободных мощностей 110 кВ у конкурентов!",
+    targetKpis: [
+      "Удержать базовую арендную ставку не ниже 460 ₽/м²",
+      "Ограничить арендные каникулы максимум 4 месяцами",
+      "Привязать подвод 8 МВт к встречному CAPEX от 1.2 млрд ₽"
+    ],
+    batna: {
+      minPricePerSqm: 460,
+      maxGracePeriodMonths: 4,
+      taxHolidayYears: 10,
+      minJobCreation: 250,
+      minCapexMillionRub: 1200,
+      redLines: [
+        "Не опускать ставку ниже 460 ₽/м² без встречных инвестиций",
+        "Не давать каникулы более 4 месяцев",
+        "Технологическое присоединение только под твердый CAPEX инвестора"
+      ]
+    }
+  };
+}
+
 // API endpoint for negotiation turn
 app.post("/api/negotiate", async (req, res) => {
   try {
@@ -477,8 +534,8 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
 
     const formattedHistory = (history || []).map((m: any) => `${m.actor}: ${m.text}`).join("\n");
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+    const geminiCall = ai.models.generateContent({
+      model: "gemini-3.6-flash",
       contents: `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`,
       config: {
         systemInstruction: dynamicSystemPrompt,
@@ -547,6 +604,7 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
       },
     });
 
+    const response = await withTimeout(geminiCall, 6000, "Gemini call timeout");
     const text = response.text?.trim();
     if (!text) {
       throw new Error("Empty response from Gemini");
@@ -561,14 +619,14 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
   }
 });
 
-// API endpoint to generate complete scenario using Gemini
+// API endpoint to generate complete scenario
 app.post("/api/generate-case", async (req, res) => {
+  const { sphere, personalityTone, toughnessLevel } = req.body;
   try {
-    const { sphere, personalityTone, toughnessLevel } = req.body;
     const ai = getGenAI();
 
     if (!ai) {
-      return res.status(503).json({ error: "Gemini API unavailable for generation" });
+      return res.json(generateFallbackCase(sphere, personalityTone, toughnessLevel));
     }
 
     const prompt = `Сгенерируй новый реалистичный кейс для тренировки жестких переговоров в Особой Экономической Зоне «Алабуга».
@@ -607,14 +665,15 @@ app.post("/api/generate-case", async (req, res) => {
   }
 }`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+    const geminiCall = ai.models.generateContent({
+      model: "gemini-3.6-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
       },
     });
 
+    const response = await withTimeout(geminiCall, 6000, "Gemini case generation timeout");
     const text = response.text?.trim();
     if (!text) {
       throw new Error("Empty response");
@@ -622,8 +681,8 @@ app.post("/api/generate-case", async (req, res) => {
 
     return res.json(JSON.parse(text));
   } catch (err) {
-    console.error("Error generating case via AI:", err);
-    return res.status(500).json({ error: "Generation failed" });
+    console.warn("Using fallback case due to AI generation error:", err);
+    return res.json(generateFallbackCase(sphere, personalityTone, toughnessLevel));
   }
 });
 
@@ -634,6 +693,11 @@ app.get("/api/health", (_req, res) => {
     app: "Alabuga Negotiation Arena KMP Backend",
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
   });
+});
+
+// Explicitly handle all unmatched /api/* requests so they NEVER fall through to Vite's SPA index.html
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found` });
 });
 
 // Setup Vite or static serving
