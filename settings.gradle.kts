@@ -1,4 +1,5 @@
-rootProject.name = "BARS-Simulator"
+rootProject.name = "bars-negotiation-arena"
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
     repositories {

@@ -65,7 +65,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
       };
 
       viewer.setAttribute("camera-target", "0m 0.85m 0m");
-      viewer.setAttribute("camera-orbit", "0deg 78deg 3.2m");
+      viewer.setAttribute("camera-orbit", "0deg 82deg 88%");
       viewer.setAttribute("field-of-view", "32deg");
 
       if (viewer.availableAnimations && viewer.availableAnimations.length > 0) {
@@ -169,7 +169,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
   return (
     <div
       id="opponent-stage"
-      className={`relative w-full h-[340px] rounded-3xl overflow-hidden border transition-all duration-700 ease-out flex items-center justify-center bg-[#090a10] shadow-[0_12px_45px_rgba(0,0,0,0.7)] ${className}`}
+      className={`relative w-full h-[380px] rounded-3xl overflow-hidden border transition-all duration-700 ease-out flex items-center justify-center bg-[#090a10] shadow-[0_12px_45px_rgba(0,0,0,0.7)] ${className}`}
       style={{
         borderColor: borderRgba,
         boxShadow: `0 12px 45px rgba(0,0,0,0.7), 0 0 35px ${borderRgba}`,
@@ -183,48 +183,44 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
       />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(0,0,0,0)_0%,rgba(9,10,16,0.6)_100%)] pointer-events-none" />
 
-      {/* 2. Неоновый проектор-подиум под ногами робота с динамическим цветом */}
+      {/* 2. Мягкое атмосферное пятно под ногами робота (без рамок/бордеров, чтобы не напоминало прогресс-бар) */}
       <div
-        className="absolute bottom-5 w-56 h-10 rounded-full blur-md pointer-events-none transition-all duration-700 ease-out z-0"
+        className="absolute bottom-3 w-64 h-12 rounded-full blur-xl pointer-events-none transition-all duration-700 ease-out opacity-70 z-0"
         style={{ background: glowRgba }}
       />
-      <div
-        id="stage-ring"
-        className="absolute bottom-6 w-48 h-4 rounded-full border pointer-events-none transition-all duration-700 ease-out z-0"
-        style={{
-          borderColor: hexColor,
-          boxShadow: `0 0 25px ${hexColor}, inset 0 0 10px ${hexColor}`,
-        }}
-      />
 
-      {/* 3. Сам 3D-робот */}
+      {/* 3. Сам 3D-робот (полностью помещается в экран, отцентрирован по высоте) */}
       {!modelError ? (
-        <model-viewer
-          id="opponent-3d"
-          ref={modelViewerRef}
-          src="./bars.glb"
-          alt={`${config.opponentName} - 3D Виртуальный переговорщик`}
-          autoplay
-          animation-name={activeAnim}
-          camera-orbit="0deg 78deg 3.2m"
-          camera-target="0m 0.85m 0m"
-          field-of-view="32deg"
-          interaction-prompt="none"
-          shadow-intensity="1.6"
-          shadow-softness="0.8"
-          exposure="1.2"
-          style={
-            {
-              pointerEvents: "none",
-              width: "100%",
-              height: "100%",
-              position: "relative",
-              zIndex: 10,
-              "--poster-color": "transparent",
-            } as any
-          }
-          onError={() => setModelError(true)}
-        />
+        <div className="w-full h-full p-4 flex items-center justify-center relative z-10 pointer-events-none">
+          <model-viewer
+            id="opponent-3d"
+            ref={modelViewerRef}
+            src="./bars.glb"
+            alt={`${config.opponentName} - 3D Виртуальный переговорщик`}
+            autoplay
+            animation-name={activeAnim}
+            camera-orbit="0deg 82deg 88%"
+            camera-target="0m 0.85m 0m"
+            field-of-view="32deg"
+            interaction-prompt="none"
+            shadow-intensity="1.2"
+            shadow-softness="0.8"
+            exposure="1.1"
+            style={
+              {
+                pointerEvents: "none",
+                width: "100%",
+                height: "100%",
+                position: "relative",
+                "--poster-color": "transparent",
+              } as any
+            }
+            onError={() => setModelError(true)}
+          >
+            {/* Скрываем встроенный прогресс-бар model-viewer */}
+            <div slot="progress-bar" style={{ display: "none" }} />
+          </model-viewer>
+        </div>
       ) : (
         <div className="flex flex-col items-center justify-center p-6 text-center z-10">
           <div className="w-20 h-20 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 text-xl font-bold font-mono shadow-[0_0_30px_rgba(0,240,255,0.3)]">

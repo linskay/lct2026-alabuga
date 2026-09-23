@@ -5,28 +5,18 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
-    // 1. Android Target (produces APK)
+    // 1. Android Target (.apk)
     androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
-    
-    // 2. Desktop Target (produces Windows .EXE and .MSI)
-    jvm("desktop") {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
-        }
-    }
-    
-    // 3. Web Kotlin/Wasm Target (runs in modern browsers)
+
+    // 2. Kotlin/Wasm Web Target (.wasm)
     wasmJs {
         moduleName = "composeApp"
         browser {
@@ -36,28 +26,46 @@ kotlin {
         }
         binaries.executable()
     }
-    
+
+    // 3. Desktop Target (.exe, .dmg, .deb)
+    jvm("desktop")
+
     sourceSets {
         val commonMain by getting {
             dependencies {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material3)
+                implementation(compose.materialIconsExtended)
+                implementation(compose.animation)
                 implementation(compose.ui)
                 implementation(compose.components.resources)
-                implementation(compose.components.uiToolingPreview)
+
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.kotlinx.datetime)
+
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.ktor.client.logging)
+                implementation(libs.androidx.lifecycle.viewmodel)
             }
         }
-        
+
         val androidMain by getting {
             dependencies {
-                implementation(libs.androidx.appcompat)
                 implementation(libs.androidx.activity.compose)
-                implementation(libs.androidx.core.ktx)
+                implementation(libs.ktor.client.okhttp)
             }
         }
-        
+
+        val wasmJsMain by getting {
+            dependencies {
+                // Wasm-specific dependencies
+            }
+        }
+
         val desktopMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
@@ -67,13 +75,13 @@ kotlin {
 }
 
 android {
-    namespace = "com.bars.simulator"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    namespace = "ru.alabuga.bars"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bars.simulator"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        applicationId = "ru.alabuga.bars"
+        minSdk = 24
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
     }
@@ -87,7 +95,6 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug") // Debug signing for direct APK installation
         }
     }
 
@@ -99,18 +106,11 @@ android {
 
 compose.desktop {
     application {
-        mainClass = "com.bars.simulator.MainKt"
-
+        mainClass = "ru.alabuga.bars.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "BARS-Simulator"
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            packageName = "ru.alabuga.bars"
             packageVersion = "1.0.0"
-            description = "Б.А.Р.С. - Тренажер жестких коммерческих переговоров"
-            vendor = "BARS AI Team"
-            windows {
-                menuGroup = "BARS Simulator"
-                upgradeUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-            }
         }
     }
 }

@@ -1,16 +1,52 @@
 # 🦾 Б.А.Р.С. — Симулятор жестких B2B-переговоров (ОЭЗ «Алабуга»)
 
 [![Команда: No PHP - No problems](https://img.shields.io/badge/Team-No%20PHP%20--%20No%20problems-7b2cbf?style=for-the-badge&logo=target)](https://github.com)
-[![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Node.js & Express](https://img.shields.io/badge/Node.js-Express%20Fullstack-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin_Multiplatform-2.1-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
+[![Compose Multiplatform](https://img.shields.io/badge/Compose_Multiplatform-1.7-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
+[![Android APK Target](https://img.shields.io/badge/Android-APK_Build-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/)
+[![Ktor Client](https://img.shields.io/badge/Ktor-3.0_Client-087CFA?style=for-the-badge&logo=ktor&logoColor=white)](https://ktor.io/)
 [![Google Gemini API](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
-[![Google Model-Viewer 3D](https://img.shields.io/badge/3D-Web_Components%20GLTF-FF6F00?style=for-the-badge&logo=webcomponents.org&logoColor=white)](https://modelviewer.dev/)
+[![React 19 Web Demo](https://img.shields.io/badge/React_19-Web_Preview_Interactive-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
 Корпоративная платформа развития человеческого капитала и тренажер ведения жестких коммерческих переговоров с ключевыми резидентами особой экономической зоны **ОЭЗ «Алабуга»**.
 
+Архитектура: **Kotlin Multiplatform (Compose Multiplatform)** с единым UI-кодом для сборки нативного **Android .apk**, **Wasm (Web)** и кроссплатформенного **Desktop**, а также веб-стенда.
+
 Разработано командой **«No PHP - No problems»**.
+
+---
+
+## 🏛️ Архитектура Kotlin Multiplatform (Compose Multiplatform)
+
+```
+                     ┌───────────────────────────────────────────┐
+                     │          commonMain (Чистый Kotlin)       │
+                     │  - MVI/Clean Architecture                 │
+                     │  - Compose Multiplatform Material 3 UI    │
+                     │  - Ktor Client (REST к Gemini 2.5 Flash)  │
+                     │  - dynamicContext & BATNA engine          │
+                     └─────────────────────┬─────────────────────┘
+                                           │
+                    ┌──────────────────────┴──────────────────────┐
+                    ▼                                             ▼
+       ┌─────────────────────────┐                   ┌─────────────────────────┐
+       │   androidMain (.apk)    │                   │     wasmJsMain (Web)    │
+       │ - Android Gradle Plugin │                   │ - Kotlin/Wasm Compiler  │
+       │ - SceneView 3D (Native) │                   │ - Canvas / WebAssembly  │
+       │ - Артефакт: release.apk │                   │ - Деплой на хостинг     │
+       └─────────────────────────┘                   └─────────────────────────┘
+```
+
+### Сборка Android .apk через Gradle:
+```bash
+./gradlew :composeApp:assembleRelease
+```
+Релизный файл будет сформирован в `composeApp/build/outputs/apk/release/composeApp-release-unsigned.apk`.
+
+### Сборка Kotlin/Wasm Web-версии:
+```bash
+./gradlew :composeApp:wasmJsBrowserDistribution
+```
 
 ---
 
