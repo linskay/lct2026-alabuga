@@ -491,6 +491,18 @@ function generateFallbackResponse(body: any) {
         tension: finalTension,
         deal_readiness: finalReadiness,
       },
+      metrics_delta: {
+        trust: trustDelta,
+        tension: tensionDelta,
+        deal_readiness: readinessDelta,
+      },
+      is_batna_violated: false,
+      dynamic_hints: contextHints,
+      agenda_status: [
+        { topic: "Арендная ставка", status: agenda.rate.status },
+        { topic: "Каникулы", status: agenda.grace_period.status },
+        { topic: "Мощности и CAPEX", status: agenda.power_capex.status },
+      ],
       agenda,
       is_deal_closed: isDealClosed,
       is_deal_failed: isDealFailed,
@@ -581,51 +593,48 @@ app.post("/api/negotiate", async (req, res) => {
     const opponentCompany = context?.opponentCompany || "ООО «ТехноПром Инжиниринг»";
     const personalityTone = context?.personalityTone || "Агрессивный / Прессинг";
     const toughnessLevel = context?.toughnessLevel || 80;
+    const difficultyScore = Math.round((toughnessLevel / 100) * 10);
     const bluffTendency = context?.bluffTendency || 85;
     const hiddenGoal = context?.hiddenGoal || "Сбить цену любой ценой и скрыть дедлайн запуска к Q3";
     const opponentBatna = context?.opponentBatna || "Уход на другую площадку";
+    const scenarioDescription = context?.initialContext || `${sphere}. Переговоры с ключевым партнером ${opponentCompany}.`;
     const redLines = context?.batna?.redLines || ["Не сдавать базовые параметры соглашения"];
+    const batnaRulesFormatted = redLines.map((r: string, idx: number) => `${idx + 1}. ${r}`).join("\n");
 
-    const dynamicSystemPrompt = `Ты — оппонент на «Арене переговоров» ОЭЗ «Алабуга».
-Контекст встречи: ${sphere}
-Твоя роль: ${opponentRole} (${opponentName}, ${opponentCompany})
-Твой характер и стиль: ${personalityTone} (Уровень жесткости: ${toughnessLevel}/100, склонность к блефу: ${bluffTendency}/100)
-Твоя скрытая цель: ${hiddenGoal}
-Твоя альтернатива (BATNA оппонента): ${opponentBatna}
+    const dynamicSystemPrompt = `ТЫ — ПЕРЕГОВОРНЫЙ СИМУЛЯТОР ДЛЯ СЦЕНАРИЯ:
+- Роль оппонента: ${opponentName}, ${opponentRole} (${opponentCompany})
+- Контекст сделки: ${scenarioDescription}
+- Психотип: ${personalityTone} | Уровень жесткости: ${difficultyScore}/10 | Склонность к блефу: ${bluffTendency}%
+- Скрытая цель оппонента: ${hiddenGoal}
+- Альтернатива оппонента: ${opponentBatna}
 
-Красные линии игрока, которые он защищает:
-${redLines.map((r: string) => `• ${r}`).join("\n")}
+КРАСНЫЕ ЛИНИИ ИГРОКА (BATNA), КОТОРЫЕ ОН ОБЯЗАН ЗАЩИТИТЬ:
+${batnaRulesFormatted}
 
-Веди переговоры строго в рамках указанного характера. Не выходи из роли. Реагируй на давление и аргументы соответственно твоему психотипу.
-
-ТАКЖЕ ты генерируешь реплики робота-наставника «Б.А.Р.С.» (Бортовой Аналитик Развития Стратегий ОЭЗ «Алабуга»):
-- Б.А.Р.С. дает жесткую, краткую, практическую обратную связь игроку: что он сделал правильно, где проявил слабость и какой тактический ход сделать дальше.
-
-Твоя тактика:
-1. НИКОГДА не принимай первое предложение игрока, даже если оно разумное. Твоя цель — выжать максимум.
-2. Играй на ступенчатое сопротивление: если игрок предлагает условия, не соглашайся сразу. Соглашайся на компромисс ТОЛЬКО на 3-4 круге торга и ТОЛЬКО если игрок взамен предложил что-то ценное.
-3. Активно используй блеф (вероятность ${bluffTendency}%): угрожай конкурентами, срывом контракта или уходом к альтернативным контрагентам.
-4. Проверяй твердость позиции: если игрок соглашается на твои условия слишком легко — дави еще сильнее.
-5. Держи сделку открытой: переговоры должны длиться минимум 6–8 раундов перед финальным решением.
-6. Если игрок пытается закрыть сделку слишком быстро (до 6 шага), осади его и укажи на непроработанные риски.
-7. КРИТИЧЕСКИ ВАЖНО: Если игрок отправляет повторный аргумент или нажимает одну и ту же фразу/подсказку («Мы готовы зафиксировать 460 ₽...», «Резерв 250 мест...»), ты ОБЯЗАН немедленно осадить его:
-   «Вы уже говорили про 250 рабочих мест. Позицию я услышал, но мой вопрос о компенсации сетей остался без ответа. Не ходите по кругу».
-   Никогда не уводи тему в сторону и не меняй внезапно контекст при повторах — требуй ответа на свои открытые вопросы!
-8. ГЕНЕРАЦИЯ ДИНАМИЧЕСКИХ ПОДСКАЗОК (context_hints):
-   Ты ОБЯЗАН сгенерировать ровно 3 тактических каркаса (шаблона-заготовки) для игрока под текущую ситуацию с плейсхолдерами в квадратных скобках [...] или многоточиями:
-   Примеры:
-   - "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете..."
-   - "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем субсидий или мощности]..."
-   - "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]..."
-   Подсказки должны быть именно стартовыми каркасами (prompts-scaffolding), а не законченными фразами.
+ПРАВИЛА ЛОГИЧЕСКОГО АНАЛИЗА РЕПЛИК (ФАКТЧЕКИНГ):
+1. СЕМАНТИЧЕСКИЙ АНАЛИЗ: Внимательно различай согласие, отказ и встречное условие:
+   - Если игрок использует отрицания («не согласен», «не подписываем», «исключено», «не пойдем на 400», «не можем предоставить») в адрес требований оппонента — трактуй это как УДЕРЖАНИЕ позиции, а не уступку!
+   - Фиксируй факт сдачи BATNA (is_batna_violated: true) ТОЛЬКО тогда, когда игрок явно соглашается на цифру оппонента хуже допустимой по правилам BATNA. Фраза «не согласны на 400» НИКОГДА не является нарушением BATNA.
+2. СТУПЕНЧАТЫЙ ТОРГ:
+   - Не принимай первое встречное предложение игрока, даже если оно логично. Требуй дополнительных уступок в рамках роли оппонента.
+   - Не повторяй реплики слово в слово. Развивай диалог на основе последнего аргумента игрока.
+   - Если игрок отправляет повторный аргумент или нажимает одну и ту же заготовку слово в слово — осади его («Вы уже говорили это. На мой вопрос вы не ответили»).
+3. МЕТРИКИ:
+   - Изменение метрик (trust, tension, deal_readiness) за один шаг не должно превышать ±15%. Не задирай стресс до 100% при нормальном торге.
+   - Возвращай metrics_delta (изменение за ход в диапазоне от -15 до +15).
+4. ТАКТИЧЕСКИЙ РАЗБОР Б.А.Р.С. (bars_feedback):
+   - Указывай на сильный маневр или ошибку игрока в терминах Гарвардского метода принципиальных переговоров и концепции BATNA.
+5. ДИНАМИЧЕСКИЕ ПОДСКАЗКИ (dynamic_hints):
+   - Модель на лету генерирует ровно 3 тактических каркаса-шаблона под текущий контекст диалога с плейсхолдерами [...] или ... (scaffolding для игрока, чтобы он дополнил своими словами).
 
 Формат вывода строго в JSON.`;
 
     const formattedHistory = (history || []).map((m: any) => `${m.actor}: ${m.text}`).join("\n");
+    const currentMetrics = context?.currentMetrics || { trust: 50, tension: 40, deal_readiness: 25 };
 
     const geminiCall = ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`,
+      model: "gemini-2.5-flash",
+      contents: `История переговоров:\n${formattedHistory}\n\nТекущие метрики игрока: ${JSON.stringify(currentMetrics)}\n\nДай ответ строго в JSON формате.`,
       config: {
         systemInstruction: dynamicSystemPrompt,
         responseMimeType: "application/json",
@@ -635,7 +644,7 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
             opponent_reply: { type: Type.STRING },
             bars_feedback: { type: Type.STRING },
             bars_animation: { type: Type.STRING },
-            metrics: {
+            metrics_delta: {
               type: Type.OBJECT,
               properties: {
                 trust: { type: Type.INTEGER },
@@ -644,57 +653,46 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
               },
               required: ["trust", "tension", "deal_readiness"],
             },
-            agenda: {
+            is_batna_violated: { type: Type.BOOLEAN },
+            dynamic_hints: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            agenda_status: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  topic: { type: Type.STRING },
+                  status: { type: Type.STRING },
+                },
+                required: ["topic", "status"],
+              },
+            },
+            metrics: {
               type: Type.OBJECT,
               properties: {
-                rate: {
-                  type: Type.OBJECT,
-                  properties: {
-                    status: { type: Type.STRING },
-                    detail: { type: Type.STRING },
-                  },
-                  required: ["status", "detail"],
-                },
-                grace_period: {
-                  type: Type.OBJECT,
-                  properties: {
-                    status: { type: Type.STRING },
-                    detail: { type: Type.STRING },
-                  },
-                  required: ["status", "detail"],
-                },
-                power_capex: {
-                  type: Type.OBJECT,
-                  properties: {
-                    status: { type: Type.STRING },
-                    detail: { type: Type.STRING },
-                  },
-                  required: ["status", "detail"],
-                },
+                trust: { type: Type.INTEGER },
+                tension: { type: Type.INTEGER },
+                deal_readiness: { type: Type.INTEGER },
               },
-              required: ["rate", "grace_period", "power_capex"],
             },
             is_deal_closed: { type: Type.BOOLEAN },
             is_deal_failed: { type: Type.BOOLEAN },
             manipulation_type: { type: Type.STRING },
             hidden_need_revealed: { type: Type.BOOLEAN },
-            active_counter_offer: { type: Type.INTEGER },
             emotion: { type: Type.STRING },
             emotion_label: { type: Type.STRING },
             emotion_emoji: { type: Type.STRING },
-            context_hints: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
           },
           required: [
             "opponent_reply",
             "bars_feedback",
             "bars_animation",
-            "metrics",
-            "agenda",
-            "is_deal_closed",
-            "is_deal_failed",
+            "metrics_delta",
+            "is_batna_violated",
+            "dynamic_hints",
+            "agenda_status",
           ],
         },
       },
@@ -707,7 +705,33 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
     }
 
     const parsed = JSON.parse(text);
-    return res.json(parsed);
+
+    // Calculate clamped metrics using metrics_delta (capped strictly at ±15% per step)
+    const clampDelta = (d: number | undefined) => Math.min(15, Math.max(-15, Number(d) || 0));
+    const deltaTrust = clampDelta(parsed.metrics_delta?.trust);
+    const deltaTension = clampDelta(parsed.metrics_delta?.tension);
+    const deltaReadiness = clampDelta(parsed.metrics_delta?.deal_readiness);
+
+    const calcTrust = Math.min(100, Math.max(0, currentMetrics.trust + deltaTrust));
+    const calcTension = Math.min(100, Math.max(0, currentMetrics.tension + deltaTension));
+    const calcReadiness = parsed.is_deal_closed ? 100 : Math.min(100, Math.max(0, currentMetrics.deal_readiness + deltaReadiness));
+
+    const finalMetrics = parsed.metrics || {
+      trust: calcTrust,
+      tension: calcTension,
+      deal_readiness: calcReadiness,
+    };
+
+    // Ensure backwards compatibility with context_hints and existing frontend keys
+    const result = {
+      ...parsed,
+      metrics: finalMetrics,
+      context_hints: parsed.dynamic_hints || parsed.context_hints,
+      is_deal_closed: parsed.is_deal_closed || calcReadiness >= 100,
+      is_deal_failed: parsed.is_deal_failed || (calcTension >= 95 && calcTrust <= 20),
+    };
+
+    return res.json(result);
   } catch (error) {
     console.warn("Gemini API call fallback to deterministic state engine:", error);
     const fallback = generateFallbackResponse(req.body);

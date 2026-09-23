@@ -71,6 +71,18 @@ export interface GeminiResponse {
   bars_feedback: string;
   bars_animation: BarsAnimationState;
   metrics: NegotiationMetrics;
+  metrics_delta?: {
+    trust: number;
+    tension: number;
+    deal_readiness: number;
+  };
+  is_batna_violated?: boolean;
+  dynamic_hints?: string[];
+  context_hints?: string[];
+  agenda_status?: Array<{
+    topic: string;
+    status: "agreed" | "negotiating" | "rejected" | AgendaItemStatus;
+  }>;
   is_deal_closed: boolean;
   is_deal_failed: boolean;
   agenda?: NegotiationAgenda;

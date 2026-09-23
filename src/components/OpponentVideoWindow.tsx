@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AdminScenarioConfig, NegotiationMetrics, BarsAnimationState } from "../types";
-import { ShieldCheck, Video, Mic } from "lucide-react";
+import { ShieldCheck, Mic } from "lucide-react";
 
 interface OpponentVideoWindowProps {
   config: AdminScenarioConfig;
@@ -48,7 +48,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
     return "Idle";
   };
 
-  // Sync animation and camera target
+  // Sync animation and camera parameters
   useEffect(() => {
     const chosen = determineAutomatedAnimation();
     setActiveAnim(chosen);
@@ -64,10 +64,8 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
         }
       };
 
-      // Exact camera parameters requested:
-      // camera-target="0m 0.9m 0m", camera-orbit="0deg 75deg 3.5m", field-of-view="32deg"
-      viewer.setAttribute("camera-target", "0m 0.9m 0m");
-      viewer.setAttribute("camera-orbit", "0deg 75deg 3.5m");
+      viewer.setAttribute("camera-target", "0m 0.85m 0m");
+      viewer.setAttribute("camera-orbit", "0deg 78deg 3.2m");
       viewer.setAttribute("field-of-view", "32deg");
 
       if (viewer.availableAnimations && viewer.availableAnimations.length > 0) {
@@ -77,6 +75,50 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
       }
     }
   }, [barsAnimation, metrics.tension, metrics.deal_readiness, isLoading, isDealClosed, isDealFailed]);
+
+  // Dynamic stress atmosphere calculation (linear RGB interpolation)
+  // Tension: 0-100
+  // 0-30%: deep purple #7B2CBF (123, 44, 191)
+  // 35-65%: magenta / rose (#C026D3 / #E11D48)
+  // 70-100%: warning neon red #EF4444 (239, 68, 68)
+  const clampedTension = Math.max(0, Math.min(100, metrics.tension));
+  const factor = clampedTension / 100;
+
+  const startColor = { r: 123, g: 44, b: 191 }; // Brand Alabuga purple
+  const dangerColor = { r: 239, g: 68, b: 68 }; // Alarm red
+
+  const currentR = Math.round(startColor.r + (dangerColor.r - startColor.r) * factor);
+  const currentG = Math.round(startColor.g + (dangerColor.g - startColor.g) * factor);
+  const currentB = Math.round(startColor.b + (dangerColor.b - startColor.b) * factor);
+
+  const glowRgba = `rgba(${currentR}, ${currentG}, ${currentB}, ${0.28 + factor * 0.28})`;
+  const borderRgba = `rgba(${currentR}, ${currentG}, ${currentB}, ${0.25 + factor * 0.45})`;
+  const hexColor = `#${((1 << 24) + (currentR << 16) + (currentG << 8) + currentB).toString(16).slice(1)}`;
+
+  // Stress status badge config
+  const getStressBadge = () => {
+    if (clampedTension < 40) {
+      return {
+        label: "СТАТУС: ШТИЛЬ / КОНСТРУКТИВ",
+        color: "#C084FC",
+        ping: false,
+      };
+    }
+    if (clampedTension < 75) {
+      return {
+        label: "ДАВЛЕНИЕ РАСТЕТ",
+        color: "#F43F5E",
+        ping: false,
+      };
+    }
+    return {
+      label: "КРИТИЧЕСКИЙ СТРЕСС / ЦЕЙТНОТ",
+      color: "#EF4444",
+      ping: true,
+    };
+  };
+
+  const stressBadge = getStressBadge();
 
   // Determine live status message of the opponent
   const getOpponentStatus = () => {
@@ -127,14 +169,35 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
   return (
     <div
       id="opponent-stage"
-      className={`relative w-full h-[340px] rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-purple-500/20 overflow-hidden flex items-center justify-center transition-all duration-500 shadow-[0_12px_40px_rgba(0,0,0,0.65)] ${
-        isLoading ? "border-purple-500/60 shadow-[0_0_40px_rgba(123,44,191,0.35)]" : ""
-      } ${className}`}
+      className={`relative w-full h-[340px] rounded-3xl overflow-hidden border transition-all duration-700 ease-out flex items-center justify-center bg-[#090a10] shadow-[0_12px_45px_rgba(0,0,0,0.7)] ${className}`}
+      style={{
+        borderColor: borderRgba,
+        boxShadow: `0 12px 45px rgba(0,0,0,0.7), 0 0 35px ${borderRgba}`,
+      }}
     >
-      {/* Subtle background glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_35%,rgba(99,102,241,0.18)_0%,transparent_70%)] pointer-events-none" />
+      {/* 1. Фоновое объемное световое пятно (Glow Spot) - динамически меняет спектр от фиолетового к красному */}
+      <div
+        id="stage-glow"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-[90px] pointer-events-none transition-all duration-700 ease-out"
+        style={{ background: glowRgba }}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(0,0,0,0)_0%,rgba(9,10,16,0.6)_100%)] pointer-events-none" />
 
-      {/* 3D Model-Viewer with exact camera parameters */}
+      {/* 2. Неоновый проектор-подиум под ногами робота с динамическим цветом */}
+      <div
+        className="absolute bottom-5 w-56 h-10 rounded-full blur-md pointer-events-none transition-all duration-700 ease-out z-0"
+        style={{ background: glowRgba }}
+      />
+      <div
+        id="stage-ring"
+        className="absolute bottom-6 w-48 h-4 rounded-full border pointer-events-none transition-all duration-700 ease-out z-0"
+        style={{
+          borderColor: hexColor,
+          boxShadow: `0 0 25px ${hexColor}, inset 0 0 10px ${hexColor}`,
+        }}
+      />
+
+      {/* 3. Сам 3D-робот */}
       {!modelError ? (
         <model-viewer
           id="opponent-3d"
@@ -143,11 +206,11 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
           alt={`${config.opponentName} - 3D Виртуальный переговорщик`}
           autoplay
           animation-name={activeAnim}
-          camera-orbit={isLoading ? "0deg 75deg 3.0m" : "0deg 75deg 3.5m"}
-          camera-target="0m 0.9m 0m"
+          camera-orbit="0deg 78deg 3.2m"
+          camera-target="0m 0.85m 0m"
           field-of-view="32deg"
           interaction-prompt="none"
-          shadow-intensity="1.5"
+          shadow-intensity="1.6"
           shadow-softness="0.8"
           exposure="1.2"
           style={
@@ -155,13 +218,15 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
               pointerEvents: "none",
               width: "100%",
               height: "100%",
+              position: "relative",
+              zIndex: 10,
               "--poster-color": "transparent",
             } as any
           }
           onError={() => setModelError(true)}
         />
       ) : (
-        <div className="flex flex-col items-center justify-center p-6 text-center">
+        <div className="flex flex-col items-center justify-center p-6 text-center z-10">
           <div className="w-20 h-20 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 text-xl font-bold font-mono shadow-[0_0_30px_rgba(0,240,255,0.3)]">
             {config.opponentName.slice(0, 2).toUpperCase()}
           </div>
@@ -169,7 +234,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
         </div>
       )}
 
-      {/* Плашка статуса (Верхний левый угол) */}
+      {/* Плашка статуса оппонента (Верхний левый угол) */}
       <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-slate-950/80 border border-white/10 backdrop-blur-md flex items-center gap-2 z-20">
         <span className={`w-2 h-2 rounded-full ${status.indicator}`} />
         <span className="text-[11px] font-mono text-slate-300">
@@ -177,13 +242,30 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
         </span>
       </div>
 
-      {/* HD 1080p & REC Badges (Верхний правый угол) */}
+      {/* Динамический индикатор тревоги / стресса в правом верхнем углу */}
       <div className="absolute top-3 right-3 flex items-center gap-2 shrink-0 z-20">
-        <div className="hidden xs:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/50 border border-white/10 text-[10px] font-mono text-slate-300 backdrop-blur-md">
-          <ShieldCheck className="w-3 h-3 text-cyan-400" />
-          <span>HD 1080p</span>
+        <div
+          className="px-3 py-1 rounded-full bg-slate-950/85 border border-white/10 backdrop-blur-md flex items-center gap-2 transition-all duration-500 shadow-md"
+          style={{ borderColor: `${borderRgba}` }}
+        >
+          <span
+            id="stress-dot"
+            className={`w-2 h-2 rounded-full transition-colors duration-500 ${
+              stressBadge.ping ? "animate-ping" : ""
+            }`}
+            style={{ backgroundColor: hexColor, boxShadow: `0 0 8px ${hexColor}` }}
+          />
+          <span
+            id="stress-text"
+            className="text-[10px] sm:text-[11px] font-mono font-bold tracking-wider transition-colors duration-500 uppercase"
+            style={{ color: stressBadge.color }}
+          >
+            {stressBadge.label} ({clampedTension}%)
+          </span>
         </div>
-        <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-[10px] font-mono font-bold text-red-400 backdrop-blur-md">
+
+        {/* REC Badge */}
+        <div className="hidden xs:flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-[10px] font-mono font-bold text-red-400 backdrop-blur-md">
           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
           <span>REC</span>
         </div>
@@ -213,7 +295,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
           className={`px-3 py-1 rounded-full border text-[11px] font-medium backdrop-blur-md flex items-center gap-2 shadow-lg transition-all ${status.color}`}
         >
           <span className={`w-2 h-2 rounded-full ${status.indicator}`} />
-          <span className="truncate max-w-[200px] sm:max-w-[320px]">{status.text}</span>
+          <span className="truncate max-w-[180px] sm:max-w-[300px]">{status.text}</span>
         </div>
       </div>
     </div>

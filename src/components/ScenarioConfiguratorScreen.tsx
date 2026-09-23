@@ -123,17 +123,25 @@ export const ScenarioConfiguratorScreen: React.FC<ScenarioConfiguratorScreenProp
     }
   };
 
-  const dynamicSystemPrompt = `Ты — оппонент на «Арене переговоров» ОЭЗ «Алабуга».
-Контекст встречи: ${config.sphere}
-Твоя роль: ${config.opponentRole} (${config.opponentName}, ${config.opponentCompany})
-Твой характер и стиль: ${config.personalityTone} (Уровень жесткости: ${config.toughnessLevel}/100, склонность к блефу: ${config.bluffTendency}/100)
-Твоя скрытая цель: ${config.hiddenGoal}
-Твоя альтернатива (BATNA оппонента): ${config.opponentBatna}
+  const dynamicSystemPrompt = `ТЫ — ПЕРЕГОВОРНЫЙ СИМУЛЯТОР ДЛЯ СЦЕНАРИЯ:
+- Роль оппонента: ${config.opponentName}, ${config.opponentRole} (${config.opponentCompany})
+- Контекст сделки: ${config.initialContext || config.sphere}
+- Психотип: ${config.personalityTone} | Уровень жесткости: ${Math.round((config.toughnessLevel / 100) * 10)}/10 | Склонность к блефу: ${config.bluffTendency}%
+- Скрытая цель оппонента: ${config.hiddenGoal}
+- Альтернатива оппонента: ${config.opponentBatna}
 
-Красные линии игрока, которые он защищает:
-${config.batna.redLines.map((r) => `• ${r}`).join("\n")}
+КРАСНЫЕ ЛИНИИ ИГРОКА (BATNA), КОТОРЫЕ ОН ОБЯЗАН ЗАЩИТИТЬ:
+${config.batna.redLines.map((r, idx) => `${idx + 1}. ${r}`).join("\n")}
 
-Веди переговоры строго в рамках указанного характера. Не выходи из роли. Реагируй на давление и аргументы соответственно твоему психотипу.`;
+ПРАВИЛА ЛОГИЧЕСКОГО АНАЛИЗА РЕПЛИК (ФАКТЧЕКИНГ):
+1. СЕМАНТИЧЕСКИЙ АНАЛИЗ:
+   - Если игрок использует отрицания («не согласен», «не подписываем», «исключено») — трактуй как УДЕРЖАНИЕ позиции, а не уступку.
+   - Фиксируй факт сдачи BATNA ТОЛЬКО тогда, когда игрок явно соглашается на цифру оппонента хуже допустимой.
+2. СТУПЕНЧАТЫЙ ТОРГ:
+   - Не принимай первое встречное предложение игрока. Требуй дополнительных уступок.
+   - Не повторяй реплики слово в слово. Развивай диалог на основе последнего аргумента игрока.
+3. МЕТРИКИ:
+   - Изменение метрик (trust, tension, deal_readiness) за один шаг не должно превышать ±15%.`;
 
   return (
     <div className="relative flex-1 w-full h-full overflow-y-auto bg-[#07080e] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">

@@ -257,6 +257,29 @@ export default function App() {
       setMetrics(data.metrics);
       if (data.agenda) {
         setAgenda(data.agenda);
+      } else if (data.agenda_status && Array.isArray(data.agenda_status)) {
+        // Map dynamic agenda_status array to agenda object
+        setAgenda((prev) => {
+          const next = { ...prev };
+          data.agenda_status.forEach((item: any) => {
+            const topic = (item.topic || "").toLowerCase();
+            const status: "agreed" | "in_progress" | "disputed" =
+              item.status === "agreed"
+                ? "agreed"
+                : item.status === "rejected"
+                ? "disputed"
+                : "in_progress";
+
+            if (topic.includes("ставк") || topic.includes("цен") || topic.includes("аренд") || topic.includes("rate")) {
+              next.rate = { ...next.rate, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            } else if (topic.includes("каникул") || topic.includes("срок") || topic.includes("grace")) {
+              next.grace_period = { ...next.grace_period, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            } else if (topic.includes("мощност") || topic.includes("capex") || topic.includes("инвестиц") || topic.includes("сет") || topic.includes("power")) {
+              next.power_capex = { ...next.power_capex, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            }
+          });
+          return next;
+        });
       }
       setBarsFeedback(data.bars_feedback);
       setBarsAnimation(data.bars_animation || "talk");
@@ -552,6 +575,8 @@ export default function App() {
 
       <DebriefingModal
         analytics={calculateDebriefing()}
+        scenario={config}
+        agenda={agenda}
         isOpen={isDebriefingOpen}
         onClose={() => setIsDebriefingOpen(false)}
         onRestart={handleRestart}

@@ -70,6 +70,65 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   const [telemetryTab, setTelemetryTab] = useState<"metrics" | "batna" | "agenda">("metrics");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const chipsRowRef = useRef<HTMLDivElement | null>(null);
+
+  // Drag-to-scroll and mouse wheel horizontal scrolling for chips
+  useEffect(() => {
+    const el = chipsRowRef.current;
+    if (!el) return;
+
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    const onMouseDown = (e: MouseEvent) => {
+      isDown = true;
+      startX = e.pageX - el.offsetLeft;
+      scrollLeft = el.scrollLeft;
+      el.style.cursor = "grabbing";
+      el.style.userSelect = "none";
+    };
+
+    const onMouseLeave = () => {
+      isDown = false;
+      el.style.cursor = "grab";
+    };
+
+    const onMouseUp = () => {
+      isDown = false;
+      el.style.cursor = "grab";
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - el.offsetLeft;
+      const walk = (x - startX) * 1.5; // Smooth scroll speed multiplier
+      el.scrollLeft = scrollLeft - walk;
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+
+    el.style.cursor = "grab";
+    el.addEventListener("mousedown", onMouseDown);
+    el.addEventListener("mouseleave", onMouseLeave);
+    el.addEventListener("mouseup", onMouseUp);
+    el.addEventListener("mousemove", onMouseMove);
+    el.addEventListener("wheel", onWheel, { passive: false });
+
+    return () => {
+      el.removeEventListener("mousedown", onMouseDown);
+      el.removeEventListener("mouseleave", onMouseLeave);
+      el.removeEventListener("mouseup", onMouseUp);
+      el.removeEventListener("mousemove", onMouseMove);
+      el.removeEventListener("wheel", onWheel);
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,7 +159,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
     setLastInsertedTemplate("");
   };
 
-  // Click on dynamic context chip: inserts scaffolding starter template
   const applyHint = (templateText: string) => {
     if (isLoading || isDealClosed || isDealFailed) return;
     setInputText(templateText);
@@ -138,105 +196,130 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(123,44,191,0.12)_0%,transparent_60%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(0,240,255,0.06)_0%,transparent_50%)] pointer-events-none" />
 
-      {/* ================= TOP APP BAR ================= */}
+      {/* ================= 2. ШАПКА СТРАНИЦЫ (HEADER): max-w-7xl mx-auto ================= */}
       <header
         id="m3-top-app-bar"
-        className="sticky top-0 z-30 glass-panel px-3 sm:px-5 py-2 flex items-center justify-between min-h-[56px] shrink-0 border-b border-white/[0.08]"
+        className="sticky top-0 z-30 glass-panel border-b border-white/[0.08] min-h-[58px] shrink-0"
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            id="m3-nav-back-button"
-            onClick={onOpenConfigurator}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all shrink-0 cursor-pointer"
-            title="Назад в Конфигуратор"
-          >
-            <ArrowLeft className="w-4 h-4 text-cyan-400" />
-          </button>
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          {/* Слева: Логотип ОЭЗ «Алабуга» + инфо о кейсе и оппоненте */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              id="m3-nav-back-button"
+              onClick={onOpenConfigurator}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all shrink-0 cursor-pointer"
+              title="Назад в Конфигуратор"
+            >
+              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+            </button>
 
-          <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-900 to-indigo-700 border border-cyan-400/50 flex items-center justify-center font-bold text-white text-xs shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-              {opponentInitials}
+            {/* Официальный бейдж-логотип ОЭЗ «Алабуга» */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500/20 via-purple-500/20 to-indigo-600/30 border border-cyan-400/40 flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.25)]">
+                <span className="text-[11px] font-black tracking-tighter text-cyan-300 font-mono">ОЭЗ</span>
+              </div>
+              <div className="hidden sm:flex flex-col">
+                <span className="text-xs font-black tracking-wider text-white uppercase font-sans">
+                  Алабуга
+                </span>
+                <span className="text-[9px] text-cyan-400/80 font-mono tracking-widest uppercase">
+                  Арена переговоров
+                </span>
+              </div>
             </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-[#07080e] shadow-[0_0_8px_#00f0ff] animate-pulse" />
+
+            <div className="h-6 w-[1px] bg-white/10 mx-1 hidden sm:block" />
+
+            {/* Opponent Identity Avatar */}
+            <div className="relative shrink-0 hidden xs:block">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-900 to-indigo-700 border border-cyan-400/50 flex items-center justify-center font-bold text-white text-xs shadow-sm">
+                {opponentInitials}
+              </div>
+              <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-cyan-400 border border-[#07080e] shadow-[0_0_6px_#00f0ff] animate-pulse" />
+            </div>
+
+            <div className="min-w-0 flex flex-col justify-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px] sm:max-w-[240px]">
+                  {config.opponentName}
+                </span>
+                <span className="text-[10px] px-2 py-0.2 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 font-medium whitespace-nowrap hidden md:inline-block">
+                  {config.personalityTone.split("/")[0].trim()}
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-400 font-sans truncate">
+                {config.opponentRole} • <span className="text-slate-300">{config.opponentCompany}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="min-w-0 flex flex-col justify-center">
-            <div className="flex items-center gap-2">
-              <span className="text-sm sm:text-base font-bold text-white truncate max-w-[160px] sm:max-w-[280px]">
-                {config.opponentName}
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 font-medium whitespace-nowrap hidden xs:inline-block">
-                {config.personalityTone.split("/")[0].trim()}
-              </span>
-            </div>
-            <div className="text-[10px] sm:text-[11px] text-slate-400 font-sans truncate">
-              {config.opponentRole} • <span className="text-slate-300">{config.opponentCompany}</span>
-            </div>
-          </div>
-        </div>
+          {/* Справа: Единая аккуратная группа кнопок (Откат, Дебрифинг, Сценарий, Таймер, Инфо) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 bg-white/[0.03] p-1 rounded-full border border-white/[0.08] shadow-inner">
+            {/* Mobile Telemetry */}
+            <button
+              id="m3-telemetry-badge-button"
+              onClick={() => setShowTelemetrySheet(true)}
+              className="h-8 px-2.5 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer lg:hidden"
+              title="Открыть полную телеметрию"
+            >
+              <Activity className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-bold text-cyan-300 font-mono">{metrics.trust}%</span>
+            </button>
 
-        {/* Top Header Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            id="m3-telemetry-badge-button"
-            onClick={() => setShowTelemetrySheet(true)}
-            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer lg:hidden"
-            title="Открыть полную телеметрию"
-          >
-            <Activity className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="font-bold text-cyan-300 font-mono">{metrics.trust}%</span>
-          </button>
-
-          <button
-            id="m3-info-button"
-            onClick={onOpenCaseInfo}
-            className="w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
-            title="Диспозиция кейса"
-          >
-            <Info className="w-4 h-4 text-purple-300" />
-          </button>
-
-          <div className="hidden md:flex items-center gap-1.5">
+            {/* Кнопка Откат (Time Travel) */}
             <button
               onClick={onOpenTimeTravel}
-              className="h-9 px-3 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Машина времени (Откат)"
+              className="h-8 px-3 rounded-full glass-pill hover:bg-white/15 text-slate-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-white/10"
+              title="Машина времени: откатить раунд назад"
             >
               <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-              <span>Откат</span>
+              <span className="hidden sm:inline">Откат</span>
             </button>
 
+            {/* Кнопка Дебрифинг */}
             <button
               onClick={onOpenDebriefing}
-              className="h-9 px-3 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Итоговый дебрифинг"
+              className="h-8 px-3 rounded-full glass-pill hover:bg-white/15 text-slate-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-white/10"
+              title="Итоговый дебрифинг и протокол MOU"
             >
               <Award className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Дебрифинг</span>
+              <span className="hidden sm:inline">Дебрифинг</span>
             </button>
 
+            {/* Кнопка Сценарий (Кейсы) */}
             <button
               onClick={onOpenConfigurator}
-              className="h-9 px-3 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(123,44,191,0.4)] cursor-pointer"
-              title="Конфигуратор"
+              className="h-8 px-3 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-[0_0_15px_rgba(123,44,191,0.35)] cursor-pointer"
+              title="Выбрать другой сценарий переговоров"
             >
               <Sliders className="w-3.5 h-3.5 text-cyan-300" />
-              <span>Кейсы</span>
+              <span className="hidden md:inline">Сценарий</span>
             </button>
-          </div>
 
-          <div className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full glass-pill border border-cyan-500/30 flex items-center gap-1.5 text-xs font-mono text-cyan-300">
-            <Clock className="w-3 h-3 text-cyan-400 animate-pulse" />
-            <span>{formatTimer(timerSeconds)}</span>
+            {/* Кнопка Диспозиция (Инфо) */}
+            <button
+              id="m3-info-button"
+              onClick={onOpenCaseInfo}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/15 active:scale-95 transition-all cursor-pointer border border-white/10"
+              title="Диспозиция кейса"
+            >
+              <Info className="w-3.5 h-3.5 text-purple-300" />
+            </button>
+
+            {/* Таймер раунда */}
+            <div className="h-8 px-2.5 sm:px-3 rounded-full bg-[#090b14] border border-cyan-500/30 flex items-center gap-1.5 text-xs font-mono text-cyan-300 shadow-inner">
+              <Clock className="w-3 h-3 text-cyan-400 animate-pulse" />
+              <span>{formatTimer(timerSeconds)}</span>
+            </div>
           </div>
         </div>
       </header>
 
       {/* ================= STRICT 2-COLUMN MAIN WORKSPACE (70% Чат / 30% Тактика) ================= */}
-      <main className="max-w-7xl w-full mx-auto px-3 sm:px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-68px)] overflow-hidden">
+      <main className="max-w-7xl w-full mx-auto px-3 sm:px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-70px)] overflow-hidden">
         {/* ЛЕВАЯ КОЛОНКА (70%): Видео собеседника + Чат диалога */}
         <div className="lg:col-span-8 flex flex-col h-full min-h-0 gap-3">
-          {/* Окно 3D (высота 320px-340px) */}
+          {/* Окно 3D (высота 340px) */}
           <div className="shrink-0">
             <OpponentVideoWindow
               config={config}
@@ -257,7 +340,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               const isUser = msg.actor === "USER";
               const isBars = msg.actor === "BARS";
 
-              // По требованию: плашки советов полностью убраны из ленты чата!
               if (isBars) {
                 return null;
               }
@@ -371,7 +453,7 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                   onClick={onOpenDebriefing}
                   className="mt-2 h-9 px-6 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs active:scale-95 transition-all shadow-[0_0_20px_rgba(16,185,129,0.5)] cursor-pointer"
                 >
-                  Открыть итоговый дебрифинг
+                  Открыть итоговый дебрифинг и протокол MOU
                 </button>
               </div>
             )}
@@ -398,20 +480,22 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Зона ввода (прибита снизу: Динамические чипсы-заготовки + Валидатор) */}
+          {/* Зона ввода (прибита снизу: 1. ГОРИЗОНТАЛЬНЫЙ СКРОЛЛ ЧИПСОВ + Валидатор) */}
           <div className="shrink-0 pt-1 border-t border-white/[0.08]">
-            {/* Динамические подсказки из контекста диалога (Неполные шаблоны scaffolding) */}
+            {/* 1. ГОРИЗОНТАЛЬНЫЙ СКРОЛЛ ЧИПСОВ: drag-to-scroll, wheel, скрытый скроллбар */}
             {!isDealClosed && !isDealFailed && (
               <div
-                id="dynamic-hints-row"
-                className="overflow-x-auto flex items-center gap-2 pb-2 scrollbar-none"
+                id="chips-row"
+                ref={chipsRowRef}
+                className="overflow-x-auto flex items-center gap-2 pb-2 no-scrollbar select-none"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
                 {dynamicHints.map((hint, idx) => (
                   <button
                     key={idx}
                     disabled={isLoading}
                     onClick={() => applyHint(hint)}
-                    className="shrink-0 h-7 sm:h-8 px-3 rounded-full glass-pill hover:bg-white/10 active:bg-white/15 text-slate-200 hover:text-white border border-cyan-500/25 hover:border-cyan-400/50 text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer max-w-[280px] sm:max-w-[360px] truncate"
+                    className="shrink-0 h-8 px-3 rounded-full glass-pill hover:bg-white/10 active:bg-white/15 text-slate-200 hover:text-white border border-cyan-500/25 hover:border-cyan-400/50 text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer max-w-[280px] sm:max-w-[380px] truncate"
                     title={`Вставить тактический каркас: ${hint}`}
                   >
                     <Sparkles className="w-3 h-3 text-cyan-400 shrink-0" />

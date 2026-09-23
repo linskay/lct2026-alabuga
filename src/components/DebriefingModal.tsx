@@ -1,9 +1,22 @@
-import React from "react";
-import { DebriefingAnalytics } from "../types";
-import { Award, CheckCircle2, AlertTriangle, TrendingUp, RefreshCw, X, ShieldCheck } from "lucide-react";
+import React, { useState } from "react";
+import { DebriefingAnalytics, AdminScenarioConfig, NegotiationAgenda } from "../types";
+import {
+  Award,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+  RefreshCw,
+  X,
+  ShieldCheck,
+  FileDown,
+  Printer,
+} from "lucide-react";
+import { downloadProtocolFile } from "../utils/exportProtocol";
 
 interface DebriefingModalProps {
   analytics: DebriefingAnalytics;
+  scenario?: AdminScenarioConfig;
+  agenda?: NegotiationAgenda;
   isOpen: boolean;
   onClose: () => void;
   onRestart: () => void;
@@ -11,10 +24,14 @@ interface DebriefingModalProps {
 
 export const DebriefingModal: React.FC<DebriefingModalProps> = ({
   analytics,
+  scenario,
+  agenda,
   isOpen,
   onClose,
   onRestart,
 }) => {
+  const [employeeName, setEmployeeName] = useState("Сотрудник дирекции привлечения инвестиций");
+
   if (!isOpen) return null;
 
   const getGradeColor = (grade: string) => {
@@ -30,9 +47,53 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
     }
   };
 
+  const handleExportProtocol = () => {
+    const defaultScenario: AdminScenarioConfig = scenario || {
+      id: "industrial_synergy",
+      title: "Индустриальный парк «Синергия»",
+      difficulty: "HARD",
+      opponentName: "Валерий Строганов",
+      opponentRole: "Вице-президент по закупкам и капитальному строительству",
+      opponentCompany: "ПАО «РосТехноПром»",
+      personalityTone: "Агрессивный экспансионист / Закупщик",
+      zoneCluster: "Синергия",
+      batna: {
+        minPricePerSqm: 460,
+        maxGracePeriodMonths: 4,
+        redLines: [
+          "Минимальная ставка 460 ₽/м²",
+          "Каникулы не более 4 месяцев",
+          "CAPEX от 1.2 млрд ₽ под подключение 8 МВт",
+        ],
+      },
+    };
+
+    const defaultAgenda: NegotiationAgenda = agenda || {
+      rate: { id: "rate", title: "Ставка", status: "agreed", detail: "460 ₽/м²" },
+      grace_period: { id: "grace_period", title: "Каникулы", status: "agreed", detail: "4 мес." },
+      power_capex: { id: "power_capex", title: "Сети", status: "agreed", detail: "8 МВт под CAPEX 1.2 млрд" },
+    };
+
+    downloadProtocolFile({
+      documentId: `MOU-ALB-${Date.now().toString().slice(-6)}`,
+      generatedDate: new Date().toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      scenario: defaultScenario,
+      agenda: defaultAgenda,
+      analytics,
+      employeeName,
+      supervisorRole: "Руководитель департамента по работе с резидентами",
+    });
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-2xl rounded-2xl border border-[#7b2cbf]/50 bg-[#14161f] p-6 shadow-2xl text-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+      <div className="relative w-full max-w-2xl rounded-2xl border border-[#7b2cbf]/50 bg-[#14161f] p-5 sm:p-6 shadow-2xl text-slate-200 my-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-[#232736]">
           <div className="flex items-center gap-3">
@@ -50,14 +111,14 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Grade & Outcome Banner */}
-        <div className="my-5 p-4 rounded-xl bg-[#0d0e12] border border-[#282c3c] flex items-center justify-between">
+        <div className="my-4 p-4 rounded-xl bg-[#0d0e12] border border-[#282c3c] flex items-center justify-between">
           <div>
             <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Итог переговорной сессии</div>
             <div className="text-base font-bold text-white flex items-center gap-2">
@@ -92,9 +153,9 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
           </div>
         </div>
 
-        {/* Hurried Warning Banner if user closed prematurely */}
+        {/* Hurried Warning Banner */}
         {analytics.hurriedWarning && (
-          <div className="mb-4 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/50 flex items-start gap-2.5">
+          <div className="mb-4 p-3 rounded-xl bg-amber-500/15 border border-amber-500/50 flex items-start gap-2.5">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
               <div className="text-xs font-bold text-amber-300 uppercase tracking-wide">
@@ -108,7 +169,7 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
         )}
 
         {/* Scores */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="p-3 rounded-xl bg-[#1a1d29]/70 border border-[#232736]">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
               <span className="flex items-center gap-1">
@@ -139,8 +200,8 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
           </div>
         </div>
 
-        {/* Advanced Criteria for Rank S Verification */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
+        {/* Advanced Criteria */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="p-2.5 rounded-xl bg-[#12141d] border border-[#232736] text-center">
             <div className="text-[10px] text-slate-400 uppercase font-mono">Скрытая боль (Q3)</div>
             <div className="text-xs font-bold mt-1">
@@ -183,40 +244,42 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
           </div>
         </div>
 
-        {/* BARS Analysis */}
-        <div className="p-4 rounded-xl bg-[#7b2cbf]/10 border border-[#7b2cbf]/40 space-y-3 mb-5">
+        {/* BARS Analysis Summary */}
+        <div className="p-3.5 rounded-xl bg-[#7b2cbf]/10 border border-[#7b2cbf]/40 space-y-2 mb-4">
           <div className="text-xs font-semibold uppercase tracking-wider text-[#9d4edd] flex items-center gap-1.5">
             Заключение наставника «Б.А.Р.С.»:
           </div>
           <p className="text-xs text-slate-200 leading-relaxed">
             {analytics.barsExecutiveSummary}
           </p>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold text-[#10b981] uppercase tracking-wider">Сильные маневры:</span>
-              {analytics.keyStrengths.map((s, idx) => (
-                <div key={idx} className="text-xs text-slate-300 flex items-start gap-1.5">
-                  <span className="text-[#10b981]">✓</span> {s}
-                </div>
-              ))}
+        {/* Enterprise Value: Export MOU Protocol Box */}
+        <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/40 via-purple-950/40 to-slate-900 border border-cyan-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300 uppercase tracking-wide">
+              <Printer className="w-4 h-4 text-cyan-400" />
+              Протокол встречи (MOU) / HR-отчет
             </div>
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold text-[#ffb703] uppercase tracking-wider">Точки роста:</span>
-              {analytics.areasForGrowth.map((g, idx) => (
-                <div key={idx} className="text-xs text-slate-300 flex items-start gap-1.5">
-                  <span className="text-[#ffb703]">▲</span> {g}
-                </div>
-              ))}
-            </div>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              Сводка условий (460 ₽/м², 4 мес., 1.2 млрд CAPEX), HR-метрики и стоп-лексикон сотрудника.
+            </p>
           </div>
+
+          <button
+            onClick={handleExportProtocol}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,240,255,0.4)] active:scale-95 transition-all shrink-0 cursor-pointer"
+          >
+            <FileDown className="w-4 h-4" />
+            <span>Скачать MOU / PDF</span>
+          </button>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 pt-2">
+        <div className="flex items-center justify-end gap-3 pt-1">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+            className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white cursor-pointer"
           >
             Вернуться в арену
           </button>
@@ -225,7 +288,7 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
               onRestart();
               onClose();
             }}
-            className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#7b2cbf] hover:bg-[#9d4edd] text-white shadow-[0_0_15px_rgba(123,44,191,0.5)] flex items-center gap-2"
+            className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#7b2cbf] hover:bg-[#9d4edd] text-white shadow-[0_0_15px_rgba(123,44,191,0.5)] flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Начать новый раунд
