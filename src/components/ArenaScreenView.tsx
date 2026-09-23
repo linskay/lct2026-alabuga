@@ -7,6 +7,7 @@ import {
   NegotiationAgenda,
 } from "../types";
 import { BarsAvatar } from "./BarsAvatar";
+import { BarsSpeakingSpotlight } from "./BarsSpeakingSpotlight";
 import {
   Send,
   RotateCcw,
@@ -74,12 +75,27 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   const [showTelemetrySheet, setShowTelemetrySheet] = useState(false);
   const [telemetryTab, setTelemetryTab] = useState<"metrics" | "batna" | "agenda">("metrics");
   const [isBarsHudExpanded, setIsBarsHudExpanded] = useState(false);
+  const [isBarsSpotlightOpen, setIsBarsSpotlightOpen] = useState(false);
+  const prevBarsFeedbackRef = useRef(barsFeedback);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  // When B.A.R.S. speaks a fresh insight, automatically show him enlarged with typewriter animation
+  useEffect(() => {
+    if (
+      barsFeedback &&
+      barsFeedback !== prevBarsFeedbackRef.current &&
+      barsFeedback !== "Ожидаем реплику оппонента..." &&
+      !isLoading
+    ) {
+      prevBarsFeedbackRef.current = barsFeedback;
+      setIsBarsSpotlightOpen(true);
+    }
+  }, [barsFeedback, isLoading]);
 
   const handleSend = () => {
     if (!inputText.trim() || isLoading || isDealClosed || isDealFailed) return;
@@ -190,6 +206,17 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
 
         {/* Actions Row */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* B.A.R.S. Mentor Spotlight Trigger */}
+          <button
+            id="m3-bars-spotlight-button"
+            onClick={() => setIsBarsSpotlightOpen(true)}
+            className="h-9 px-2.5 sm:px-3 rounded-full bg-[#4f378b]/40 hover:bg-[#4f378b] border border-[#d0bcff]/40 text-[#d0bcff] text-xs font-semibold flex items-center gap-1.5 transition-colors active:scale-95 shadow-sm"
+            title="Вызвать наставника Б.А.Р.С. (3D и тактика)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-[#00f0ff]" />
+            <span className="hidden xs:inline">Б.А.Р.С.</span>
+          </button>
+
           {/* Mobile Telemetry Status Pill (Linear Indicator Hint) */}
           <button
             id="m3-telemetry-badge-button"
@@ -250,6 +277,94 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
       </header>
 
       {/* ========================================================================= */}
+      {/* 1.1 PERSISTENT TELEMETRY HUD RIBBON (Always visible at top, never at bottom) */}
+      {/* ========================================================================= */}
+      <section
+        id="m3-telemetry-ribbon"
+        className="bg-[#1d1b20] border-b border-[#49454f]/40 px-3 sm:px-4 py-2 flex items-center justify-between gap-3 text-xs shrink-0 overflow-x-auto select-none"
+      >
+        <div className="flex items-center gap-4 sm:gap-6 min-w-max">
+          {/* Trust Meter */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#cac4d0]">Доверие:</span>
+            <div className="w-16 sm:w-20 bg-[#36343b] h-2 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#d0bcff] transition-all duration-300"
+                style={{ width: `${metrics.trust}%` }}
+              />
+            </div>
+            <span className="font-bold text-[#d0bcff] text-[11px]">{metrics.trust}%</span>
+          </div>
+
+          {/* Tension Meter */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#cac4d0]">Стресс:</span>
+            <div className="w-16 sm:w-20 bg-[#36343b] h-2 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#f2b8b5] transition-all duration-300"
+                style={{ width: `${metrics.tension}%` }}
+              />
+            </div>
+            <span className="font-bold text-[#f2b8b5] text-[11px]">{metrics.tension}%</span>
+          </div>
+
+          {/* Deal Readiness Meter */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#cac4d0]">Готовность:</span>
+            <div className="w-16 sm:w-20 bg-[#36343b] h-2 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#00f0ff] transition-all duration-300"
+                style={{ width: `${metrics.deal_readiness}%` }}
+              />
+            </div>
+            <span className="font-bold text-[#00f0ff] text-[11px]">{metrics.deal_readiness}%</span>
+          </div>
+
+          {/* Quick Agenda Status Chips */}
+          <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-[#49454f]/40">
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-md font-medium border ${
+                agenda.rate.status === "agreed"
+                  ? "bg-[#004f58]/40 border-[#00f0ff]/40 text-[#00f0ff]"
+                  : "bg-[#2b2930] border-[#49454f]/40 text-[#cac4d0]"
+              }`}
+            >
+              Ставка: {agenda.rate.status === "agreed" ? "✓ 460 ₽" : "В процессе"}
+            </span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-md font-medium border ${
+                agenda.grace_period.status === "agreed"
+                  ? "bg-[#004f58]/40 border-[#00f0ff]/40 text-[#00f0ff]"
+                  : "bg-[#2b2930] border-[#49454f]/40 text-[#cac4d0]"
+              }`}
+            >
+              Каникулы: {agenda.grace_period.status === "agreed" ? "✓ 4 мес." : "В процессе"}
+            </span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-md font-medium border ${
+                agenda.power_capex.status === "agreed"
+                  ? "bg-[#004f58]/40 border-[#00f0ff]/40 text-[#00f0ff]"
+                  : "bg-[#2b2930] border-[#49454f]/40 text-[#cac4d0]"
+              }`}
+            >
+              Сети CAPEX: {agenda.power_capex.status === "agreed" ? "✓ Согласовано" : "В процессе"}
+            </span>
+          </div>
+        </div>
+
+        {/* Expand / Details Button */}
+        <button
+          id="m3-telemetry-expand-btn"
+          onClick={() => setShowTelemetrySheet(true)}
+          className="px-2.5 py-1 rounded-lg bg-[#2b2930] hover:bg-[#36343b] text-[#d0bcff] hover:text-white border border-[#49454f]/50 text-[11px] font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer active:scale-95"
+          title="Открыть полный тактический центр и BATNA"
+        >
+          <Activity className="w-3.5 h-3.5 text-[#00f0ff]" />
+          <span>BATNA и Анализ</span>
+        </button>
+      </section>
+
+      {/* ========================================================================= */}
       {/* 2. BODY CONTENT (Material 3 LazyColumn & Dual-Pane on Desktop)            */}
       {/* ========================================================================= */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-4 p-0 lg:p-4 overflow-hidden">
@@ -262,16 +377,21 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               className="rounded-2xl bg-[#2b2930] border border-[#49454f]/40 p-3 sm:p-3.5 shadow-md transition-all flex flex-col justify-between"
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="shrink-0">
+                <div
+                  onClick={() => setIsBarsSpotlightOpen(true)}
+                  className="flex items-center gap-2.5 min-w-0 cursor-pointer group flex-1"
+                  title="Нажмите, чтобы развернуть Б.А.Р.С. в полный рост с анимацией"
+                >
+                  <div className="shrink-0 group-hover:scale-105 transition-transform">
                     <BarsAvatar animation={barsAnimation} size="xs" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#d0bcff]">Б.А.Р.С.</span>
+                      <span className="text-xs font-bold text-[#d0bcff] group-hover:text-[#00f0ff] transition-colors">Б.А.Р.С.</span>
                       <span className="text-[10px] text-[#cac4d0]">| Наставник ОЭЗ</span>
+                      <span className="text-[10px] text-[#00f0ff] font-mono opacity-80 group-hover:opacity-100 transition-opacity">↗ 3D</span>
                     </div>
-                    <p className="text-xs text-[#e6e0e9] font-sans truncate max-w-sm sm:max-w-md">
+                    <p className="text-xs text-[#e6e0e9] font-sans truncate max-w-sm sm:max-w-md group-hover:text-white transition-colors">
                       «{barsFeedback}»
                     </p>
                   </div>
@@ -331,13 +451,24 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                     key={msg.id}
                     className="flex gap-2.5 sm:gap-3 items-start my-1 max-w-[95%] sm:max-w-[85%]"
                   >
-                    <BarsAvatar animation={msg.barsAnimation || barsAnimation} size="xs" />
-                    <div className="flex-1 rounded-2xl p-3 sm:p-3.5 bg-[#332d41] border border-[#49454f]/40 text-[#e8def8] shadow-sm">
+                    <div
+                      onClick={() => setIsBarsSpotlightOpen(true)}
+                      className="cursor-pointer hover:scale-110 transition-transform"
+                      title="Развернуть 3D робота крупно"
+                    >
+                      <BarsAvatar animation={msg.barsAnimation || barsAnimation} size="xs" />
+                    </div>
+                    <div
+                      onClick={() => setIsBarsSpotlightOpen(true)}
+                      className="flex-1 rounded-2xl p-3 sm:p-3.5 bg-[#332d41] border border-[#49454f]/40 text-[#e8def8] shadow-sm cursor-pointer hover:border-[#00f0ff]/50 transition-colors"
+                      title="Нажмите, чтобы развернуть Б.А.Р.С. в 3D с анимацией"
+                    >
                       <div className="flex items-center justify-between gap-2 mb-1 text-[11px]">
                         <span className="font-semibold text-[#d0bcff] flex items-center gap-1">
                           <Sparkles className="w-3.5 h-3.5 text-[#00f0ff]" />
                           Б.А.Р.С. (Тактический разбор)
                         </span>
+                        <span className="text-[10px] text-[#00f0ff] font-mono">3D Робот ↗</span>
                       </div>
                       <p className="text-xs sm:text-sm leading-relaxed text-[#e6e0e9] font-sans">
                         {msg.text}
@@ -618,24 +749,19 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
       </main>
 
       {/* ========================================================================= */}
-      {/* 4. M3 MODAL BOTTOM SHEET (Mobile & On-Demand)                             */}
+      {/* 4. M3 TELEMETRY DIALOG (Centered, On-Demand, Never Stuck to Bottom)         */}
       {/* ========================================================================= */}
       {showTelemetrySheet && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          {/* Backdrop Click Dismiss */}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setShowTelemetrySheet(false)}
+        >
+          {/* Dialog Container (Centered Material 3 Dialog) */}
           <div
-            className="flex-1 w-full"
-            onClick={() => setShowTelemetrySheet(false)}
-          />
-
-          {/* Sheet Container (rounded-t-[28px], shape extraLarge) */}
-          <div
-            id="m3-modal-bottom-sheet"
-            className="w-full max-w-xl mx-auto rounded-t-[28px] bg-[#211f26] border-t border-[#49454f]/50 p-4 sm:p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto"
+            id="m3-telemetry-dialog"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl mx-auto rounded-3xl bg-[#211f26] border border-[#49454f]/60 p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200"
           >
-            {/* M3 Drag Handle */}
-            <div className="w-8 h-1 rounded-full bg-[#938f99] mx-auto mb-2" />
-
             <div className="flex items-center justify-between border-b border-[#49454f]/30 pb-3">
               <div>
                 <h3 className="text-lg font-bold text-[#e6e0e9]">Телеметрия встречи</h3>
@@ -643,7 +769,8 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               </div>
               <button
                 onClick={() => setShowTelemetrySheet(false)}
-                className="w-9 h-9 rounded-full bg-[#2b2930] hover:bg-[#36343b] text-[#cac4d0] hover:text-white flex items-center justify-center"
+                className="w-9 h-9 rounded-full bg-[#2b2930] hover:bg-[#36343b] text-[#cac4d0] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                title="Закрыть окно"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -821,6 +948,16 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* 5. B.A.R.S. LARGE SPEAKING SPOTLIGHT WITH TYPEWRITER EFFECT */}
+      <BarsSpeakingSpotlight
+        isOpen={isBarsSpotlightOpen}
+        adviceText={barsFeedback}
+        recommendedAction={suggestionChips[0]?.text}
+        animation={barsAnimation === "idle" ? "talk" : barsAnimation}
+        onClose={() => setIsBarsSpotlightOpen(false)}
+        onApplyAction={(actionText) => setInputText(actionText)}
+      />
     </div>
   );
 };
