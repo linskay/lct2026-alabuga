@@ -19,6 +19,9 @@ export interface Message {
   snapshotMetrics: NegotiationMetrics;
   tacticalNote?: string;
   barsAnimation?: BarsAnimationState;
+  emotion?: "attack" | "compromise" | "bluff" | "neutral";
+  emotionLabel?: string;
+  emotionEmoji?: string;
 }
 
 export interface BatnaConfig {

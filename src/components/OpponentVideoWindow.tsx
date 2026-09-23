@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AdminScenarioConfig, NegotiationMetrics, BarsAnimationState } from "../types";
-import { ShieldCheck, Video, Mic, Volume2 } from "lucide-react";
+import { ShieldCheck, Video, Mic } from "lucide-react";
 
 interface OpponentVideoWindowProps {
   config: AdminScenarioConfig;
@@ -23,7 +23,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
 }) => {
   const modelViewerRef = useRef<any>(null);
   const [modelError, setModelError] = useState(false);
-  const [activeAnim, setActiveAnim] = useState<string>("Idle");
+  const [activeAnim, setActiveAnim] = useState<string>("idle");
 
   // Determine automated animation based on live negotiation state
   const determineAutomatedAnimation = (): string => {
@@ -34,7 +34,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
       return "No";
     }
     if (isLoading) {
-      // Opponent is processing response
+      // Opponent is actively thinking / analyzing player's offer
       return "Standing";
     }
     if (barsAnimation === "warn" || metrics.tension >= 65) {
@@ -49,7 +49,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
     return "Idle";
   };
 
-  // Sync animation automatically whenever states change
+  // Sync animation and dynamic camera orbit when thinking / replying
   useEffect(() => {
     const chosen = determineAutomatedAnimation();
     setActiveAnim(chosen);
@@ -58,12 +58,21 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
     if (viewer) {
       const apply = () => {
         const available: string[] = viewer.availableAnimations || [];
-        const finalAnim = available.includes(chosen) ? chosen : "Idle";
-        viewer.animationName = finalAnim;
+        const match = available.find((a) => a.toLowerCase() === chosen.toLowerCase()) || "Idle";
+        viewer.animationName = match;
         if (viewer.play) {
           viewer.play();
         }
       };
+
+      // Set dynamic camera orbit: smoothly zoom in when thinking or responding
+      if (isLoading) {
+        viewer.setAttribute("camera-orbit", "0deg 82deg 1.7m");
+        viewer.setAttribute("field-of-view", "28deg");
+      } else {
+        viewer.setAttribute("camera-orbit", "0deg 85deg 2.2m");
+        viewer.setAttribute("field-of-view", "30deg");
+      }
 
       if (viewer.availableAnimations && viewer.availableAnimations.length > 0) {
         apply();
@@ -121,7 +130,15 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
 
   return (
     <div
-      className={`relative w-full rounded-3xl overflow-hidden border border-white/[0.12] bg-gradient-to-b from-[#131522] via-[#0b0c16] to-[#06070c] shadow-[0_12px_40px_rgba(0,0,0,0.65)] flex flex-col ${className}`}
+      id="opponent-stage"
+      className={`relative w-full rounded-3xl overflow-hidden border border-white/[0.12] bg-gradient-to-b from-[#131522] via-[#0b0c16] to-[#06070c] shadow-[0_12px_40px_rgba(0,0,0,0.65)] flex flex-col transition-all duration-500 ${
+        isLoading
+          ? "scale-[1.015] sm:scale-[1.02] border-purple-500/50 shadow-[0_0_40px_rgba(123,44,191,0.35)]"
+          : "scale-100"
+      } ${className}`}
+      style={{
+        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+      }}
     >
       {/* Background Studio Lighting & Subtle Tech Grid */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(99,102,241,0.18)_0%,transparent_70%)] pointer-events-none" />
@@ -165,7 +182,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
         </div>
       </div>
 
-      {/* 3D Video Viewport: Opponent sitting directly across the negotiation table */}
+      {/* 3D Video Viewport: Opponent sitting directly across the table with NO manual mouse rotation */}
       <div className="relative w-full h-52 sm:h-64 md:h-72 flex items-center justify-center overflow-hidden">
         {/* Holographic conference table pedestal */}
         <div className="absolute -bottom-10 inset-x-0 h-28 bg-gradient-to-t from-[#05060a] via-[#101222]/80 to-transparent pointer-events-none z-10" />
@@ -173,21 +190,21 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
 
         {!modelError ? (
           <model-viewer
+            id="opponent-3d"
             ref={modelViewerRef}
             src="/bars.glb"
             alt={`${config.opponentName} - 3D Виртуальный переговорщик`}
             autoplay
             animation-name={activeAnim}
-            camera-controls
-            touch-action="pan-y"
-            disable-zoom
-            shadow-intensity="1.6"
+            interaction-prompt="none"
+            camera-orbit={isLoading ? "0deg 82deg 1.7m" : "0deg 85deg 2.2m"}
+            field-of-view="30deg"
+            shadow-intensity="1.5"
             shadow-softness="0.8"
             exposure="1.2"
-            camera-orbit="0deg 78deg 105%"
-            camera-target="auto auto auto"
             style={
               {
+                pointerEvents: "none",
                 width: "100%",
                 height: "100%",
                 "--poster-color": "transparent",

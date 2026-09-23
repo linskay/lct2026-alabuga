@@ -79,6 +79,9 @@ export default function App() {
     timestamp: Date.now(),
     stepIndex: 0,
     snapshotMetrics: { ...initialMetrics },
+    emotion: "attack",
+    emotionLabel: "Первый выпад / Давление",
+    emotionEmoji: "😠",
   };
 
   const [messages, setMessages] = useState<Message[]>([initialBarsWelcome, initialOpponentMessage]);
@@ -199,6 +202,31 @@ export default function App() {
         setActiveCounterOffer(data.active_counter_offer);
       }
 
+      // Determine emotion classification
+      let emotion: "attack" | "compromise" | "bluff" | "neutral" = data.emotion || "neutral";
+      let emotionLabel = data.emotion_label;
+      let emotionEmoji = data.emotion_emoji;
+
+      if (!emotionLabel) {
+        if (data.manipulation_type === "bluff" || data.opponent_reply?.includes("Калуг")) {
+          emotion = "bluff";
+          emotionLabel = "Блеф конкурентами";
+          emotionEmoji = "⚠️";
+        } else if (data.bars_animation === "warn" || data.metrics?.tension >= 60) {
+          emotion = "attack";
+          emotionLabel = "Несогласие";
+          emotionEmoji = "😠";
+        } else if (data.bars_animation === "win" || data.metrics?.deal_readiness >= 65 || data.is_deal_closed) {
+          emotion = "compromise";
+          emotionLabel = "Заинтересован";
+          emotionEmoji = "🤝";
+        } else {
+          emotion = "neutral";
+          emotionLabel = "Позиция";
+          emotionEmoji = "💬";
+        }
+      }
+
       const opponentMessage: Message = {
         id: `msg_opp_${Date.now()}`,
         actor: "OPPONENT",
@@ -208,6 +236,9 @@ export default function App() {
         snapshotMetrics: { ...data.metrics },
         tacticalNote: data.bars_feedback,
         barsAnimation: data.bars_animation,
+        emotion,
+        emotionLabel,
+        emotionEmoji,
       };
 
       const newHistory = [...updatedMessages, opponentMessage];

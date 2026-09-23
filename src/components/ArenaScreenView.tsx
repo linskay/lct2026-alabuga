@@ -69,8 +69,16 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   const [inputText, setInputText] = useState("");
   const [showTelemetrySheet, setShowTelemetrySheet] = useState(false);
   const [telemetryTab, setTelemetryTab] = useState<"metrics" | "batna" | "agenda">("metrics");
+  const [usedChipLabels, setUsedChipLabels] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset used chips if session restarted
+  useEffect(() => {
+    if (messages.length <= 2) {
+      setUsedChipLabels(new Set());
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -79,6 +87,13 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   const handleSend = () => {
     if (!inputText.trim() || isLoading || isDealClosed || isDealFailed) return;
     onSendMessage(inputText.trim());
+    setInputText("");
+  };
+
+  const handleChipClick = (chip: { label: string; text: string }) => {
+    if (isLoading || isDealClosed || isDealFailed || usedChipLabels.has(chip.label)) return;
+    setUsedChipLabels((prev) => new Set(prev).add(chip.label));
+    onSendMessage(chip.text);
     setInputText("");
   };
 
@@ -307,35 +322,83 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                 );
               }
 
-              // Human-to-Opponent Negotiation Dialogue
+              // Opponent Message with Dynamic Emotion Avatar and Status Badge
+              if (!isUser) {
+                // Determine styling based on emotion
+                const emotion = msg.emotion || (msg.snapshotMetrics.tension >= 65 ? "attack" : msg.snapshotMetrics.deal_readiness >= 65 ? "compromise" : "neutral");
+                let ringColor = "ring-slate-500/50";
+                let badgeBg = "bg-slate-500/10 text-slate-300 border-slate-500/20";
+                let emoji = msg.emotionEmoji || "💬";
+                let statusLabel = msg.emotionLabel || "Позиция";
+
+                if (emotion === "attack") {
+                  ringColor = "ring-rose-500/60";
+                  badgeBg = "bg-rose-500/15 text-rose-300 border-rose-500/30";
+                  emoji = msg.emotionEmoji || "😠";
+                  statusLabel = msg.emotionLabel || "Несогласие / Прессинг";
+                } else if (emotion === "compromise") {
+                  ringColor = "ring-emerald-500/60";
+                  badgeBg = "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+                  emoji = msg.emotionEmoji || "🤝";
+                  statusLabel = msg.emotionLabel || "Сближение / Компромисс";
+                } else if (emotion === "bluff") {
+                  ringColor = "ring-amber-500/60";
+                  badgeBg = "bg-amber-500/15 text-amber-300 border-amber-500/30";
+                  emoji = msg.emotionEmoji || "⚠️";
+                  statusLabel = msg.emotionLabel || "Блеф / Проверка границ";
+                }
+
+                return (
+                  <div key={msg.id} className="animate-message-in flex items-start gap-3 my-2.5 max-w-[94%] sm:max-w-[88%]">
+                    {/* Opponent Avatar with Emotion Ring & Indicator */}
+                    <div className="relative shrink-0 mt-0.5">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ${ringColor} overflow-hidden shadow-lg bg-gradient-to-tr from-purple-950 to-indigo-900 border border-white/10 flex items-center justify-center font-bold text-white text-xs sm:text-sm`}>
+                        {opponentInitials}
+                      </div>
+                      <span className="absolute -bottom-1 -right-1 text-xs bg-[#0b0c16] rounded-full p-0.5 border border-white/10 shadow-sm leading-none">
+                        {emoji}
+                      </span>
+                    </div>
+
+                    {/* Opponent Message Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="text-xs sm:text-sm font-semibold text-white tracking-wide">
+                          {config.opponentName}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono hidden xs:inline-block">
+                          {config.opponentRole}
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium flex items-center gap-1 ${badgeBg}`}>
+                          <span>{emoji}</span>
+                          <span>{statusLabel}</span>
+                        </span>
+                      </div>
+
+                      <div className="p-3.5 sm:p-4 rounded-2xl rounded-tl-xs bg-[#131525]/90 border border-white/[0.09] shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-md">
+                        <p className="text-xs sm:text-sm text-slate-100 leading-relaxed font-sans whitespace-pre-wrap">
+                          {msg.text}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // User Message (Right Aligned)
               return (
                 <div
                   key={msg.id}
-                  className={`animate-message-in flex flex-col group ${isUser ? "items-end" : "items-start"}`}
+                  className="animate-message-in flex flex-col items-end my-2 group self-end max-w-[90%] sm:max-w-[85%]"
                 >
-                  {/* Sender Label */}
-                  <div
-                    className={`text-[11px] font-medium mb-1 px-1 flex items-center gap-1.5 ${
-                      isUser ? "text-cyan-300" : "text-slate-400"
-                    }`}
-                  >
-                    <span>{isUser ? "Вы (ОЭЗ «Алабуга»)" : config.opponentName}</span>
-                    {!isUser && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-white/5 border border-white/10 text-slate-400">
-                        {config.opponentCompany}
-                      </span>
-                    )}
+                  <div className="text-[11px] font-medium mb-1 px-1 flex items-center gap-1.5 text-cyan-300">
+                    <span>Вы (ОЭЗ «Алабуга»)</span>
                   </div>
 
-                  {/* Message Bubble */}
-                  <div
-                    className={`p-3 sm:p-3.5 rounded-3xl text-xs sm:text-sm leading-relaxed max-w-[90%] sm:max-w-[85%] transition-all ${
-                      isUser
-                        ? "bg-gradient-to-br from-indigo-600/90 via-purple-700/90 to-purple-900/90 text-white rounded-tr-xs border border-cyan-400/30 shadow-[0_6px_25px_rgba(99,102,241,0.25)] backdrop-blur-md"
-                        : "bg-[#141624]/90 text-slate-100 rounded-tl-xs border border-white/[0.09] shadow-[0_4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md"
-                    }`}
-                  >
-                    <p className="font-sans whitespace-pre-wrap">{msg.text}</p>
+                  <div className="p-3.5 sm:p-4 rounded-2xl rounded-tr-xs bg-gradient-to-br from-indigo-600/90 via-purple-700/90 to-purple-900/90 text-white border border-cyan-400/30 shadow-[0_6px_25px_rgba(99,102,241,0.25)] backdrop-blur-md">
+                    <p className="text-xs sm:text-sm text-white leading-relaxed font-sans whitespace-pre-wrap">
+                      {msg.text}
+                    </p>
                   </div>
                 </div>
               );
@@ -416,22 +479,36 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               </div>
             )}
 
-            {/* Быстрые переговорные чипсы */}
+            {/* Быстрые переговорные чипсы (С защитой от повторного спама аргументов) */}
             {!isDealClosed && !isDealFailed && (
               <div
                 id="m3-suggestion-chips-row"
                 className="overflow-x-auto flex items-center gap-2 pb-2.5 scrollbar-none"
               >
-                {suggestionChips.map((chip, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setInputText(chip.text)}
-                    className="shrink-0 h-7 sm:h-8 px-3 rounded-full glass-pill hover:bg-white/10 active:bg-white/15 text-slate-200 hover:text-white text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap active:scale-95 shadow-sm flex items-center gap-1.5 border border-white/10 hover:border-cyan-400/40 cursor-pointer"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f0ff]" />
-                    <span>{chip.label}</span>
-                  </button>
-                ))}
+                {suggestionChips.map((chip, idx) => {
+                  const isUsed = usedChipLabels.has(chip.label);
+                  return (
+                    <button
+                      key={idx}
+                      disabled={isUsed || isLoading}
+                      onClick={() => handleChipClick(chip)}
+                      className={`shrink-0 h-7 sm:h-8 px-3 rounded-full text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border shadow-sm ${
+                        isUsed
+                          ? "bg-white/[0.03] text-slate-500 border-white/[0.06] cursor-not-allowed line-through opacity-60"
+                          : "glass-pill hover:bg-white/10 active:bg-white/15 text-slate-200 hover:text-white border-white/10 hover:border-cyan-400/40 active:scale-95 cursor-pointer"
+                      }`}
+                      title={isUsed ? "Аргумент уже озвучен в переговорах" : `Озвучить: ${chip.text}`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isUsed ? "bg-slate-600" : "bg-cyan-400 shadow-[0_0_6px_#00f0ff]"
+                        }`}
+                      />
+                      <span>{chip.label}</span>
+                      {isUsed && <span className="text-[10px] text-slate-500 ml-0.5">✓</span>}
+                    </button>
+                  );
+                })}
               </div>
             )}
 

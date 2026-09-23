@@ -61,6 +61,29 @@ function generateFallbackResponse(body: any) {
 
   const agenda = JSON.parse(JSON.stringify(currentAgenda));
 
+  // Detect whether player is repeating previous arguments (anti-spam / anti-loop)
+  const previousUserMessages = userMessages.slice(0, -1);
+  const isRepeatingArgument = previousUserMessages.some((prev: any) => {
+    const prevText = (prev.text || "").toLowerCase().trim();
+    if (!prevText || prevText.length < 10) return false;
+    // Check direct equality or high substring overlap (e.g. repeated chip)
+    if (prevText === lower) return true;
+    if (lower.length > 25 && prevText.includes(lower.slice(0, 25))) return true;
+    if (prevText.length > 25 && lower.includes(prevText.slice(0, 25))) return true;
+    return false;
+  });
+
+  if (isRepeatingArgument) {
+    trustDelta = -12;
+    tensionDelta = +18;
+    barsAnimation = "warn";
+    opponentReply =
+      "Вы уже повторяли этот аргумент слово в слово. Вашу позицию я услышал, но мои встречные вопросы остались без ответа. Не ходите по кругу — давайте конкретные встречные уступки, иначе диалог теряет смысл.";
+    barsFeedback =
+      "ОШИБКА: Повторение одного и того же тезиса! Оппонент раздражен хождением по кругу. Смените предмет торга или задайте встречный вопрос о приоритетах.";
+    return buildResponse("attack", "Несогласие / Осаживание", "😠");
+  }
+
   // Detect whether previous turn was a manipulation attack
   const wasBluff = lastOpponentMsg.includes("Калуга") || lastOpponentMsg.includes("калуга");
   const wasAuthorityPress = lastOpponentMsg.includes("уполномочены") || lastOpponentMsg.includes("генеральному директору");
@@ -388,7 +411,11 @@ function generateFallbackResponse(body: any) {
   barsFeedback =
     "Строганов прощупывает вашу устойчивость. Используйте ступенчатое сопротивление: назовите 460 ₽/м² и выясните его дедлайн по вводу оборудования.";
 
-  function buildResponse() {
+  function buildResponse(
+    customEmotion?: "attack" | "compromise" | "bluff" | "neutral",
+    customLabel?: string,
+    customEmoji?: string
+  ) {
     // Double check anti-loop
     if (previousOpponentTexts.includes(opponentReply)) {
       opponentReply = `Слушайте меня внимательно: ${opponentReply}`;
@@ -407,6 +434,27 @@ function generateFallbackResponse(body: any) {
         "ПРОВАЛ ПЕРЕГОВОРОВ: Напряжение зашкалило, оппонент разорвал контакт. Используйте «Машину времени», чтобы вернуться на спорный шаг назад.";
     }
 
+    // Determine emotion defaults
+    let emotion: "attack" | "compromise" | "bluff" | "neutral" = customEmotion || "neutral";
+    let emotionLabel = customLabel || "Внимательный диалог";
+    let emotionEmoji = customEmoji || "💬";
+
+    if (!customEmotion) {
+      if (manipulationType === "bluff" || opponentReply.includes("Калуг") || opponentReply.includes("Ульяновск")) {
+        emotion = "bluff";
+        emotionLabel = "Блеф / Проверка границ";
+        emotionEmoji = "⚠️";
+      } else if (barsAnimation === "warn" || tensionDelta > 5 || finalTension >= 65) {
+        emotion = "attack";
+        emotionLabel = "Несогласие / Прессинг";
+        emotionEmoji = "😠";
+      } else if (barsAnimation === "win" || trustDelta > 5 || finalReadiness >= 65 || isDealClosed) {
+        emotion = "compromise";
+        emotionLabel = "Заинтересован / Компромисс";
+        emotionEmoji = "🤝";
+      }
+    }
+
     return {
       opponent_reply: opponentReply,
       bars_feedback: barsFeedback,
@@ -422,6 +470,9 @@ function generateFallbackResponse(body: any) {
       manipulation_type: manipulationType,
       hidden_need_revealed: hiddenNeedRevealed,
       active_counter_offer: activeCounterOffer,
+      emotion,
+      emotion_label: emotionLabel,
+      emotion_emoji: emotionEmoji,
     };
   }
 
@@ -529,6 +580,9 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
 4. Проверяй твердость позиции: если игрок соглашается на твои условия слишком легко — дави еще сильнее.
 5. Держи сделку открытой: переговоры должны длиться минимум 6–8 раундов перед финальным решением.
 6. Если игрок пытается закрыть сделку слишком быстро (до 6 шага), осади его и укажи на непроработанные риски.
+7. КРИТИЧЕСКИ ВАЖНО: Если игрок отправляет повторный аргумент или нажимает одну и ту же фразу/подсказку («Мы готовы зафиксировать 460 ₽...», «Резерв 250 мест...»), ты ОБЯЗАН немедленно осадить его:
+   «Вы уже говорили про 250 рабочих мест. Позицию я услышал, но мой вопрос о компенсации сетей остался без ответа. Не ходите по кругу».
+   Никогда не уводи тему в сторону и не меняй внезапно контекст при повторах — требуй ответа на свои открытые вопросы!
 
 Формат вывода строго в JSON.`;
 
@@ -590,6 +644,9 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
             manipulation_type: { type: Type.STRING },
             hidden_need_revealed: { type: Type.BOOLEAN },
             active_counter_offer: { type: Type.INTEGER },
+            emotion: { type: Type.STRING },
+            emotion_label: { type: Type.STRING },
+            emotion_emoji: { type: Type.STRING },
           },
           required: [
             "opponent_reply",
