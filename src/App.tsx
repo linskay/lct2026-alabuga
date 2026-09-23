@@ -82,6 +82,11 @@ export default function App() {
     emotion: "attack",
     emotionLabel: "Первый выпад / Давление",
     emotionEmoji: "😠",
+    contextHints: [
+      "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+      "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем субсидий или мощности]...",
+      "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
+    ],
   };
 
   const [messages, setMessages] = useState<Message[]>([initialBarsWelcome, initialOpponentMessage]);
@@ -239,23 +244,14 @@ export default function App() {
         emotion,
         emotionLabel,
         emotionEmoji,
+        contextHints: data.context_hints || [
+          "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+          "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
+          "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
+        ],
       };
 
       const newHistory = [...updatedMessages, opponentMessage];
-
-      // If B.A.R.S. triggers a warning, win, or critical feedback, insert a living mentor bubble
-      if (data.bars_animation === "warn" || data.bars_animation === "win" || nextStep % 2 === 0) {
-        const barsMessage: Message = {
-          id: `msg_bars_${Date.now() + 1}`,
-          actor: "BARS",
-          text: data.bars_feedback,
-          timestamp: Date.now() + 1,
-          stepIndex: nextStep,
-          snapshotMetrics: { ...data.metrics },
-          barsAnimation: data.bars_animation,
-        };
-        newHistory.push(barsMessage);
-      }
 
       setMessages(newHistory);
       setMetrics(data.metrics);

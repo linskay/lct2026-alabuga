@@ -1,28 +1,26 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Message,
   AdminScenarioConfig,
+  Message,
   NegotiationMetrics,
-  BarsAnimationState,
   NegotiationAgenda,
+  BarsAnimationState,
 } from "../types";
 import { OpponentVideoWindow } from "./OpponentVideoWindow";
 import {
   Send,
   RotateCcw,
   Sparkles,
-  CheckCircle2,
-  AlertTriangle,
   Info,
-  Sliders,
-  Award,
   Clock,
   ShieldCheck,
+  Award,
+  Sliders,
+  CheckCircle2,
+  AlertTriangle,
   ArrowLeft,
-  X,
   Activity,
-  Mic,
-  ArrowDownRight,
+  AlertCircle,
 } from "lucide-react";
 
 interface ArenaScreenViewProps {
@@ -67,34 +65,46 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   onOpenConfigurator,
 }) => {
   const [inputText, setInputText] = useState("");
+  const [lastInsertedTemplate, setLastInsertedTemplate] = useState<string>("");
   const [showTelemetrySheet, setShowTelemetrySheet] = useState(false);
   const [telemetryTab, setTelemetryTab] = useState<"metrics" | "batna" | "agenda">("metrics");
-  const [usedChipLabels, setUsedChipLabels] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  // Reset used chips if session restarted
-  useEffect(() => {
-    if (messages.length <= 2) {
-      setUsedChipLabels(new Set());
-    }
-  }, [messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  // Validation logic: checks placeholders and exact unmodified template
+  const val = inputText.trim();
+  const hasPlaceholders = /\[.*?\]|\.\.\./.test(val);
+  const isExactTemplate = lastInsertedTemplate.length > 0 && val === lastInsertedTemplate.trim();
+  const isTooShort = val.length < 10;
+  const isSendDisabled = isTooShort || isExactTemplate || hasPlaceholders || isLoading || isDealClosed || isDealFailed;
+
+  let validationWarning = "";
+  if (inputText.length > 0) {
+    if (hasPlaceholders) {
+      validationWarning = "Заполните ваши условия своими словами вместо [...] или ...";
+    } else if (isExactTemplate) {
+      validationWarning = "Добавьте конкретный аргумент или встречное требование в шаблон";
+    } else if (isTooShort) {
+      validationWarning = "Сформулируйте развернутый аргумент (минимум 10 символов)";
+    }
+  }
+
   const handleSend = () => {
-    if (!inputText.trim() || isLoading || isDealClosed || isDealFailed) return;
-    onSendMessage(inputText.trim());
+    if (isSendDisabled) return;
+    onSendMessage(val);
     setInputText("");
+    setLastInsertedTemplate("");
   };
 
-  const handleChipClick = (chip: { label: string; text: string }) => {
-    if (isLoading || isDealClosed || isDealFailed || usedChipLabels.has(chip.label)) return;
-    setUsedChipLabels((prev) => new Set(prev).add(chip.label));
-    onSendMessage(chip.text);
-    setInputText("");
+  // Click on dynamic context chip: inserts scaffolding starter template
+  const applyHint = (templateText: string) => {
+    if (isLoading || isDealClosed || isDealFailed) return;
+    setInputText(templateText);
+    setLastInsertedTemplate(templateText);
   };
 
   const formatTimer = (totalSeconds: number) => {
@@ -111,72 +121,29 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
       .slice(0, 2)
       .toUpperCase() || "ОП";
 
-  const getSuggestionChips = () => {
-    if (config.id === "robotics_procurement") {
-      return [
-        { label: "Квоты линий", text: "Чжан Вэй, давайте начистоту: какова реальная загрузка шанхайской линии и почему вы избегаете ответственности за сроки?" },
-        { label: "Штраф 0.2%/день", text: "ОЭЗ не может рисковать простоем цехов. Мы согласуем контракт только при наличии штрафа 0.2% за каждый день задержки ПНР." },
-        { label: "Кадры Политеха", text: "Мы берем 40 роботов только с условием бесплатного сертифицированного курса для 50 студентов и инженеров «Алабуга Политех»." },
-        { label: "Склад запчастей", text: "Обязательное условие резидентов — гарантийный склад критических сервоприводов и плат непосредственно на территории ОЭЗ." },
-        { label: "30% постоплата", text: "Финальный транш 30% мы перечисляем строго после успешного 72-часового непрерывного стресс-теста роботов на линии." },
-      ];
-    }
-    if (config.id === "retention_lead_engineer") {
-      return [
-        { label: "Вскрыть боль", text: "Артем, я понимаю твою усталость от ночных аварий. Дело только в деньгах или в том, что ты погряз в операционке вместо архитектуры?" },
-        { label: "R&D Лидерство", text: "Мы отдаем тебе карт-бланш: ты возглавляешь разработку новой системы ИИ-диспетчеризации энергосетей ОЭЗ как технический лидер." },
-        { label: "3 стажера Политеха", text: "Мы снимаем с тебя ночные дежурства: закрепляем за тобой 3 лучших выпускников «Алабуга Политех», чтобы они закрывали рутину." },
-        { label: "Оклад +20% и KPI", text: "Мы поднимаем фиксированный оклад на 20% плюс закладываем квартальный бонус за ключевые вехи запуска SCADA." },
-      ];
-    }
-    if (config.id === "internal_capex_dispute") {
-      return [
-        { label: "Страх проверки", text: "Михаил, мы ценим вашу щепетильность к ГОСТам. Скажите прямо: какой конкретный узел вызывает наибольшие опасения у технадзора?" },
-        { label: "Независимый надзор", text: "Мы привлекаем аккредитованный независимый технадзор за счет фонда оптимизации, чтобы снять с вас единоличную ответственность." },
-        { label: "Премия сменам", text: "Мы выделяем целевой фонд премирования подрядчикам за работу в 2 смены без нарушения технологических пауз бетонирования." },
-      ];
-    }
-    return [
-      { label: "Предложить 460 ₽", text: "Мы готовы зафиксировать базовую ставку 460 ₽/м² в обмен на резерв 250 рабочих мест через «Алабуга Политех»." },
-      { label: "Каникулы до 4 мес", text: "12 месяцев каникул исключены регламентом ОЭЗ. Мы согласовываем 4 месяца с приоритетным допуском шеф-монтажа станков." },
-      { label: "8 МВт под CAPEX 1.2 млрд", text: "Подвод 8 МВт мощности мы обеспечим в приоритетном порядке, но только под взаимное обязательство CAPEX не менее 1.2 млрд рублей." },
-      { label: "Отразить Калугу", text: "В Калуге нет свободной подстанции 110 кВ на границе площадки, а у нас она уже введена в эксплуатацию и готова к подключению." },
-      { label: "Закрепить протокол", text: "Если ключевые параметры ставки 460 ₽, каникул 4 месяца и CAPEX 1.2 млрд согласованы, предлагаю зафиксировать их в итоговом соглашении." },
-    ];
-  };
-
-  const suggestionChips = getSuggestionChips();
+  // Dynamic context hints: extract from the most recent opponent message
+  const latestOpponentMsg = [...messages].reverse().find((m) => m.actor === "OPPONENT");
+  const dynamicHints: string[] =
+    latestOpponentMsg?.contextHints && latestOpponentMsg.contextHints.length > 0
+      ? latestOpponentMsg.contextHints
+      : [
+          "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+          "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
+          "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
+        ];
 
   return (
-    <div
-      id="m3-scaffold"
-      className="relative flex flex-col h-full w-full overflow-hidden bg-[#07080e] text-[#f8fafc] select-none font-sans"
-    >
-      {/* ========================================================================= */}
-      {/* 1. AMBIENT RADIAL GLOW BACKGROUND SPHERES (Modern Apple / Awwwards UI)   */}
-      {/* ========================================================================= */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="ambient-glow-spot w-[650px] h-[650px] -top-48 -left-48 bg-purple-600/20" />
-        <div
-          className="ambient-glow-spot w-[550px] h-[550px] top-[22%] -right-36 bg-cyan-500/15"
-          style={{ animationDelay: "-5s" }}
-        />
-        <div
-          className="ambient-glow-spot w-[500px] h-[500px] -bottom-36 left-[18%] bg-rose-600/12"
-          style={{ animationDelay: "-9s" }}
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none opacity-25" />
-      </div>
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#07080e] text-slate-100 select-none">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(123,44,191,0.12)_0%,transparent_60%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(0,240,255,0.06)_0%,transparent_50%)] pointer-events-none" />
 
-      {/* ========================================================================= */}
-      {/* 2. TOP APP BAR                                                           */}
-      {/* ========================================================================= */}
+      {/* ================= TOP APP BAR ================= */}
       <header
         id="m3-top-app-bar"
         className="sticky top-0 z-30 glass-panel px-3 sm:px-5 py-2 flex items-center justify-between min-h-[56px] shrink-0 border-b border-white/[0.08]"
       >
         <div className="flex items-center gap-3 min-w-0">
-          {/* Navigation Back Button */}
           <button
             id="m3-nav-back-button"
             onClick={onOpenConfigurator}
@@ -186,7 +153,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             <ArrowLeft className="w-4 h-4 text-cyan-400" />
           </button>
 
-          {/* Opponent Avatar with Glowing Status */}
           <div className="relative shrink-0">
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-900 to-indigo-700 border border-cyan-400/50 flex items-center justify-center font-bold text-white text-xs shadow-[0_0_15px_rgba(0,240,255,0.3)]">
               {opponentInitials}
@@ -194,7 +160,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-[#07080e] shadow-[0_0_8px_#00f0ff] animate-pulse" />
           </div>
 
-          {/* Title & Context */}
           <div className="min-w-0 flex flex-col justify-center">
             <div className="flex items-center gap-2">
               <span className="text-sm sm:text-base font-bold text-white truncate max-w-[160px] sm:max-w-[280px]">
@@ -210,30 +175,27 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
           </div>
         </div>
 
-        {/* Actions Row (Cleaned up: No redundant buttons) */}
+        {/* Top Header Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Telemetry Badge Button (Mobile and Quick Glance) */}
           <button
             id="m3-telemetry-badge-button"
             onClick={() => setShowTelemetrySheet(true)}
-            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer lg:hidden"
             title="Открыть полную телеметрию"
           >
             <Activity className="w-3.5 h-3.5 text-cyan-400" />
             <span className="font-bold text-cyan-300 font-mono">{metrics.trust}%</span>
           </button>
 
-          {/* Case Disposition Trigger */}
           <button
             id="m3-info-button"
             onClick={onOpenCaseInfo}
-            className="w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all"
+            className="w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
             title="Диспозиция кейса"
           >
             <Info className="w-4 h-4 text-purple-300" />
           </button>
 
-          {/* Desktop Direct Actions */}
           <div className="hidden md:flex items-center gap-1.5">
             <button
               onClick={onOpenTimeTravel}
@@ -263,7 +225,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </button>
           </div>
 
-          {/* Timer Display */}
           <div className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full glass-pill border border-cyan-500/30 flex items-center gap-1.5 text-xs font-mono text-cyan-300">
             <Clock className="w-3 h-3 text-cyan-400 animate-pulse" />
             <span>{formatTimer(timerSeconds)}</span>
@@ -271,14 +232,12 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
         </div>
       </header>
 
-      {/* ========================================================================= */}
-      {/* 3. MAIN ARENA VIEWPORT (Strict 2-Column: Video Call + Chat | Telemetry)   */}
-      {/* ========================================================================= */}
-      <main className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4 p-2 sm:p-3 lg:p-4 min-h-0 overflow-hidden">
-        {/* ================= LEFT / MAIN COLUMN (~70%): VIDEO CALL & DIALOGUE ================= */}
-        <section className="lg:col-span-8 xl:col-span-8 flex flex-col h-full min-h-0 overflow-hidden glass-panel rounded-3xl border border-white/[0.08]">
-          {/* 3D СОБЕСЕДНИК НАПРОТИВ (Интерактивное окно видеосвязи) */}
-          <div className="p-2 sm:p-3 pb-0 shrink-0">
+      {/* ================= STRICT 2-COLUMN MAIN WORKSPACE (70% Чат / 30% Тактика) ================= */}
+      <main className="max-w-7xl w-full mx-auto px-3 sm:px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-68px)] overflow-hidden">
+        {/* ЛЕВАЯ КОЛОНКА (70%): Видео собеседника + Чат диалога */}
+        <div className="lg:col-span-8 flex flex-col h-full min-h-0 gap-3">
+          {/* Окно 3D (высота 320px-340px) */}
+          <div className="shrink-0">
             <OpponentVideoWindow
               config={config}
               metrics={metrics}
@@ -289,43 +248,29 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             />
           </div>
 
-          {/* СТЕНОГРАММА / СУБТИТРЫ ПЕРЕГОВОРОВ (Чат диалога) */}
+          {/* Область сообщений (скроллится внутри, ЧИСТЫЙ ЧАТ БЕЗ СОВЕТОВ ВНУТРИ) */}
           <div
-            id="m3-chat-list"
-            className="flex-1 px-3 sm:px-4 py-3 min-h-0 overflow-y-auto space-y-3 flex flex-col"
+            id="chat-messages"
+            className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-white/10"
           >
             {messages.map((msg) => {
               const isUser = msg.actor === "USER";
               const isBars = msg.actor === "BARS";
 
-              // B.A.R.S. Tactical Whisper (Sleek, unobtrusive coaching note)
+              // По требованию: плашки советов полностью убраны из ленты чата!
               if (isBars) {
-                return (
-                  <div
-                    key={msg.id}
-                    className="animate-message-in my-1 w-full flex justify-center"
-                  >
-                    <div className="max-w-[92%] px-3.5 py-2.5 rounded-2xl bg-[#14162a]/90 border border-cyan-500/30 backdrop-blur-md flex items-start gap-2.5 text-xs text-slate-200 shadow-md">
-                      <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <span className="font-mono text-[10px] text-cyan-300 font-bold uppercase tracking-wider">
-                            Совет наставника Б.А.Р.С.
-                          </span>
-                        </div>
-                        <p className="font-sans text-slate-200 leading-relaxed text-[11px] sm:text-xs">
-                          {msg.text}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
+                return null;
               }
 
               // Opponent Message with Dynamic Emotion Avatar and Status Badge
               if (!isUser) {
-                // Determine styling based on emotion
-                const emotion = msg.emotion || (msg.snapshotMetrics.tension >= 65 ? "attack" : msg.snapshotMetrics.deal_readiness >= 65 ? "compromise" : "neutral");
+                const emotion =
+                  msg.emotion ||
+                  (msg.snapshotMetrics.tension >= 65
+                    ? "attack"
+                    : msg.snapshotMetrics.deal_readiness >= 65
+                    ? "compromise"
+                    : "neutral");
                 let ringColor = "ring-slate-500/50";
                 let badgeBg = "bg-slate-500/10 text-slate-300 border-slate-500/20";
                 let emoji = msg.emotionEmoji || "💬";
@@ -349,10 +294,11 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                 }
 
                 return (
-                  <div key={msg.id} className="animate-message-in flex items-start gap-3 my-2.5 max-w-[94%] sm:max-w-[88%]">
-                    {/* Opponent Avatar with Emotion Ring & Indicator */}
+                  <div key={msg.id} className="animate-message-in flex items-start gap-3 my-2 max-w-[94%] sm:max-w-[88%]">
                     <div className="relative shrink-0 mt-0.5">
-                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ${ringColor} overflow-hidden shadow-lg bg-gradient-to-tr from-purple-950 to-indigo-900 border border-white/10 flex items-center justify-center font-bold text-white text-xs sm:text-sm`}>
+                      <div
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ${ringColor} overflow-hidden shadow-lg bg-gradient-to-tr from-purple-950 to-indigo-900 border border-white/10 flex items-center justify-center font-bold text-white text-xs sm:text-sm`}
+                      >
                         {opponentInitials}
                       </div>
                       <span className="absolute -bottom-1 -right-1 text-xs bg-[#0b0c16] rounded-full p-0.5 border border-white/10 shadow-sm leading-none">
@@ -360,9 +306,8 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                       </span>
                     </div>
 
-                    {/* Opponent Message Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs sm:text-sm font-semibold text-white tracking-wide">
                           {config.opponentName}
                         </span>
@@ -453,62 +398,34 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* BOTTOM CONTROLS & INPUT DOCK */}
-          <footer
-            id="m3-bottom-bar"
-            className="sticky bottom-0 z-20 glass-panel-elevated border-t border-white/[0.08] p-3 pb-safe shrink-0 shadow-2xl"
-          >
-            {/* Тонкая плашка подсказки Б.А.Р.С. прямо над вводом (Без визуального мусора) */}
-            {barsFeedback && barsFeedback !== "Ожидаем реплику оппонента..." && !isDealClosed && !isDealFailed && (
-              <div className="mb-2 px-3 py-1.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span className="text-[10px] font-mono font-bold text-cyan-300 shrink-0 uppercase">
-                    Совет наставника:
-                  </span>
-                  <span className="text-slate-200 truncate">{barsFeedback}</span>
-                </div>
-                <button
-                  onClick={() => setInputText(barsFeedback)}
-                  className="text-[10px] font-medium text-cyan-300 hover:text-white shrink-0 px-2 py-0.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 transition-colors flex items-center gap-1 cursor-pointer"
-                  title="Подставить совет в поле ввода"
-                >
-                  <span>Вставить</span>
-                  <ArrowDownRight className="w-3 h-3" />
-                </button>
+          {/* Зона ввода (прибита снизу: Динамические чипсы-заготовки + Валидатор) */}
+          <div className="shrink-0 pt-1 border-t border-white/[0.08]">
+            {/* Динамические подсказки из контекста диалога (Неполные шаблоны scaffolding) */}
+            {!isDealClosed && !isDealFailed && (
+              <div
+                id="dynamic-hints-row"
+                className="overflow-x-auto flex items-center gap-2 pb-2 scrollbar-none"
+              >
+                {dynamicHints.map((hint, idx) => (
+                  <button
+                    key={idx}
+                    disabled={isLoading}
+                    onClick={() => applyHint(hint)}
+                    className="shrink-0 h-7 sm:h-8 px-3 rounded-full glass-pill hover:bg-white/10 active:bg-white/15 text-slate-200 hover:text-white border border-cyan-500/25 hover:border-cyan-400/50 text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer max-w-[280px] sm:max-w-[360px] truncate"
+                    title={`Вставить тактический каркас: ${hint}`}
+                  >
+                    <Sparkles className="w-3 h-3 text-cyan-400 shrink-0" />
+                    <span className="truncate">{hint}</span>
+                  </button>
+                ))}
               </div>
             )}
 
-            {/* Быстрые переговорные чипсы (С защитой от повторного спама аргументов) */}
-            {!isDealClosed && !isDealFailed && (
-              <div
-                id="m3-suggestion-chips-row"
-                className="overflow-x-auto flex items-center gap-2 pb-2.5 scrollbar-none"
-              >
-                {suggestionChips.map((chip, idx) => {
-                  const isUsed = usedChipLabels.has(chip.label);
-                  return (
-                    <button
-                      key={idx}
-                      disabled={isUsed || isLoading}
-                      onClick={() => handleChipClick(chip)}
-                      className={`shrink-0 h-7 sm:h-8 px-3 rounded-full text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border shadow-sm ${
-                        isUsed
-                          ? "bg-white/[0.03] text-slate-500 border-white/[0.06] cursor-not-allowed line-through opacity-60"
-                          : "glass-pill hover:bg-white/10 active:bg-white/15 text-slate-200 hover:text-white border-white/10 hover:border-cyan-400/40 active:scale-95 cursor-pointer"
-                      }`}
-                      title={isUsed ? "Аргумент уже озвучен в переговорах" : `Озвучить: ${chip.text}`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isUsed ? "bg-slate-600" : "bg-cyan-400 shadow-[0_0_6px_#00f0ff]"
-                        }`}
-                      />
-                      <span>{chip.label}</span>
-                      {isUsed && <span className="text-[10px] text-slate-500 ml-0.5">✓</span>}
-                    </button>
-                  );
-                })}
+            {/* Validation Banner if user hasn't completed prompt or placeholders remain */}
+            {validationWarning && (
+              <div className="mb-2 px-3 py-1.5 rounded-xl bg-amber-950/60 border border-amber-500/40 flex items-center gap-2 text-xs text-amber-200 animate-in fade-in duration-200">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="font-medium">{validationWarning}</span>
               </div>
             )}
 
@@ -516,51 +433,41 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <input
-                  id="m3-outlined-text-field"
+                  id="chat-input"
                   type="text"
                   placeholder={
                     isDealClosed || isDealFailed
                       ? "Раунд переговоров завершен"
-                      : "Введите аргумент или предложение по условиям..."
+                      : "Сформулируйте аргумент или дополните шаблон своими условиями..."
                   }
                   disabled={isLoading || isDealClosed || isDealFailed}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                  onKeyDown={(e) => e.key === "Enter" && !isSendDisabled && handleSend()}
                   className="w-full h-11 sm:h-12 px-4 rounded-full bg-[#0c0e18]/80 border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 text-xs sm:text-sm text-white placeholder-slate-400 transition-all outline-none disabled:opacity-50 shadow-inner"
                 />
               </div>
 
-              {/* Quick Prompt Mic Hint */}
+              {/* Send Button with anti-cheat state */}
               <button
-                type="button"
-                onClick={() => {
-                  const rnd = suggestionChips[Math.floor(Math.random() * suggestionChips.length)].text;
-                  setInputText(rnd);
-                }}
-                disabled={isLoading || isDealClosed || isDealFailed}
-                className="w-11 sm:w-12 h-11 sm:h-12 rounded-full glass-pill hover:bg-white/15 text-slate-300 hover:text-cyan-300 flex items-center justify-center shrink-0 active:scale-95 transition-all border border-white/10 cursor-pointer"
-                title="Подставить реплику"
-              >
-                <Mic className="w-4 sm:w-5 h-4 sm:h-5 text-cyan-400" />
-              </button>
-
-              {/* Send Button */}
-              <button
-                id="m3-filled-icon-button"
+                id="send-btn"
                 onClick={handleSend}
-                disabled={!inputText.trim() || isLoading || isDealClosed || isDealFailed}
-                className="w-11 sm:w-12 h-11 sm:h-12 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 active:scale-95 disabled:opacity-35 text-slate-950 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all cursor-pointer disabled:cursor-not-allowed font-bold"
-                title="Отправить аргумент"
+                disabled={isSendDisabled}
+                className={`w-11 sm:w-12 h-11 sm:h-12 rounded-full flex items-center justify-center shrink-0 transition-all font-bold ${
+                  isSendDisabled
+                    ? "opacity-40 cursor-not-allowed bg-slate-800 text-slate-500 border border-white/10"
+                    : "bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 active:scale-95 text-slate-950 shadow-[0_0_20px_rgba(0,240,255,0.4)] cursor-pointer"
+                }`}
+                title={isSendDisabled ? validationWarning || "Введите аргумент" : "Отправить аргумент"}
               >
-                <Send className="w-4 sm:w-5 h-4 sm:h-5 text-slate-950" />
+                <Send className="w-4 sm:w-5 h-4 sm:h-5 text-current" />
               </button>
             </div>
-          </footer>
-        </section>
+          </div>
+        </div>
 
-        {/* ================= RIGHT COLUMN (~30%): ТАКТИЧЕСКИЙ ЦЕНТР И BATNA ================= */}
-        <aside className="hidden lg:flex lg:col-span-4 xl:col-span-4 flex-col glass-panel rounded-3xl p-4 space-y-4 overflow-y-auto min-h-0 border border-white/[0.08] shadow-2xl">
+        {/* ПРАВАЯ КОЛОНКА (30%): Только приборы и Совет БАРС */}
+        <aside className="hidden lg:flex lg:col-span-4 flex-col gap-4 h-full overflow-y-auto glass-panel rounded-3xl p-4 border border-white/[0.08] shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <div className="flex items-center gap-2">
@@ -574,7 +481,7 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </span>
           </div>
 
-          {/* Индикаторы встречи (Телеметрия с неоновыми шкалами) */}
+          {/* 1. Телеметрия (Доверие, Стресс, Готовность) */}
           <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3.5 shadow-inner">
             <div className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
               Индикаторы встречи
@@ -623,7 +530,7 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </div>
           </div>
 
-          {/* Красные линии BATNA (Шпаргалка переговорщика) */}
+          {/* 2. Красные линии (BATNA ОЭЗ) */}
           <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3 shadow-inner">
             <div className="flex items-center justify-between text-xs font-bold text-white">
               <span className="flex items-center gap-1.5">
@@ -656,26 +563,26 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </div>
           </div>
 
-          {/* Повестка встречи (Agenda Checklist) */}
+          {/* Повестка встречи */}
           <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-2.5 shadow-inner">
             <div className="text-xs font-bold text-white font-mono uppercase tracking-wider">
               Повестка встречи:
             </div>
             <div className="space-y-2 text-xs">
               <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
-                <span className="text-slate-200">Ставка: 460 ₽/м²</span>
+                <span className="text-slate-200">Ставка: {config.batna.minPricePerSqm} ₽/м²</span>
                 <span className={agenda.rate.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                   {agenda.rate.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
-                <span className="text-slate-200">Каникулы: 4 мес.</span>
+                <span className="text-slate-200">Каникулы: {config.batna.maxGracePeriodMonths} мес.</span>
                 <span className={agenda.grace_period.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                   {agenda.grace_period.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
-                <span className="text-slate-200">Сети под CAPEX 1.2 млрд</span>
+                <span className="text-slate-200">Сети под инвестиции</span>
                 <span className={agenda.power_capex.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                   {agenda.power_capex.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                 </span>
@@ -683,29 +590,27 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </div>
           </div>
 
-          {/* Компактный тактический модуль Б.А.Р.С. */}
+          {/* 3. ТАКТИЧЕСКИЙ СОВЕТ Б.А.Р.С. (ЕДИНСТВЕННОЕ МЕСТО ОТОБРАЖЕНИЯ СОВЕТА!) */}
           {barsFeedback && (
-            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-950/40 via-purple-950/30 to-slate-900/60 border border-cyan-500/30 space-y-2 shadow-inner">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/50 via-purple-950/40 to-slate-900/80 border border-cyan-500/40 space-y-2.5 shadow-[0_4px_25px_rgba(0,240,255,0.12)]">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5 font-mono uppercase">
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5 font-mono uppercase tracking-wide">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
                   Тактический совет Б.А.Р.С.
                 </span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-mono">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-400/30">
                   LIVE
                 </span>
               </div>
-              <p className="text-xs text-slate-200 leading-relaxed font-sans italic">
-                «{barsFeedback}»
+              <p className="text-xs text-slate-100 leading-relaxed font-sans">
+                {barsFeedback}
               </p>
             </div>
           )}
         </aside>
       </main>
 
-      {/* ========================================================================= */}
-      {/* 4. TELEMETRY DIALOG MODAL (On-Demand / Mobile)                            */}
-      {/* ========================================================================= */}
+      {/* ================= TELEMETRY DIALOG MODAL (Mobile View) ================= */}
       {showTelemetrySheet && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
@@ -718,113 +623,113 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
           >
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <h3 className="text-lg font-bold text-white">Телеметрия встречи</h3>
-                <p className="text-xs text-slate-400">Кейс: {config.title}</p>
+                <h3 className="text-base font-bold text-white">Телеметрия встречи</h3>
+                <p className="text-xs text-slate-400">Параметры состояния и подсказки Б.А.Р.С.</p>
               </div>
               <button
                 onClick={() => setShowTelemetrySheet(false)}
-                className="w-9 h-9 rounded-full glass-pill hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                title="Закрыть окно"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white glass-pill"
               >
-                <X className="w-5 h-5" />
+                ✕
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-full bg-black/50 border border-white/10">
+            {/* Mobile Tab Selectors */}
+            <div className="flex rounded-full bg-white/5 p-1 border border-white/10">
               <button
                 onClick={() => setTelemetryTab("metrics")}
-                className={`py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                  telemetryTab === "metrics"
-                    ? "bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                className={`flex-1 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  telemetryTab === "metrics" ? "bg-cyan-500/20 text-cyan-300 shadow-sm" : "text-slate-400"
                 }`}
               >
-                Метрики
+                Индикаторы
               </button>
               <button
                 onClick={() => setTelemetryTab("batna")}
-                className={`py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                  telemetryTab === "batna"
-                    ? "bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                className={`flex-1 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  telemetryTab === "batna" ? "bg-purple-500/20 text-purple-300 shadow-sm" : "text-slate-400"
                 }`}
               >
-                BATNA
+                Красные линии
               </button>
               <button
                 onClick={() => setTelemetryTab("agenda")}
-                className={`py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                  telemetryTab === "agenda"
-                    ? "bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                className={`flex-1 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  telemetryTab === "agenda" ? "bg-indigo-500/20 text-indigo-300 shadow-sm" : "text-slate-400"
                 }`}
               >
                 Повестка
               </button>
             </div>
 
-            {/* Content */}
+            {/* Content based on tab */}
             {telemetryTab === "metrics" && (
-              <div className="space-y-4 pt-1">
+              <div className="space-y-4 py-2">
                 <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-300">Доверие оппонента</span>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-300">Доверие:</span>
                     <span className="text-cyan-300 font-bold font-mono">{metrics.trust}%</span>
                   </div>
-                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/10 p-[1px]">
+                  <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-white/10">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-500 shadow-[0_0_10px_#00f0ff]"
+                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400"
                       style={{ width: `${metrics.trust}%` }}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-300">Стресс / Напряжение</span>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-300">Напряжение:</span>
                     <span className="text-rose-400 font-bold font-mono">{metrics.tension}%</span>
                   </div>
-                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/10 p-[1px]">
+                  <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-white/10">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-600 transition-all duration-500 shadow-[0_0_10px_#ff3366]"
+                      className="h-full rounded-full bg-gradient-to-r from-amber-500 to-red-500"
                       style={{ width: `${metrics.tension}%` }}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-300">Готовность к сделке</span>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-300">Готовность к сделке:</span>
                     <span className="text-emerald-300 font-bold font-mono">{metrics.deal_readiness}%</span>
                   </div>
-                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/10 p-[1px]">
+                  <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-white/10">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-teal-400 to-green-300 transition-all duration-500 shadow-[0_0_10px_#10b981]"
+                      className="h-full rounded-full bg-gradient-to-r from-teal-400 to-green-400"
                       style={{ width: `${metrics.deal_readiness}%` }}
                     />
                   </div>
                 </div>
+
+                {barsFeedback && (
+                  <div className="p-3.5 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-xs text-slate-200 mt-2">
+                    <div className="text-[10px] font-bold text-cyan-300 uppercase font-mono mb-1">
+                      Совет Б.А.Р.С.:
+                    </div>
+                    {barsFeedback}
+                  </div>
+                )}
               </div>
             )}
 
             {telemetryTab === "batna" && (
-              <div className="space-y-3 pt-1">
-                <div className="grid grid-cols-2 gap-2.5 text-xs">
-                  <div className="p-3 rounded-2xl bg-black/40 border border-white/10">
-                    <span className="text-[10px] text-slate-400 block font-mono">МИНИМАЛЬНАЯ СТАВКА</span>
-                    <span className="text-base font-bold text-white font-mono">{config.batna.minPricePerSqm} ₽/м²</span>
+              <div className="space-y-3 py-2 text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                    <span className="text-[10px] text-slate-400 block font-mono">МИН. СТАВКА:</span>
+                    <span className="font-bold text-white text-sm">{config.batna.minPricePerSqm} ₽/м²</span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-black/40 border border-white/10">
-                    <span className="text-[10px] text-slate-400 block font-mono">МАКС. КАНИКУЛЫ</span>
-                    <span className="text-base font-bold text-white font-mono">{config.batna.maxGracePeriodMonths} мес.</span>
+                  <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                    <span className="text-[10px] text-slate-400 block font-mono">МАКС. КАНИКУЛЫ:</span>
+                    <span className="font-bold text-white text-sm">{config.batna.maxGracePeriodMonths} мес.</span>
                   </div>
                 </div>
-
-                <div className="space-y-2 pt-2 border-t border-white/10">
-                  <div className="text-xs font-semibold text-rose-400">Красные линии ОЭЗ (Табу):</div>
+                <div className="space-y-1.5 pt-2">
                   {config.batna.redLines.map((line, idx) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-xs text-slate-200 flex items-start gap-2">
+                    <div key={idx} className="flex items-start gap-2 text-slate-300 text-[11px]">
                       <span className="text-rose-400 font-bold shrink-0">✕</span>
                       <span>{line}</span>
                     </div>
@@ -834,21 +739,21 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             )}
 
             {telemetryTab === "agenda" && (
-              <div className="space-y-2.5 pt-1 text-xs">
-                <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
-                  <span className="text-slate-300">Ставка: 460 ₽/м²</span>
+              <div className="space-y-2 py-2 text-xs">
+                <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-200">Ставка: {config.batna.minPricePerSqm} ₽/м²</span>
                   <span className={agenda.rate.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                     {agenda.rate.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                   </span>
                 </div>
-                <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
-                  <span className="text-slate-300">Каникулы: 4 мес.</span>
+                <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-200">Каникулы: {config.batna.maxGracePeriodMonths} мес.</span>
                   <span className={agenda.grace_period.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                     {agenda.grace_period.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                   </span>
                 </div>
-                <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
-                  <span className="text-slate-300">Сети под CAPEX 1.2 млрд</span>
+                <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-200">Сети под инвестиции</span>
                   <span className={agenda.power_capex.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
                     {agenda.power_capex.status === "agreed" ? "✓ Согласовано" : "В процессе"}
                   </span>

@@ -34,7 +34,6 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
       return "No";
     }
     if (isLoading) {
-      // Opponent is actively thinking / analyzing player's offer
       return "Standing";
     }
     if (barsAnimation === "warn" || metrics.tension >= 65) {
@@ -49,7 +48,7 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
     return "Idle";
   };
 
-  // Sync animation and dynamic camera orbit when thinking / replying
+  // Sync animation and camera target
   useEffect(() => {
     const chosen = determineAutomatedAnimation();
     setActiveAnim(chosen);
@@ -65,14 +64,11 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
         }
       };
 
-      // Set dynamic camera orbit: smoothly zoom in when thinking or responding
-      if (isLoading) {
-        viewer.setAttribute("camera-orbit", "0deg 82deg 1.7m");
-        viewer.setAttribute("field-of-view", "28deg");
-      } else {
-        viewer.setAttribute("camera-orbit", "0deg 85deg 2.2m");
-        viewer.setAttribute("field-of-view", "30deg");
-      }
+      // Exact camera parameters requested:
+      // camera-target="0m 0.9m 0m", camera-orbit="0deg 75deg 3.5m", field-of-view="32deg"
+      viewer.setAttribute("camera-target", "0m 0.9m 0m");
+      viewer.setAttribute("camera-orbit", "0deg 75deg 3.5m");
+      viewer.setAttribute("field-of-view", "32deg");
 
       if (viewer.availableAnimations && viewer.availableAnimations.length > 0) {
         apply();
@@ -131,122 +127,93 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
   return (
     <div
       id="opponent-stage"
-      className={`relative w-full rounded-3xl overflow-hidden border border-white/[0.12] bg-gradient-to-b from-[#131522] via-[#0b0c16] to-[#06070c] shadow-[0_12px_40px_rgba(0,0,0,0.65)] flex flex-col transition-all duration-500 ${
-        isLoading
-          ? "scale-[1.015] sm:scale-[1.02] border-purple-500/50 shadow-[0_0_40px_rgba(123,44,191,0.35)]"
-          : "scale-100"
+      className={`relative w-full h-[340px] rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-purple-500/20 overflow-hidden flex items-center justify-center transition-all duration-500 shadow-[0_12px_40px_rgba(0,0,0,0.65)] ${
+        isLoading ? "border-purple-500/60 shadow-[0_0_40px_rgba(123,44,191,0.35)]" : ""
       } ${className}`}
-      style={{
-        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
-      }}
     >
-      {/* Background Studio Lighting & Subtle Tech Grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(99,102,241,0.18)_0%,transparent_70%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(0,240,255,0.08)_0%,transparent_50%)] pointer-events-none" />
-      <div className="absolute inset-0 opacity-15 bg-[linear-gradient(to_right,#ffffff10_1px,transparent_1px),linear-gradient(to_bottom,#ffffff10_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_35%,rgba(99,102,241,0.18)_0%,transparent_70%)] pointer-events-none" />
 
-      {/* Top Video Header / Conference Room HUD */}
-      <div className="relative z-10 px-4 py-2.5 flex items-center justify-between border-b border-white/[0.08] bg-[#080911]/70 backdrop-blur-md">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="relative flex items-center justify-center w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300">
-            <Video className="w-3.5 h-3.5" />
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+      {/* 3D Model-Viewer with exact camera parameters */}
+      {!modelError ? (
+        <model-viewer
+          id="opponent-3d"
+          ref={modelViewerRef}
+          src="./bars.glb"
+          alt={`${config.opponentName} - 3D Виртуальный переговорщик`}
+          autoplay
+          animation-name={activeAnim}
+          camera-orbit={isLoading ? "0deg 75deg 3.0m" : "0deg 75deg 3.5m"}
+          camera-target="0m 0.9m 0m"
+          field-of-view="32deg"
+          interaction-prompt="none"
+          shadow-intensity="1.5"
+          shadow-softness="0.8"
+          exposure="1.2"
+          style={
+            {
+              pointerEvents: "none",
+              width: "100%",
+              height: "100%",
+              "--poster-color": "transparent",
+            } as any
+          }
+          onError={() => setModelError(true)}
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-20 h-20 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 text-xl font-bold font-mono shadow-[0_0_30px_rgba(0,240,255,0.3)]">
+            {config.opponentName.slice(0, 2).toUpperCase()}
           </div>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
-                {config.opponentName}
-              </span>
-              <span className="text-[10px] px-2 py-0.2 rounded-full bg-white/5 border border-white/10 text-slate-300 hidden sm:inline-block">
-                {config.opponentRole}
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-400 truncate">
-              {config.opponentCompany} • Переговорный зал ОЭЗ «Алабуга»
-            </div>
-          </div>
+          <p className="text-xs text-slate-300 mt-3 font-medium">{config.opponentName}</p>
         </div>
+      )}
 
-        {/* Video Call Badges */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden xs:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 border border-white/10 text-[10px] font-mono text-slate-300">
-            <ShieldCheck className="w-3 h-3 text-cyan-400" />
-            <span>HD 1080p</span>
-          </div>
+      {/* Плашка статуса (Верхний левый угол) */}
+      <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-slate-950/80 border border-white/10 backdrop-blur-md flex items-center gap-2 z-20">
+        <span className={`w-2 h-2 rounded-full ${status.indicator}`} />
+        <span className="text-[11px] font-mono text-slate-300">
+          {config.opponentName} {isLoading ? "(Обдумывает...)" : "(В эфире)"}
+        </span>
+      </div>
 
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-[10px] font-mono font-bold text-red-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-            <span>REC</span>
-          </div>
+      {/* HD 1080p & REC Badges (Верхний правый угол) */}
+      <div className="absolute top-3 right-3 flex items-center gap-2 shrink-0 z-20">
+        <div className="hidden xs:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/50 border border-white/10 text-[10px] font-mono text-slate-300 backdrop-blur-md">
+          <ShieldCheck className="w-3 h-3 text-cyan-400" />
+          <span>HD 1080p</span>
+        </div>
+        <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-[10px] font-mono font-bold text-red-400 backdrop-blur-md">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          <span>REC</span>
         </div>
       </div>
 
-      {/* 3D Video Viewport: Opponent sitting directly across the table with NO manual mouse rotation */}
-      <div className="relative w-full h-52 sm:h-64 md:h-72 flex items-center justify-center overflow-hidden">
-        {/* Holographic conference table pedestal */}
-        <div className="absolute -bottom-10 inset-x-0 h-28 bg-gradient-to-t from-[#05060a] via-[#101222]/80 to-transparent pointer-events-none z-10" />
-        <div className="absolute bottom-2 w-72 h-10 rounded-[100%] border border-cyan-400/20 bg-cyan-500/5 shadow-[0_0_40px_rgba(0,240,255,0.15)] pointer-events-none" />
-
-        {!modelError ? (
-          <model-viewer
-            id="opponent-3d"
-            ref={modelViewerRef}
-            src="/bars.glb"
-            alt={`${config.opponentName} - 3D Виртуальный переговорщик`}
-            autoplay
-            animation-name={activeAnim}
-            interaction-prompt="none"
-            camera-orbit={isLoading ? "0deg 82deg 1.7m" : "0deg 85deg 2.2m"}
-            field-of-view="30deg"
-            shadow-intensity="1.5"
-            shadow-softness="0.8"
-            exposure="1.2"
-            style={
-              {
-                pointerEvents: "none",
-                width: "100%",
-                height: "100%",
-                "--poster-color": "transparent",
-              } as any
-            }
-            onError={() => setModelError(true)}
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 text-xl font-bold font-mono shadow-[0_0_30px_rgba(0,240,255,0.3)]">
-              {config.opponentName.slice(0, 2).toUpperCase()}
-            </div>
-            <p className="text-xs text-slate-300 mt-3 font-medium">{config.opponentName}</p>
-          </div>
-        )}
-
-        {/* Live Audio / Speaking Indicator Overlay */}
-        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/70 border border-white/10 backdrop-blur-md">
-          <Mic className={`w-3.5 h-3.5 ${isLoading ? "text-amber-400 animate-pulse" : "text-cyan-400"}`} />
-          <div className="flex items-end gap-0.5 h-3">
-            {[40, 75, 50, 90, 60].map((h, i) => (
-              <span
-                key={i}
-                className={`w-0.5 rounded-full ${
-                  isLoading || activeAnim === "Wave" ? "bg-cyan-400 animate-pulse" : "bg-slate-600"
-                }`}
-                style={{
-                  height: isLoading || activeAnim === "Wave" ? `${Math.max(4, h / 7)}px` : "4px",
-                }}
-              />
-            ))}
-          </div>
+      {/* Live Audio / Speaking Indicator Overlay (Нижний левый угол) */}
+      <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/70 border border-white/10 backdrop-blur-md">
+        <Mic className={`w-3.5 h-3.5 ${isLoading ? "text-amber-400 animate-pulse" : "text-cyan-400"}`} />
+        <div className="flex items-end gap-0.5 h-3">
+          {[40, 75, 50, 90, 60].map((h, i) => (
+            <span
+              key={i}
+              className={`w-0.5 rounded-full ${
+                isLoading || activeAnim === "Wave" ? "bg-cyan-400 animate-pulse" : "bg-slate-600"
+              }`}
+              style={{
+                height: isLoading || activeAnim === "Wave" ? `${Math.max(4, h / 7)}px` : "4px",
+              }}
+            />
+          ))}
         </div>
+      </div>
 
-        {/* Dynamic State Overlay Ribbon on Video */}
-        <div className="absolute bottom-3 right-3 z-20">
-          <div
-            className={`px-3 py-1 rounded-full border text-[11px] font-medium backdrop-blur-md flex items-center gap-2 shadow-lg transition-all ${status.color}`}
-          >
-            <span className={`w-2 h-2 rounded-full ${status.indicator}`} />
-            <span className="truncate max-w-[200px] sm:max-w-[320px]">{status.text}</span>
-          </div>
+      {/* Dynamic State Overlay Ribbon on Video (Нижний правый угол) */}
+      <div className="absolute bottom-3 right-3 z-20">
+        <div
+          className={`px-3 py-1 rounded-full border text-[11px] font-medium backdrop-blur-md flex items-center gap-2 shadow-lg transition-all ${status.color}`}
+        >
+          <span className={`w-2 h-2 rounded-full ${status.indicator}`} />
+          <span className="truncate max-w-[200px] sm:max-w-[320px]">{status.text}</span>
         </div>
       </div>
     </div>

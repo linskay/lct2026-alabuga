@@ -22,6 +22,7 @@ export interface Message {
   emotion?: "attack" | "compromise" | "bluff" | "neutral";
   emotionLabel?: string;
   emotionEmoji?: string;
+  contextHints?: string[];
 }
 
 export interface BatnaConfig {
@@ -126,6 +127,10 @@ declare global {
         "rotation-per-second"?: string;
         "shadow-intensity"?: string;
         "exposure"?: string;
+        "camera-orbit"?: string;
+        "camera-target"?: string;
+        "field-of-view"?: string;
+        "interaction-prompt"?: string;
         style?: React.CSSProperties & { [key: string]: any };
       };
     }
