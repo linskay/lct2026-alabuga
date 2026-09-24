@@ -180,6 +180,34 @@ data class NegotiationMetrics(
 }
 
 /**
+ * Тег методологии переговоров (SPIN / Гарвард / BATNA / Ошибка)
+ */
+@Serializable
+data class MethodologyTag(
+    val category: String, // "SPIN" | "HARVARD" | "BATNA" | "ERROR" | "TACTIC"
+    val tag: String,
+    val description: String,
+    val type: String // "positive" | "warning" | "danger" | "info"
+)
+
+/**
+ * Интерактивная карта ZOPA (Zone of Possible Agreement)
+ */
+@Serializable
+data class ZopaState(
+    val buyerMin: Int = 300,
+    val buyerMax: Int = 420,
+    val sellerMin: Int = 460,
+    val sellerMax: Int = 500,
+    val isOverlap: Boolean = false,
+    val overlapMin: Int? = null,
+    val overlapMax: Int? = null,
+    val currentOffer: Int? = 300,
+    val status: String = "narrowing", // "expanding" | "narrowing" | "deadlock" | "agreed"
+    val changeReason: String? = null
+)
+
+/**
  * Отдельная реплика переговорного процесса
  */
 @Serializable
@@ -191,7 +219,8 @@ data class Message(
     val stepIndex: Int,
     val snapshotMetrics: NegotiationMetrics = NegotiationMetrics(),
     val tacticalNote: String? = null,
-    val barsAnimation: BarsAnimationState = BarsAnimationState.IDLE
+    val barsAnimation: BarsAnimationState = BarsAnimationState.IDLE,
+    val methodologyTag: MethodologyTag? = null
 )
 
 /**
@@ -326,7 +355,8 @@ data class NegotiationSessionState(
     val isDealFailed: Boolean = false,
     val isLoading: Boolean = false,
     val historySnapshots: List<SessionSnapshot> = emptyList(),
-    val currentStepIndex: Int = 0
+    val currentStepIndex: Int = 0,
+    val zopa: ZopaState = ZopaState()
 )
 `,
   },

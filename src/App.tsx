@@ -8,6 +8,7 @@ import {
   DebriefingAnalytics,
   NegotiationAgenda,
   Achievement,
+  ZopaState,
 } from "./types";
 import { PRESET_SCENARIOS } from "./data/scenarios";
 import { ArenaScreenView } from "./components/ArenaScreenView";
@@ -109,6 +110,51 @@ export default function App() {
   const [hiddenNeedsDiscovered, setHiddenNeedsDiscovered] = useState<boolean>(false);
   const [activeCounterOffer, setActiveCounterOffer] = useState<number>(300);
 
+  // New ZOPA & Latency & Offline mode states
+  const [zopa, setZopa] = useState<ZopaState | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [modelName, setModelName] = useState<string>("meta-llama/llama-3.1-8b-instruct:free");
+  const [providerName, setProviderName] = useState<string>("openrouter");
+  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(false);
+
+  // Query initial provider on mount
+  useEffect(() => {
+    fetch("/api/provider")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.activeProvider === "fallback") {
+          setIsOfflineMode(true);
+          setProviderName("fallback");
+          setModelName("Autonomous Engine (Offline)");
+        } else {
+          setIsOfflineMode(false);
+          setProviderName(data.activeProvider || "openrouter");
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleToggleOfflineMode = async () => {
+    const nextMode = !isOfflineMode;
+    try {
+      const res = await fetch("/api/provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: nextMode ? "fallback" : null }),
+      });
+      const data = await res.json();
+      setIsOfflineMode(data.activeProvider === "fallback");
+      setProviderName(data.activeProvider);
+      if (data.activeProvider === "fallback") {
+        setModelName("Autonomous Engine (Offline)");
+      } else {
+        setModelName(data.activeProvider === "gemini" ? "gemini-3.8-flash" : "meta-llama/llama-3.1-8b-instruct:free");
+      }
+    } catch (err) {
+      console.error("Failed to switch provider:", err);
+    }
+  };
+
   // Modals
   const [isCaseInfoOpen, setIsCaseInfoOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -155,6 +201,23 @@ export default function App() {
       }
 
       const data = await response.json();
+
+      if (data.methodology_tag) {
+        userMessage.methodologyTag = data.methodology_tag;
+      }
+      if (data.zopa) {
+        setZopa(data.zopa);
+      }
+      if (data.latency_ms !== undefined) {
+        setLatencyMs(data.latency_ms);
+      }
+      if (data.model_name) {
+        setModelName(data.model_name);
+      }
+      if (data.provider_name) {
+        setProviderName(data.provider_name);
+        setIsOfflineMode(data.provider_name === "fallback");
+      }
 
       if (data.hidden_need_revealed) {
         setHiddenNeedsDiscovered(true);
@@ -507,6 +570,12 @@ export default function App() {
           isDealClosed={isDealClosed}
           isDealFailed={isDealFailed}
           timerSeconds={timerSeconds}
+          zopa={zopa}
+          latencyMs={latencyMs}
+          modelName={modelName}
+          providerName={providerName}
+          isOfflineMode={isOfflineMode}
+          onToggleOfflineMode={handleToggleOfflineMode}
           onSendMessage={handleSendMessage}
           onRollback={handleRollback}
           onOpenCaseInfo={() => setIsCaseInfoOpen(true)}

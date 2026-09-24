@@ -5,8 +5,13 @@ import {
   NegotiationMetrics,
   BarsAnimationState,
   NegotiationAgenda,
+  ZopaState,
 } from "../types";
 import { BarsAvatar } from "./BarsAvatar";
+import { ZopaMapCard } from "./ZopaMapCard";
+import { MethodologyTagBadge } from "./MethodologyTagBadge";
+import { LatencyBadge } from "./LatencyBadge";
+import { OfflineToggle } from "./OfflineToggle";
 import {
   Send,
   RotateCcw,
@@ -27,6 +32,7 @@ import {
   Mic,
   SlidersHorizontal,
   Check,
+  ArrowRightLeft,
 } from "lucide-react";
 
 interface ArenaScreenViewProps {
@@ -40,6 +46,12 @@ interface ArenaScreenViewProps {
   isDealClosed: boolean;
   isDealFailed: boolean;
   timerSeconds: number;
+  zopa: ZopaState | null;
+  latencyMs: number | null;
+  modelName: string;
+  providerName: string;
+  isOfflineMode: boolean;
+  onToggleOfflineMode: () => void;
   onSendMessage: (text: string) => void;
   onRollback: (step: number) => void;
   onOpenCaseInfo: () => void;
@@ -61,6 +73,12 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   isDealClosed,
   isDealFailed,
   timerSeconds,
+  zopa,
+  latencyMs,
+  modelName,
+  providerName,
+  isOfflineMode,
+  onToggleOfflineMode,
   onSendMessage,
   onRollback,
   onOpenCaseInfo,
@@ -72,7 +90,7 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
 }) => {
   const [inputText, setInputText] = useState("");
   const [showTelemetrySheet, setShowTelemetrySheet] = useState(false);
-  const [telemetryTab, setTelemetryTab] = useState<"metrics" | "batna" | "agenda">("metrics");
+  const [telemetryTab, setTelemetryTab] = useState<"metrics" | "zopa" | "batna" | "agenda">("metrics");
   const [isBarsHudExpanded, setIsBarsHudExpanded] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -241,6 +259,22 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </button>
           </div>
 
+          {/* Offline / Live Demo 1-Click Toggle */}
+          <OfflineToggle
+            isOffline={isOfflineMode}
+            onToggle={onToggleOfflineMode}
+            isLoading={isLoading}
+          />
+
+          {/* Latency & Model Badge */}
+          <div className="hidden sm:flex">
+            <LatencyBadge
+              latencyMs={latencyMs}
+              providerName={providerName}
+              modelName={modelName}
+            />
+          </div>
+
           {/* Timer Pill */}
           <div className="h-9 px-3 rounded-full bg-[#1d1b20] border border-[#49454f]/40 flex items-center gap-1.5 text-xs font-mono text-[#00f0ff]">
             <Clock className="w-3 h-3 text-[#00f0ff] animate-pulse" />
@@ -352,6 +386,11 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                   key={msg.id}
                   className={`flex flex-col group ${isUser ? "items-end" : "items-start"}`}
                 >
+                  {/* BARS Methodology Tag (SPIN / Harvard / BATNA / Error) */}
+                  {isUser && msg.methodologyTag && (
+                    <MethodologyTagBadge tag={msg.methodologyTag} />
+                  )}
+
                   {/* Sender Name */}
                   <div
                     className={`text-[11px] font-medium mb-1 px-1 ${
@@ -557,6 +596,9 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </div>
           </div>
 
+          {/* M3 Dynamic ZOPA Map Card (Zone of Possible Agreement) */}
+          <ZopaMapCard zopa={zopa} minPriceBatna={config.batna.minPricePerSqm} />
+
           {/* BATNA Card */}
           <div className="p-4 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40 space-y-3 shadow-sm">
             <div className="flex items-center justify-between text-xs font-bold text-[#e6e0e9]">
@@ -649,8 +691,8 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               </button>
             </div>
 
-            {/* M3 Tabs: Metrics / BATNA / Agenda */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-full bg-[#1d1b20]">
+            {/* M3 Tabs: Metrics / ZOPA / BATNA / Agenda */}
+            <div className="grid grid-cols-4 gap-1 p-1 rounded-full bg-[#1d1b20]">
               <button
                 onClick={() => setTelemetryTab("metrics")}
                 className={`py-2 rounded-full text-xs font-semibold transition-all ${
@@ -660,6 +702,16 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                 }`}
               >
                 Метрики
+              </button>
+              <button
+                onClick={() => setTelemetryTab("zopa")}
+                className={`py-2 rounded-full text-xs font-semibold transition-all ${
+                  telemetryTab === "zopa"
+                    ? "bg-[#4f378b] text-[#eaddff] shadow-sm"
+                    : "text-[#cac4d0] hover:text-white"
+                }`}
+              >
+                ZOPA
               </button>
               <button
                 onClick={() => setTelemetryTab("batna")}
@@ -727,6 +779,12 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                     />
                   </div>
                 </div>
+              </div>
+            )}
+
+            {telemetryTab === "zopa" && (
+              <div className="pt-1">
+                <ZopaMapCard zopa={zopa} minPriceBatna={config.batna.minPricePerSqm} />
               </div>
             )}
 

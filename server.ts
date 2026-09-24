@@ -14,7 +14,16 @@ app.use(express.json());
 // Multi-provider LLM Configuration (OpenRouter, Gemini, Local Docker LLM, Fallback)
 export type LlmProvider = "openrouter" | "gemini" | "local" | "fallback";
 
+let runtimeProviderOverride: LlmProvider | null = null;
+
+export function setRuntimeProvider(provider: LlmProvider | null) {
+  runtimeProviderOverride = provider;
+}
+
 export function getActiveProvider(): LlmProvider {
+  if (runtimeProviderOverride) {
+    return runtimeProviderOverride;
+  }
   const explicit = (process.env.LLM_PROVIDER || "").toLowerCase().trim();
   if (explicit === "openrouter" || explicit === "gemini" || explicit === "local" || explicit === "fallback") {
     return explicit as LlmProvider;
@@ -23,6 +32,243 @@ export function getActiveProvider(): LlmProvider {
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.LOCAL_LLM_URL) return "local";
   return "fallback";
+}
+
+export interface MethodologyTag {
+  category: "SPIN" | "HARVARD" | "BATNA" | "ERROR" | "TACTIC";
+  tag: string;
+  description: string;
+  type: "positive" | "warning" | "danger" | "info";
+}
+
+export interface ZopaState {
+  buyerMin: number;
+  buyerMax: number;
+  sellerMin: number;
+  sellerMax: number;
+  isOverlap: boolean;
+  overlapMin?: number;
+  overlapMax?: number;
+  currentOffer?: number;
+  status: "expanding" | "narrowing" | "deadlock" | "agreed";
+  changeReason?: string;
+}
+
+// BARS Methodology Detector: analyzes player's utterance using SPIN, Harvard, and BATNA frameworks
+export function detectMethodologyTag(userText: string, lastOpponentText?: string): MethodologyTag {
+  const text = (userText || "").trim();
+  const lower = text.toLowerCase();
+
+  // 1. Ошибки / Конфликтогены / Безоговорочные уступки
+  if (
+    lower.startsWith("к сожалению") ||
+    lower.startsWith("извините") ||
+    lower.startsWith("простите") ||
+    lower.includes("вынуждены отказать") ||
+    lower.includes("не в нашей власти")
+  ) {
+    return {
+      category: "ERROR",
+      tag: "Ошибка: Конфликтоген / Оправдание",
+      description: "Начало реплики с оправдания или извинений ставит вас в слабую позицию и провоцирует давление.",
+      type: "danger",
+    };
+  }
+
+  if (
+    (lower.includes("согласны на 300") || lower.includes("хорошо, 300") || lower.includes("скидка 40%")) &&
+    !lower.includes("в обмен") &&
+    !lower.includes("при условии")
+  ) {
+    return {
+      category: "ERROR",
+      tag: "Ошибка: Сдача позиций без обмена",
+      description: "Бесплатная уступка ключевой ставки BATNA разрушает маржинальность проекта и обесценивает предложение ОЭЗ.",
+      type: "danger",
+    };
+  }
+
+  // 2. Гарвард: Разделение людей и проблемы
+  if (
+    lower.includes("отложим эмоци") ||
+    lower.includes("без эмоци") ||
+    lower.includes("понимаю вашу обеспокоенность") ||
+    lower.includes("дело не в персонали") ||
+    lower.includes("давайте опираться на цифры") ||
+    lower.includes("давайте к фактам") ||
+    lower.includes("деловой подход")
+  ) {
+    return {
+      category: "HARVARD",
+      tag: "Гарвард: Разделение людей и проблемы",
+      description: "Эмоции отделены от существа спора. Снижение градуса агрессии без потери жесткости в отстаивании интересов.",
+      type: "positive",
+    };
+  }
+
+  // 3. SPIN: Извлекающие вопросы (риски простоя, последствия срыва сроков, штрафы)
+  if (
+    lower.includes("риск") ||
+    lower.includes("просто") ||
+    lower.includes("убыт") ||
+    lower.includes("штраф") ||
+    lower.includes("дедлайн") ||
+    lower.includes("срыв") ||
+    lower.includes("к чему приведет") ||
+    lower.includes("что произойдет, если")
+  ) {
+    return {
+      category: "SPIN",
+      tag: "SPIN: Извлекающий вопрос",
+      description: "Фокус на цене простоя оборудования и рисках срыва запуска заставляет оппонента осознать скрытые финансовые потери.",
+      type: "positive",
+    };
+  }
+
+  // 4. SPIN: Проблемные вопросы (вскрытие узких мест)
+  if (
+    lower.includes("в чем главная сложность") ||
+    lower.includes("какие препятствия") ||
+    lower.includes("почему именно") ||
+    lower.includes("что вас смущает") ||
+    lower.includes("в чем сомнения")
+  ) {
+    return {
+      category: "SPIN",
+      tag: "SPIN: Проблемный вопрос",
+      description: "Вскрытие неудовлетворенности текущей ситуацией помогает найти истинный корень сопротивления оппонента.",
+      type: "info",
+    };
+  }
+
+  // 5. SPIN: Направляющие вопросы (ценность решения ОЭЗ)
+  if (
+    lower.includes("как бы повлияло") ||
+    lower.includes("было бы полезно") ||
+    lower.includes("насколько важно для вас") ||
+    lower.includes("если мы решим")
+  ) {
+    return {
+      category: "SPIN",
+      tag: "SPIN: Направляющий вопрос",
+      description: "Помогает оппоненту самому сформулировать выгоду от инфраструктуры, кадров Политеха и надежности ОЭЗ.",
+      type: "positive",
+    };
+  }
+
+  // 6. Гарвард: Объективные критерии & BATNA факты
+  if (
+    lower.includes("110 кв") ||
+    lower.includes("подстанц") ||
+    lower.includes("калуг") ||
+    lower.includes("политех") ||
+    lower.includes("гост") ||
+    lower.includes("регламент") ||
+    lower.includes("аудит")
+  ) {
+    return {
+      category: "HARVARD",
+      tag: "Гарвард: Объективные критерии",
+      description: "Опора на независимые факты, технические параметры подстанции 110 кВ и регламенты ОЭЗ нейтрализует блеф.",
+      type: "positive",
+    };
+  }
+
+  // 7. BATNA: Принцип взаимного размена
+  if (
+    lower.includes("в обмен на") ||
+    lower.includes("при условии") ||
+    lower.includes("взамен") ||
+    lower.includes("только если") ||
+    lower.includes("встречн")
+  ) {
+    return {
+      category: "BATNA",
+      tag: "BATNA: Взаимный размен позиций",
+      description: "Классическое правило Алабуги: ни единой уступки без встречной ценности (рабочие места, CAPEX или каникулы).",
+      type: "positive",
+    };
+  }
+
+  // 8. BATNA: Защита красной линии (ставка 460 ₽/м²)
+  if (lower.includes("460") || lower.includes("базовая ставка") || lower.includes("порог") || lower.includes("красная линия")) {
+    return {
+      category: "BATNA",
+      tag: "BATNA: Фиксация красной линии",
+      description: "Четкое обозначение предела допустимых условий удерживает границы рентабельности и защищает активы ОЭЗ.",
+      type: "positive",
+    };
+  }
+
+  // Default tactic
+  return {
+    category: "TACTIC",
+    tag: "Тактика: Позиционное зондирование",
+    description: "Разведка намерений оппонента и тестирование его переговорных позиций.",
+    type: "info",
+  };
+}
+
+// Dynamic ZOPA (Zone of Possible Agreement) Calculator
+export function calculateZopa(
+  context: any,
+  activeCounterOffer: number,
+  agenda: any,
+  isDealClosed: boolean,
+  isDealFailed: boolean
+): ZopaState {
+  const sellerMin = context?.batna?.minPricePerSqm || 460;
+  const sellerMax = 500; // Стандартная базовая ставка ОЭЗ
+  const buyerMin = 300;  // Первоначальный ультиматум инвестора
+
+  // Потолок готовности инвестора динамически растет по мере торга и закрытия болей
+  let buyerMax = 420;
+  if (activeCounterOffer >= 460) {
+    buyerMax = 475;
+  } else if (activeCounterOffer >= 400) {
+    buyerMax = 460;
+  } else if (activeCounterOffer >= 380) {
+    buyerMax = 440;
+  }
+
+  // Если ставка уже согласована в чек-листе
+  const isRateAgreed = agenda?.rate?.status === "agreed";
+  const currentOffer = isRateAgreed ? sellerMin : Math.max(buyerMin, activeCounterOffer);
+
+  // Вычисляем пересечение ZOPA
+  const overlapMin = Math.max(sellerMin, buyerMin);
+  const overlapMax = Math.min(sellerMax, buyerMax);
+  const isOverlap = overlapMax >= overlapMin || isRateAgreed;
+
+  let status: "expanding" | "narrowing" | "deadlock" | "agreed" = "narrowing";
+  let changeReason = "Оппонент удерживает заниженную планку, зона торга не сформирована.";
+
+  if (isDealClosed || isRateAgreed) {
+    status = "agreed";
+    changeReason = `Договоренность зафиксирована на отметке ${currentOffer} ₽/м². Интересы сторон согласованы!`;
+  } else if (isDealFailed) {
+    status = "deadlock";
+    changeReason = "Схлопывание ZOPA: оппонент разорвал переговоры, позиции несовместимы.";
+  } else if (isOverlap) {
+    status = "expanding";
+    changeReason = `ZOPA открыта [${overlapMin}–${overlapMax} ₽/м²]! Встречные уступки позволили найти коридор соглашения.`;
+  } else if (activeCounterOffer > 300) {
+    status = "narrowing";
+    changeReason = `Разрыв сокращается (предложение выросло до ${activeCounterOffer} ₽/м²), но пока ниже BATNA (${sellerMin} ₽).`;
+  }
+
+  return {
+    buyerMin,
+    buyerMax,
+    sellerMin,
+    sellerMax,
+    isOverlap,
+    overlapMin: isOverlap ? overlapMin : undefined,
+    overlapMax: isOverlap ? overlapMax : undefined,
+    currentOffer,
+    status,
+    changeReason,
+  };
 }
 
 async function callOpenAICompatible(options: {
@@ -466,6 +712,9 @@ function generateFallbackResponse(body: any) {
         "ПРОВАЛ ПЕРЕГОВОРОВ: Напряжение зашкалило, оппонент разорвал контакт. Используйте «Машину времени», чтобы вернуться на спорный шаг назад.";
     }
 
+    const methodologyTag = detectMethodologyTag(lastUserMsg, lastOpponentMsg);
+    const zopaState = calculateZopa(context, activeCounterOffer, agenda, isDealClosed, isDealFailed);
+
     return {
       opponent_reply: opponentReply,
       bars_feedback: barsFeedback,
@@ -481,6 +730,11 @@ function generateFallbackResponse(body: any) {
       manipulation_type: manipulationType,
       hidden_need_revealed: hiddenNeedRevealed,
       active_counter_offer: activeCounterOffer,
+      methodology_tag: methodologyTag,
+      zopa: zopaState,
+      latency_ms: Math.floor(Math.random() * 25) + 15,
+      provider_name: "fallback",
+      model_name: "Autonomous Engine (Offline)",
     };
   }
 
@@ -489,12 +743,20 @@ function generateFallbackResponse(body: any) {
 
 // API endpoint for negotiation turn
 app.post("/api/negotiate", async (req, res) => {
+  const startTime = Date.now();
   const provider = getActiveProvider();
-  if (provider === "fallback") {
-    return res.json(generateFallbackResponse(req.body));
-  }
-
   const { history, context } = req.body;
+
+  const userMessages = (history || []).filter((m: any) => m.actor === "USER" || m.actor === "user");
+  const opponentMessages = (history || []).filter((m: any) => m.actor === "OPPONENT" || m.actor === "opponent");
+  const lastUserMsg = userMessages[userMessages.length - 1]?.text || "";
+  const lastOpponentMsg = opponentMessages[opponentMessages.length - 1]?.text || "";
+
+  if (provider === "fallback") {
+    const fallback = generateFallbackResponse(req.body);
+    fallback.latency_ms = Date.now() - startTime;
+    return res.json(fallback);
+  }
   const sphere = context?.sphere || "B2B / Инвесторы ОЭЗ";
   const opponentRole = context?.opponentRole || "Генеральный директор";
   const opponentName = context?.opponentName || "Валерий Строганов";
@@ -510,7 +772,7 @@ app.post("/api/negotiate", async (req, res) => {
 Контекст встречи: ${sphere}
 Твоя роль: ${opponentRole} (${opponentName}, ${opponentCompany})
 Твой характер и стиль: ${personalityTone} (Уровень жесткости: ${toughnessLevel}/100, склонность к блефу: ${bluffTendency}/100)
-Твоя скрытая цель: ${hiddenGoal}
+Твой скрытый интерес / боль: ${hiddenGoal}
 Твоя альтернатива (BATNA оппонента): ${opponentBatna}
 
 Красные линии игрока, которые он защищает:
@@ -555,13 +817,16 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
   const userPrompt = `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`;
 
   try {
+    let result: any = null;
+    let modelName = "";
+
     if (provider === "openrouter") {
       const openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
-      const model = process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet";
-      const parsed = await callOpenAICompatible({
+      modelName = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
+      result = await callOpenAICompatible({
         url: openRouterUrl,
         apiKey: process.env.OPENROUTER_API_KEY,
-        model,
+        model: modelName,
         systemPrompt: dynamicSystemPrompt,
         userPrompt,
         extraHeaders: {
@@ -569,28 +834,23 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
           "X-Title": "Alabuga Negotiation Arena",
         },
       });
-      return res.json(parsed);
-    }
-
-    if (provider === "local") {
+    } else if (provider === "local") {
       const baseUrl = (process.env.LOCAL_LLM_URL || "http://127.0.0.1:11434").replace(/\/+$/, "");
       const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/v1/chat/completions`;
-      const model = process.env.LOCAL_LLM_MODEL || "llama3.2";
-      const parsed = await callOpenAICompatible({
+      modelName = process.env.LOCAL_LLM_MODEL || "llama3.2";
+      result = await callOpenAICompatible({
         url: endpoint,
-        model,
+        model: modelName,
         systemPrompt: dynamicSystemPrompt,
         userPrompt,
       });
-      return res.json(parsed);
-    }
-
-    if (provider === "gemini") {
+    } else if (provider === "gemini") {
       const ai = getGenAI();
       if (!ai) throw new Error("Gemini AI client not initialized (GEMINI_API_KEY missing)");
+      modelName = "gemini-3.8-flash";
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: modelName,
         contents: `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`,
         config: {
           systemInstruction: dynamicSystemPrompt,
@@ -661,14 +921,54 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
 
       const text = response.text?.trim();
       if (!text) throw new Error("Empty response from Gemini");
-      return res.json(JSON.parse(text));
+      result = JSON.parse(text);
+    }
+
+    if (result) {
+      result.latency_ms = Date.now() - startTime;
+      result.provider_name = provider;
+      result.model_name = modelName;
+      result.methodology_tag = detectMethodologyTag(lastUserMsg, lastOpponentMsg);
+      result.zopa = calculateZopa(
+        context,
+        result.active_counter_offer || 300,
+        result.agenda || context?.agenda,
+        result.is_deal_closed || false,
+        result.is_deal_failed || false
+      );
+      return res.json(result);
     }
   } catch (error) {
     console.warn(`[${provider.toUpperCase()}] Provider failed, fallback to state engine:`, error);
-    return res.json(generateFallbackResponse(req.body));
+    const fallback = generateFallbackResponse(req.body);
+    fallback.latency_ms = Date.now() - startTime;
+    return res.json(fallback);
   }
 
-  return res.json(generateFallbackResponse(req.body));
+  const fallback = generateFallbackResponse(req.body);
+  fallback.latency_ms = Date.now() - startTime;
+  return res.json(fallback);
+});
+
+// Runtime provider switcher endpoint (1-click Live <-> Offline switch)
+app.get("/api/provider", (_req, res) => {
+  res.json({
+    activeProvider: getActiveProvider(),
+    runtimeOverride: runtimeProviderOverride,
+  });
+});
+
+app.post("/api/provider", (req, res) => {
+  const { provider } = req.body;
+  if (provider === "openrouter" || provider === "gemini" || provider === "local" || provider === "fallback" || provider === null) {
+    setRuntimeProvider(provider);
+    return res.json({
+      success: true,
+      activeProvider: getActiveProvider(),
+      runtimeOverride: runtimeProviderOverride,
+    });
+  }
+  return res.status(400).json({ error: "Invalid provider name" });
 });
 
 // API endpoint to generate complete scenario using active LLM provider

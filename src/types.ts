@@ -10,6 +10,26 @@ export interface NegotiationMetrics {
   deal_readiness: number; // 0..100
 }
 
+export interface MethodologyTag {
+  category: "SPIN" | "HARVARD" | "BATNA" | "ERROR" | "TACTIC";
+  tag: string;
+  description: string;
+  type: "positive" | "warning" | "danger" | "info";
+}
+
+export interface ZopaState {
+  buyerMin: number;       // Мин. предложение оппонента (₽/м²)
+  buyerMax: number;       // Макс. предел оппонента (₽/м²)
+  sellerMin: number;      // BATNA ОЭЗ (мин. допустимая) (₽/м²)
+  sellerMax: number;      // Базовая ставка ОЭЗ (₽/м²)
+  isOverlap: boolean;     // Есть ли пересечение (Зона возможного соглашения)
+  overlapMin?: number;    // Нижняя граница ZOPA
+  overlapMax?: number;    // Верхняя граница ZOPA
+  currentOffer?: number;  // Текущая обсуждаемая ставка
+  status: "expanding" | "narrowing" | "deadlock" | "agreed";
+  changeReason?: string;
+}
+
 export interface Message {
   id: string;
   actor: ActorRole;
@@ -19,6 +39,7 @@ export interface Message {
   snapshotMetrics: NegotiationMetrics;
   tacticalNote?: string;
   barsAnimation?: BarsAnimationState;
+  methodologyTag?: MethodologyTag;
 }
 
 export interface BatnaConfig {
@@ -73,6 +94,11 @@ export interface GeminiResponse {
   manipulation_type?: "none" | "bluff" | "authority_press" | "hurry_trap";
   hidden_need_revealed?: boolean;
   active_counter_offer?: number;
+  methodology_tag?: MethodologyTag;
+  zopa?: ZopaState;
+  latency_ms?: number;
+  model_name?: string;
+  provider_name?: string;
 }
 
 export type AgendaItemStatus = "agreed" | "in_progress" | "disputed";
