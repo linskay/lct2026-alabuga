@@ -66,7 +66,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="w-full h-full relative flex items-center justify-center pointer-events-none">
           <model-viewer
             id="bars-lobby-avatar"
-            src="./bars.glb"
+            src="/bars.glb"
             alt="Робот-наставник Б.А.Р.С. ОЭЗ Алабуга"
             autoplay
             animation-name="Idle"

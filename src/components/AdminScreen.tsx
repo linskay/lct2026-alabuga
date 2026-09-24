@@ -83,6 +83,7 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({
       );
       setConfig({
         id: `custom_ai_${Date.now()}`,
+        title: `AI Кейс: ${config.sphere}`,
         name: `AI Кейс: ${config.sphere}`,
         sphere: config.sphere,
         opponentRole:

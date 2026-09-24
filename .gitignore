@@ -1,4 +1,4 @@
-# Web Container Runtime Artifacts (Google AI Studio Web Runner)
+# AI Studio Dev Server & Web Preview Files (локально для веб-песочницы)
 metadata.json
 package.json
 package-lock.json
@@ -8,16 +8,13 @@ yarn.lock
 tsconfig.json
 vite.config.ts
 vite.config.js
-esbuild.config.js
 server.ts
 server.js
 index.html
-dist/
 node_modules/
-*.log
-.DS_Store
-.env*
-!.env.example
+dist/
+.pnp
+.pnp.js
 
 # Gradle & Android Build Artifacts
 .gradle/
@@ -29,3 +26,14 @@ composeApp/build/
 local.properties
 .idea/
 *.iml
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Environment & OS
+.env*
+!.env.example
+.DS_Store

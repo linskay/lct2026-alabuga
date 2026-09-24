@@ -28,31 +28,32 @@ export interface Message {
 export interface BatnaConfig {
   minPricePerSqm: number;
   maxGracePeriodMonths: number;
-  taxHolidayYears: number;
-  minJobCreation: number;
-  minCapexMillionRub: number;
+  taxHolidayYears?: number;
+  minJobCreation?: number;
+  minCapexMillionRub?: number;
   redLines: string[];
 }
 
 export interface AdminScenarioConfig {
   id: string;
   title: string;
-  sphere: "B2B / Инвесторы ОЭЗ" | "Закупки и тендеры" | "HR / Наем топов" | "Внутренний спор";
+  name?: string;
+  sphere?: "B2B / Инвесторы ОЭЗ" | "Закупки и тендеры" | "HR / Наем топов" | "Внутренний спор" | string;
   opponentRole: string;
   opponentName: string;
   opponentCompany: string;
-  opponentPersonality: string;
-  personalityTone: "Агрессивный / Прессинг" | "Скрытный манипулятор" | "Бюрократ / Регламент" | "Эмоциональный / Шантаж";
-  hiddenGoal: string;
-  opponentBatna: string;
-  toughnessLevel: number; // 0..100
-  bluffTendency: number;  // 0..100
-  difficulty: DifficultyLevel;
+  opponentPersonality?: string;
+  personalityTone: "Агрессивный / Прессинг" | "Скрытный манипулятор" | "Бюрократ / Регламент" | "Эмоциональный / Шантаж" | string;
+  hiddenGoal?: string;
+  opponentBatna?: string;
+  toughnessLevel?: number; // 0..100
+  bluffTendency?: number;  // 0..100
+  difficulty: DifficultyLevel | string;
   zoneCluster: string;
-  initialContext: string;
+  initialContext?: string;
   initialOpponentUtterance?: string;
   initialBarsAdvice?: string;
-  targetKpis: string[];
+  targetKpis?: string[];
   batna: BatnaConfig;
 }
 

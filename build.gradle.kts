@@ -6,3 +6,10 @@ plugins {
     alias(libs.plugins.composeCompiler) apply false
     alias(libs.plugins.kotlinSerialization) apply false
 }
+
+tasks.register<Exec>("devServer") {
+    group = "development"
+    description = "Launch AI Studio Web Preview Dev Server"
+    commandLine("npm", "run", "dev")
+}
+
