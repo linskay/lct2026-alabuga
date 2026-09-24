@@ -81,6 +81,14 @@ export default function App() {
     timestamp: Date.now(),
     stepIndex: 0,
     snapshotMetrics: { ...initialMetrics },
+    emotion: "attack",
+    emotionLabel: "Первый выпад / Давление",
+    emotionEmoji: "😠",
+    contextHints: [
+      "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+      "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем субсидий или мощности]...",
+      "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
+    ],
   };
 
   const [messages, setMessages] = useState<Message[]>([initialBarsWelcome, initialOpponentMessage]);
@@ -181,26 +189,63 @@ export default function App() {
     setBarsAnimation("talk");
 
     try {
-      const response = await fetch("/api/negotiate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          history: updatedMessages,
-          context: {
-            ...config,
-            currentMetrics: metrics,
-            agenda,
-            hiddenNeedsDiscovered,
-            activeCounterOffer,
-          },
-        }),
-      });
+      let data: any = null;
+      try {
+        const response = await fetch("/api/negotiate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            history: updatedMessages,
+            context: {
+              ...config,
+              currentMetrics: metrics,
+              agenda,
+              hiddenNeedsDiscovered,
+              activeCounterOffer,
+            },
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const contentType = response.headers.get("content-type") || "";
+        if (response.ok && contentType.includes("application/json")) {
+          data = await response.json();
+        }
+      } catch (fetchErr) {
+        console.warn("API request failed, switching to local state engine:", fetchErr);
       }
 
-      const data = await response.json();
+      // If network or server didn't return valid JSON, compute deterministic local fallback
+      if (!data || !data.opponent_reply) {
+        const lower = text.toLowerCase();
+        let fallbackReply = "Ваше предложение требует дополнительного анализа. 400 ₽ за квадратный метр — наш ориентир, но назовите конкретные встречные уступки по срокам и сетям.";
+        let fallbackFeedback = "Оппонент держит оборону. Удерживайте ставку 460 ₽/м² и проверьте его скрытую потребность по срокам запуска.";
+        let fallbackAnimation = "talk";
+        let newTrust = metrics.trust;
+        let newTension = metrics.tension;
+        let newReadiness = metrics.deal_readiness;
+
+        if (lower.includes("460")) {
+          fallbackReply = "460 ₽/м² — это серьезная планка. Чем вы обоснуете такую цену по сравнению с предложениями в других регионах?";
+          fallbackFeedback = "Позиция по ставке обозначена. Подкрепите 460 ₽ надежностью подстанций ОЭЗ и гарантией ввода корпуса!";
+          newTrust = Math.min(100, newTrust + 5);
+          newReadiness = Math.min(100, newReadiness + 5);
+        } else if (lower.includes("каникул") || lower.includes("срок")) {
+          fallbackReply = "По каникулам мы готовы обсуждать оптимизацию графика, если вы гарантируете шеф-монтаж без задержек.";
+          fallbackFeedback = "Диалог перешел в конструктивное русло. Фиксируйте каникулы не более 4 месяцев.";
+          newTrust = Math.min(100, newTrust + 8);
+          newTension = Math.max(0, newTension - 5);
+        }
+
+        data = {
+          opponent_reply: fallbackReply,
+          bars_feedback: fallbackFeedback,
+          bars_animation: fallbackAnimation,
+          metrics: { trust: newTrust, tension: newTension, deal_readiness: newReadiness },
+          agenda,
+          is_deal_closed: false,
+          is_deal_failed: false,
+        };
+      }
 
       if (data.methodology_tag) {
         userMessage.methodologyTag = data.methodology_tag;
@@ -226,6 +271,31 @@ export default function App() {
         setActiveCounterOffer(data.active_counter_offer);
       }
 
+      // Determine emotion classification
+      let emotion: "attack" | "compromise" | "bluff" | "neutral" = data.emotion || "neutral";
+      let emotionLabel = data.emotion_label;
+      let emotionEmoji = data.emotion_emoji;
+
+      if (!emotionLabel) {
+        if (data.manipulation_type === "bluff" || data.opponent_reply?.includes("Калуг")) {
+          emotion = "bluff";
+          emotionLabel = "Блеф конкурентами";
+          emotionEmoji = "⚠️";
+        } else if (data.bars_animation === "warn" || data.metrics?.tension >= 60) {
+          emotion = "attack";
+          emotionLabel = "Несогласие";
+          emotionEmoji = "😠";
+        } else if (data.bars_animation === "win" || data.metrics?.deal_readiness >= 65 || data.is_deal_closed) {
+          emotion = "compromise";
+          emotionLabel = "Заинтересован";
+          emotionEmoji = "🤝";
+        } else {
+          emotion = "neutral";
+          emotionLabel = "Позиция";
+          emotionEmoji = "💬";
+        }
+      }
+
       const opponentMessage: Message = {
         id: `msg_opp_${Date.now()}`,
         actor: "OPPONENT",
@@ -235,28 +305,45 @@ export default function App() {
         snapshotMetrics: { ...data.metrics },
         tacticalNote: data.bars_feedback,
         barsAnimation: data.bars_animation,
+        emotion,
+        emotionLabel,
+        emotionEmoji,
+        contextHints: data.context_hints || [
+          "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+          "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
+          "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
+        ],
       };
 
       const newHistory = [...updatedMessages, opponentMessage];
-
-      // If B.A.R.S. triggers a warning, win, or critical feedback, insert a living mentor bubble
-      if (data.bars_animation === "warn" || data.bars_animation === "win" || nextStep % 2 === 0) {
-        const barsMessage: Message = {
-          id: `msg_bars_${Date.now() + 1}`,
-          actor: "BARS",
-          text: data.bars_feedback,
-          timestamp: Date.now() + 1,
-          stepIndex: nextStep,
-          snapshotMetrics: { ...data.metrics },
-          barsAnimation: data.bars_animation,
-        };
-        newHistory.push(barsMessage);
-      }
 
       setMessages(newHistory);
       setMetrics(data.metrics);
       if (data.agenda) {
         setAgenda(data.agenda);
+      } else if (data.agenda_status && Array.isArray(data.agenda_status)) {
+        // Map dynamic agenda_status array to agenda object
+        setAgenda((prev) => {
+          const next = { ...prev };
+          data.agenda_status.forEach((item: any) => {
+            const topic = (item.topic || "").toLowerCase();
+            const status: "agreed" | "in_progress" | "disputed" =
+              item.status === "agreed"
+                ? "agreed"
+                : item.status === "rejected"
+                ? "disputed"
+                : "in_progress";
+
+            if (topic.includes("ставк") || topic.includes("цен") || topic.includes("аренд") || topic.includes("rate")) {
+              next.rate = { ...next.rate, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            } else if (topic.includes("каникул") || topic.includes("срок") || topic.includes("grace")) {
+              next.grace_period = { ...next.grace_period, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            } else if (topic.includes("мощност") || topic.includes("capex") || topic.includes("инвестиц") || topic.includes("сет") || topic.includes("power")) {
+              next.power_capex = { ...next.power_capex, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            }
+          });
+          return next;
+        });
       }
       setBarsFeedback(data.bars_feedback);
       setBarsAnimation(data.bars_animation || "talk");
@@ -612,6 +699,8 @@ export default function App() {
 
       <DebriefingModal
         analytics={calculateDebriefing()}
+        scenario={config}
+        agenda={agenda}
         isOpen={isDebriefingOpen}
         onClose={() => setIsDebriefingOpen(false)}
         onRestart={handleRestart}

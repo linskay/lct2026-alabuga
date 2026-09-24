@@ -40,6 +40,10 @@ export interface Message {
   tacticalNote?: string;
   barsAnimation?: BarsAnimationState;
   methodologyTag?: MethodologyTag;
+  emotion?: "attack" | "compromise" | "bluff" | "neutral";
+  emotionLabel?: string;
+  emotionEmoji?: string;
+  contextHints?: string[];
 }
 
 export interface BatnaConfig {
@@ -88,6 +92,18 @@ export interface GeminiResponse {
   bars_feedback: string;
   bars_animation: BarsAnimationState;
   metrics: NegotiationMetrics;
+  metrics_delta?: {
+    trust: number;
+    tension: number;
+    deal_readiness: number;
+  };
+  is_batna_violated?: boolean;
+  dynamic_hints?: string[];
+  context_hints?: string[];
+  agenda_status?: Array<{
+    topic: string;
+    status: "agreed" | "negotiating" | "rejected" | AgendaItemStatus;
+  }>;
   is_deal_closed: boolean;
   is_deal_failed: boolean;
   agenda?: NegotiationAgenda;
@@ -161,6 +177,10 @@ declare global {
         "rotation-per-second"?: string;
         "shadow-intensity"?: string;
         "exposure"?: string;
+        "camera-orbit"?: string;
+        "camera-target"?: string;
+        "field-of-view"?: string;
+        "interaction-prompt"?: string;
         style?: React.CSSProperties & { [key: string]: any };
       };
     }

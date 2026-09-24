@@ -366,6 +366,29 @@ function generateFallbackResponse(body: any) {
 
   const agenda = JSON.parse(JSON.stringify(currentAgenda));
 
+  // Detect whether player is repeating previous arguments (anti-spam / anti-loop)
+  const previousUserMessages = userMessages.slice(0, -1);
+  const isRepeatingArgument = previousUserMessages.some((prev: any) => {
+    const prevText = (prev.text || "").toLowerCase().trim();
+    if (!prevText || prevText.length < 10) return false;
+    // Check direct equality or high substring overlap (e.g. repeated chip)
+    if (prevText === lower) return true;
+    if (lower.length > 25 && prevText.includes(lower.slice(0, 25))) return true;
+    if (prevText.length > 25 && lower.includes(prevText.slice(0, 25))) return true;
+    return false;
+  });
+
+  if (isRepeatingArgument) {
+    trustDelta = -12;
+    tensionDelta = +18;
+    barsAnimation = "warn";
+    opponentReply =
+      "Вы уже повторяли этот аргумент слово в слово. Вашу позицию я услышал, но мои встречные вопросы остались без ответа. Не ходите по кругу — давайте конкретные встречные уступки, иначе диалог теряет смысл.";
+    barsFeedback =
+      "ОШИБКА: Повторение одного и того же тезиса! Оппонент раздражен хождением по кругу. Смените предмет торга или задайте встречный вопрос о приоритетах.";
+    return buildResponse("attack", "Несогласие / Осаживание", "😠");
+  }
+
   // Detect whether previous turn was a manipulation attack
   const wasBluff = lastOpponentMsg.includes("Калуга") || lastOpponentMsg.includes("калуга");
   const wasAuthorityPress = lastOpponentMsg.includes("уполномочены") || lastOpponentMsg.includes("генеральному директору");
@@ -693,7 +716,11 @@ function generateFallbackResponse(body: any) {
   barsFeedback =
     "Строганов прощупывает вашу устойчивость. Используйте ступенчатое сопротивление: назовите 460 ₽/м² и выясните его дедлайн по вводу оборудования.";
 
-  function buildResponse() {
+  function buildResponse(
+    customEmotion?: "attack" | "compromise" | "bluff" | "neutral",
+    customLabel?: string,
+    customEmoji?: string
+  ) {
     // Double check anti-loop
     if (previousOpponentTexts.includes(opponentReply)) {
       opponentReply = `Слушайте меня внимательно: ${opponentReply}`;
@@ -715,6 +742,54 @@ function generateFallbackResponse(body: any) {
     const methodologyTag = detectMethodologyTag(lastUserMsg, lastOpponentMsg);
     const zopaState = calculateZopa(context, activeCounterOffer, agenda, isDealClosed, isDealFailed);
 
+    // Determine emotion defaults
+    let emotion: "attack" | "compromise" | "bluff" | "neutral" = customEmotion || "neutral";
+    let emotionLabel = customLabel || "Внимательный диалог";
+    let emotionEmoji = customEmoji || "💬";
+
+    if (!customEmotion) {
+      if (manipulationType === "bluff" || opponentReply.includes("Калуг") || opponentReply.includes("Ульяновск")) {
+        emotion = "bluff";
+        emotionLabel = "Блеф / Проверка границ";
+        emotionEmoji = "⚠️";
+      } else if (barsAnimation === "warn" || tensionDelta > 5 || finalTension >= 65) {
+        emotion = "attack";
+        emotionLabel = "Несогласие / Прессинг";
+        emotionEmoji = "😠";
+      } else if (barsAnimation === "win" || trustDelta > 5 || finalReadiness >= 65 || isDealClosed) {
+        emotion = "compromise";
+        emotionLabel = "Заинтересован / Компромисс";
+        emotionEmoji = "🤝";
+      }
+    }
+
+    // Determine context_hints scaffolding based on current negotiation turn
+    let contextHints: string[] = [
+      "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+      "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
+      "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим [опишите компромисс]...",
+    ];
+
+    if (manipulationType === "bluff" || opponentReply.includes("Калуг")) {
+      contextHints = [
+        "В Калуге нет свободной подстанции 110 кВ на границе площадки, а у нас [поясните готовность сетей]...",
+        "Мы готовы зафиксировать базовую ставку 460 ₽/м² в обмен на [укажите встречное обязательство инвестора]...",
+        "Сравнение с Калугой некорректно без учета логистики: назовите ваши реальные требования к [срокам или кадрам]...",
+      ];
+    } else if (opponentReply.includes("самолет") || opponentReply.includes("2 часа") || manipulationType === "hurry") {
+      contextHints = [
+        "Спешка перед самолетом — плохой советчик при CAPEX в миллиарды. Давайте прямо сейчас согласуем [ставку или каникулы]...",
+        "Мы не подписываем соглашения под давлением цейтнота, однако можем пойти навстречу по [укажите параметр]...",
+        "Если вы цените свое время, зафиксируем 460 ₽/м² прямо сейчас при условии, что вы [укажите встречное требование]...",
+      ];
+    } else if (isDealClosed) {
+      contextHints = [
+        "Отлично, фиксируем протокол согласования: ставка [укажите ставку] и каникулы [укажите срок]...",
+        "Передаем проект договора на подписание юристам обеих сторон с учетом [укажите обязательства]...",
+        "Благодарю за конструктивный диалог. Закрепляем обязательства по CAPEX [укажите сумму]...",
+      ];
+    }
+
     return {
       opponent_reply: opponentReply,
       bars_feedback: barsFeedback,
@@ -724,6 +799,18 @@ function generateFallbackResponse(body: any) {
         tension: finalTension,
         deal_readiness: finalReadiness,
       },
+      metrics_delta: {
+        trust: trustDelta,
+        tension: tensionDelta,
+        deal_readiness: readinessDelta,
+      },
+      is_batna_violated: false,
+      dynamic_hints: contextHints,
+      agenda_status: [
+        { topic: "Арендная ставка", status: agenda.rate.status },
+        { topic: "Каникулы", status: agenda.grace_period.status },
+        { topic: "Мощности и CAPEX", status: agenda.power_capex.status },
+      ],
       agenda,
       is_deal_closed: isDealClosed,
       is_deal_failed: isDealFailed,
@@ -735,10 +822,71 @@ function generateFallbackResponse(body: any) {
       latency_ms: Math.floor(Math.random() * 25) + 15,
       provider_name: "fallback",
       model_name: "Autonomous Engine (Offline)",
+      emotion,
+      emotion_label: emotionLabel,
+      emotion_emoji: emotionEmoji,
+      context_hints: contextHints,
     };
   }
 
   return buildResponse();
+}
+
+// Helper for timeout
+function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMsg)), ms)),
+  ]);
+}
+
+// Fallback scenario generator
+function generateFallbackCase(sphere?: string, personalityTone?: string, toughnessLevel?: number) {
+  const chosenSphere = sphere || "B2B / Инвесторы ОЭЗ";
+  const chosenToughness = toughnessLevel || 80;
+  return {
+    id: `case_${Date.now()}`,
+    title: `Переговоры с инвестором: «${chosenSphere}»`,
+    sphere: chosenSphere,
+    opponentRole:
+      chosenSphere === "B2B / Инвесторы ОЭЗ"
+        ? "Генеральный директор агрохолдинга"
+        : chosenSphere === "Закупки и тендеры"
+        ? "Коммерческий директор поставщика"
+        : chosenSphere === "HR / Наем топов"
+        ? "Главный инженер производства"
+        : "Руководитель дивизиона",
+    opponentName: "Валерий Строганов",
+    opponentCompany: "ООО «ТехноПром Инжиниринг»",
+    opponentPersonality: "Хладнокровный прагматик, прессингует альтернативными площадками",
+    personalityTone: personalityTone || "Агрессивный / Прессинг",
+    hiddenGoal: "Срочный дедлайн запуска производства к 3 кварталу (подписаны контракты на станки)",
+    opponentBatna: "Уход в индустриальный парк «Север» с готовым складом",
+    toughnessLevel: chosenToughness,
+    bluffTendency: 80,
+    difficulty: "Прожжённый закупщик",
+    zoneCluster: "Индустриальный парк «Синергия»",
+    initialContext: "Крупный производитель оборудования выбирает между ОЭЗ «Алабуга» и альтернативной площадкой. Оппонент требует скидку на аренду и бесплатное технологическое присоединение.",
+    initialOpponentUtterance: "Добрый день. Наше предложение: 400 ₽/м² и 6 месяцев каникул, плюс 8 МВт электросетей полностью за ваш счет. Иначе мы подписываем договор с Калугой.",
+    initialBarsAdvice: "Внимание: оппонент сразу открывает встречу жестким блефом по Калуге. Парируйте дефицитом свободных мощностей 110 кВ у конкурентов!",
+    targetKpis: [
+      "Удержать базовую арендную ставку не ниже 460 ₽/м²",
+      "Ограничить арендные каникулы максимум 4 месяцами",
+      "Привязать подвод 8 МВт к встречному CAPEX от 1.2 млрд ₽"
+    ],
+    batna: {
+      minPricePerSqm: 460,
+      maxGracePeriodMonths: 4,
+      taxHolidayYears: 10,
+      minJobCreation: 250,
+      minCapexMillionRub: 1200,
+      redLines: [
+        "Не опускать ставку ниже 460 ₽/м² без встречных инвестиций",
+        "Не давать каникулы более 4 месяцев",
+        "Технологическое присоединение только под твердый CAPEX инвестора"
+      ]
+    }
+  };
 }
 
 // API endpoint for negotiation turn
@@ -757,39 +905,46 @@ app.post("/api/negotiate", async (req, res) => {
     fallback.latency_ms = Date.now() - startTime;
     return res.json(fallback);
   }
+
   const sphere = context?.sphere || "B2B / Инвесторы ОЭЗ";
   const opponentRole = context?.opponentRole || "Генеральный директор";
   const opponentName = context?.opponentName || "Валерий Строганов";
   const opponentCompany = context?.opponentCompany || "ООО «ТехноПром Инжиниринг»";
   const personalityTone = context?.personalityTone || "Агрессивный / Прессинг";
   const toughnessLevel = context?.toughnessLevel || 80;
+  const difficultyScore = Math.round((toughnessLevel / 100) * 10);
   const bluffTendency = context?.bluffTendency || 85;
   const hiddenGoal = context?.hiddenGoal || "Сбить цену любой ценой и скрыть дедлайн запуска к Q3";
   const opponentBatna = context?.opponentBatna || "Уход на другую площадку";
+  const scenarioDescription = context?.initialContext || `${sphere}. Переговоры с ключевым партнером ${opponentCompany}.`;
   const redLines = context?.batna?.redLines || ["Не сдавать базовые параметры соглашения"];
+  const batnaRulesFormatted = redLines.map((r: string, idx: number) => `${idx + 1}. ${r}`).join("\n");
 
-  const dynamicSystemPrompt = `Ты — оппонент на «Арене переговоров» ОЭЗ «Алабуга».
-Контекст встречи: ${sphere}
-Твоя роль: ${opponentRole} (${opponentName}, ${opponentCompany})
-Твой характер и стиль: ${personalityTone} (Уровень жесткости: ${toughnessLevel}/100, склонность к блефу: ${bluffTendency}/100)
-Твой скрытый интерес / боль: ${hiddenGoal}
-Твоя альтернатива (BATNA оппонента): ${opponentBatna}
+  const dynamicSystemPrompt = `ТЫ — ПЕРЕГОВОРНЫЙ СИМУЛЯТОР ДЛЯ СЦЕНАРИЯ:
+- Роль оппонента: ${opponentName}, ${opponentRole} (${opponentCompany})
+- Контекст сделки: ${scenarioDescription}
+- Психотип: ${personalityTone} | Уровень жесткости: ${difficultyScore}/10 | Склонность к блефу: ${bluffTendency}%
+- Скрытая цель оппонента: ${hiddenGoal}
+- Альтернатива оппонента: ${opponentBatna}
 
-Красные линии игрока, которые он защищает:
-${redLines.map((r: string) => `• ${r}`).join("\n")}
+КРАСНЫЕ ЛИНИИ ИГРОКА (BATNA), КОТОРЫЕ ОН ОБЯЗАН ЗАЩИТИТЬ:
+${batnaRulesFormatted}
 
-Веди переговоры строго в рамках указанного характера. Не выходи из роли. Реагируй на давление и аргументы соответственно твоему психотипу.
-
-ТАКЖЕ ты генерируешь реплики робота-наставника «Б.А.Р.С.» (Бортовой Аналитик Развития Стратегий ОЭЗ «Алабуга»):
-- Б.А.Р.С. дает жесткую, краткую, практическую обратную связь игроку: что он сделал правильно, где проявил слабость и какой тактический ход сделать дальше.
-
-Твоя тактика:
-1. НИКОГДА не принимай первое предложение игрока, даже если оно разумное. Твоя цель — выжать максимум.
-2. Играй на ступенчатое сопротивление: если игрок предлагает условия, не соглашайся сразу. Соглашайся на компромисс ТОЛЬКО на 3-4 круге торга и ТОЛЬКО если игрок взамен предложил что-то ценное.
-3. Активно используй блеф (вероятность ${bluffTendency}%): угрожай конкурентами, срывом контракта или уходом к альтернативным контрагентам.
-4. Проверяй твердость позиции: если игрок соглашается на твои условия слишком легко — дави еще сильнее.
-5. Держи сделку открытой: переговоры должны длиться минимум 6–8 раундов перед финальным решением.
-6. Если игрок пытается закрыть сделку слишком быстро (до 6 шага), осади его и укажи на непроработанные риски.
+ПРАВИЛА ЛОГИЧЕСКОГО АНАЛИЗА РЕПЛИК (ФАКТЧЕКИНГ):
+1. СЕМАНТИЧЕСКИЙ АНАЛИЗ: Внимательно различай согласие, отказ и встречное условие:
+   - Если игрок использует отрицания («не согласен», «не подписываем», «исключено», «не пойдем на 400», «не можем предоставить») в адрес требований оппонента — трактуй это как УДЕРЖАНИЕ позиции, а не уступку!
+   - Фиксируй факт сдачи BATNA (is_batna_violated: true) ТОЛЬКО тогда, когда игрок явно соглашается на цифру оппонента хуже допустимой по правилам BATNA. Фраза «не согласны на 400» НИКОГДА не является нарушением BATNA.
+2. СТУПЕНЧАТЫЙ ТОРГ:
+   - Не принимай первое встречное предложение игрока, даже если оно логично. Требуй дополнительных уступок в рамках роли оппонента.
+   - Не повторяй реплики слово в слово. Развивай диалог на основе последнего аргумента игрока.
+   - Если игрок отправляет повторный аргумент или нажимает одну и ту же заготовку слово в слово — осади его («Вы уже говорили это. На мой вопрос вы не ответили»).
+3. МЕТРИКИ:
+   - Изменение метрик (trust, tension, deal_readiness) за один шаг не должно превышать ±15%. Не задирай стресс до 100% при нормальном торге.
+   - Возвращай metrics_delta (изменение за ход в диапазоне от -15 до +15).
+4. ТАКТИЧЕСКИЙ РАЗБОР Б.А.Р.С. (bars_feedback):
+   - Указывай на сильный маневр или ошибку игрока в терминах Гарвардского метода принципиальных переговоров и концепции BATNA.
+5. ДИНАМИЧЕСКИЕ ПОДСКАЗКИ (dynamic_hints):
+   - Модель на лету генерирует ровно 3 тактических каркаса-шаблона под текущий контекст диалога с плейсхолдерами [...] или ... (scaffolding для игрока, чтобы он дополнил своими словами).
 
 Верни ответ СТРОГО в JSON формате со следующими полями:
 {
@@ -814,7 +969,8 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
 }`;
 
   const formattedHistory = (history || []).map((m: any) => `${m.actor}: ${m.text}`).join("\n");
-  const userPrompt = `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`;
+  const currentMetrics = context?.currentMetrics || { trust: 50, tension: 40, deal_readiness: 25 };
+  const userPrompt = `История переговоров:\n${formattedHistory}\n\nТекущие метрики игрока: ${JSON.stringify(currentMetrics)}\n\nДай ответ строго в JSON формате.`;
 
   try {
     let result: any = null;
@@ -849,9 +1005,9 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
       if (!ai) throw new Error("Gemini AI client not initialized (GEMINI_API_KEY missing)");
       modelName = "gemini-3.8-flash";
 
-      const response = await ai.models.generateContent({
+      const geminiCall = ai.models.generateContent({
         model: modelName,
-        contents: `История переговоров:\n${formattedHistory}\n\nТекущие метрики: ${JSON.stringify(context?.currentMetrics || {})}\n\nДай ответ строго в JSON формате.`,
+        contents: userPrompt,
         config: {
           systemInstruction: dynamicSystemPrompt,
           responseMimeType: "application/json",
@@ -861,7 +1017,7 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
               opponent_reply: { type: Type.STRING },
               bars_feedback: { type: Type.STRING },
               bars_animation: { type: Type.STRING },
-              metrics: {
+              metrics_delta: {
                 type: Type.OBJECT,
                 properties: {
                   trust: { type: Type.INTEGER },
@@ -869,6 +1025,22 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
                   deal_readiness: { type: Type.INTEGER },
                 },
                 required: ["trust", "tension", "deal_readiness"],
+              },
+              is_batna_violated: { type: Type.BOOLEAN },
+              dynamic_hints: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              agenda_status: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    topic: { type: Type.STRING },
+                    status: { type: Type.STRING },
+                  },
+                  required: ["topic", "status"],
+                },
               },
               agenda: {
                 type: Type.OBJECT,
@@ -898,37 +1070,61 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
                     required: ["status", "detail"],
                   },
                 },
-                required: ["rate", "grace_period", "power_capex"],
+              },
+              metrics: {
+                type: Type.OBJECT,
+                properties: {
+                  trust: { type: Type.INTEGER },
+                  tension: { type: Type.INTEGER },
+                  deal_readiness: { type: Type.INTEGER },
+                },
               },
               is_deal_closed: { type: Type.BOOLEAN },
               is_deal_failed: { type: Type.BOOLEAN },
               manipulation_type: { type: Type.STRING },
               hidden_need_revealed: { type: Type.BOOLEAN },
               active_counter_offer: { type: Type.INTEGER },
+              emotion: { type: Type.STRING },
+              emotion_label: { type: Type.STRING },
+              emotion_emoji: { type: Type.STRING },
             },
             required: [
               "opponent_reply",
               "bars_feedback",
               "bars_animation",
-              "metrics",
-              "agenda",
-              "is_deal_closed",
-              "is_deal_failed",
             ],
           },
         },
       });
 
+      const response = await withTimeout(geminiCall, 7000, "Gemini call timeout");
       const text = response.text?.trim();
       if (!text) throw new Error("Empty response from Gemini");
       result = JSON.parse(text);
     }
 
     if (result) {
+      // Calculate clamped metrics using metrics_delta (capped strictly at ±15% per step)
+      const clampDelta = (d: number | undefined) => Math.min(15, Math.max(-15, Number(d) || 0));
+      const deltaTrust = clampDelta(result.metrics_delta?.trust);
+      const deltaTension = clampDelta(result.metrics_delta?.tension);
+      const deltaReadiness = clampDelta(result.metrics_delta?.deal_readiness);
+
+      const calcTrust = Math.min(100, Math.max(0, currentMetrics.trust + deltaTrust));
+      const calcTension = Math.min(100, Math.max(0, currentMetrics.tension + deltaTension));
+      const calcReadiness = result.is_deal_closed ? 100 : Math.min(100, Math.max(0, currentMetrics.deal_readiness + deltaReadiness));
+
+      const finalMetrics = result.metrics || {
+        trust: calcTrust,
+        tension: calcTension,
+        deal_readiness: calcReadiness,
+      };
+
+      result.metrics = finalMetrics;
       result.latency_ms = Date.now() - startTime;
       result.provider_name = provider;
       result.model_name = modelName;
-      result.methodology_tag = detectMethodologyTag(lastUserMsg, lastOpponentMsg);
+      result.methodology_tag = result.methodology_tag || detectMethodologyTag(lastUserMsg, lastOpponentMsg);
       result.zopa = calculateZopa(
         context,
         result.active_counter_offer || 300,
@@ -936,6 +1132,14 @@ ${redLines.map((r: string) => `• ${r}`).join("\n")}
         result.is_deal_closed || false,
         result.is_deal_failed || false
       );
+      result.context_hints = result.dynamic_hints || result.context_hints || [
+        "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+        "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
+        "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим [опишите компромисс]...",
+      ];
+      result.is_deal_closed = Boolean(result.is_deal_closed || calcReadiness >= 100);
+      result.is_deal_failed = Boolean(result.is_deal_failed || (calcTension >= 95 && calcTrust <= 20));
+
       return res.json(result);
     }
   } catch (error) {
@@ -1061,6 +1265,7 @@ app.post("/api/generate-case", async (req, res) => {
     }
   } catch (err) {
     console.warn(`[${provider.toUpperCase()}] Case generation fallback:`, err);
+    return res.json(generateFallbackCase(sphere, personalityTone, toughnessLevel));
   }
 
   // Fallback case generation
@@ -1113,6 +1318,11 @@ app.get("/api/health", (_req, res) => {
       local: process.env.LOCAL_LLM_MODEL || "llama3.2",
     },
   });
+});
+
+// Explicitly handle all unmatched /api/* requests so they NEVER fall through to Vite's SPA index.html
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found` });
 });
 
 // Setup Vite or static serving

@@ -1,9 +1,25 @@
-import React from "react";
-import { DebriefingAnalytics } from "../types";
-import { Award, CheckCircle2, AlertTriangle, TrendingUp, RefreshCw, X, ShieldCheck, Trophy, Lock, Sparkles } from "lucide-react";
+import React, { useState } from "react";
+import { DebriefingAnalytics, AdminScenarioConfig, NegotiationAgenda } from "../types";
+import {
+  Award,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+  RefreshCw,
+  X,
+  ShieldCheck,
+  Trophy,
+  Lock,
+  Sparkles,
+  FileDown,
+  Printer,
+} from "lucide-react";
+import { downloadProtocolFile } from "../utils/exportProtocol";
 
 interface DebriefingModalProps {
   analytics: DebriefingAnalytics;
+  scenario?: AdminScenarioConfig;
+  agenda?: NegotiationAgenda;
   isOpen: boolean;
   onClose: () => void;
   onRestart: () => void;
@@ -11,10 +27,14 @@ interface DebriefingModalProps {
 
 export const DebriefingModal: React.FC<DebriefingModalProps> = ({
   analytics,
+  scenario,
+  agenda,
   isOpen,
   onClose,
   onRestart,
 }) => {
+  const [employeeName, setEmployeeName] = useState("Сотрудник дирекции привлечения инвестиций");
+
   if (!isOpen) return null;
 
   const getGradeColor = (grade: string) => {
@@ -28,6 +48,50 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
       default:
         return "text-[#ff3366] border-[#ff3366] bg-[#ff3366]/10";
     }
+  };
+
+  const handleExportProtocol = () => {
+    const defaultScenario: AdminScenarioConfig = scenario || {
+      id: "industrial_synergy",
+      title: "Индустриальный парк «Синергия»",
+      difficulty: "HARD",
+      opponentName: "Валерий Строганов",
+      opponentRole: "Вице-президент по закупкам и капитальному строительству",
+      opponentCompany: "ПАО «РосТехноПром»",
+      personalityTone: "Агрессивный экспансионист / Закупщик",
+      zoneCluster: "Синергия",
+      batna: {
+        minPricePerSqm: 460,
+        maxGracePeriodMonths: 4,
+        redLines: [
+          "Минимальная ставка 460 ₽/м²",
+          "Каникулы не более 4 месяцев",
+          "CAPEX от 1.2 млрд ₽ под подключение 8 МВт",
+        ],
+      },
+    };
+
+    const defaultAgenda: NegotiationAgenda = agenda || {
+      rate: { id: "rate", title: "Ставка", status: "agreed", detail: "460 ₽/м²" },
+      grace_period: { id: "grace_period", title: "Каникулы", status: "agreed", detail: "4 мес." },
+      power_capex: { id: "power_capex", title: "Сети", status: "agreed", detail: "8 МВт под CAPEX 1.2 млрд" },
+    };
+
+    downloadProtocolFile({
+      documentId: `MOU-ALB-${Date.now().toString().slice(-6)}`,
+      generatedDate: new Date().toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      scenario: defaultScenario,
+      agenda: defaultAgenda,
+      analytics,
+      employeeName,
+      supervisorRole: "Руководитель департамента по работе с резидентами",
+    });
   };
 
   return (
@@ -50,7 +114,7 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -85,7 +149,6 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
                 Откатов машины времени: <span className="font-mono text-[#00f0ff] font-bold">{analytics.timeTravelUsedCount}</span>
               </div>
             </div>
-
             <div className="flex flex-col items-center">
               <div className="text-[10px] text-slate-400 font-mono uppercase mb-1">Рейтинг тактики</div>
               <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center text-2xl font-black font-mono ${getGradeColor(analytics.overallRating)}`}>
@@ -141,7 +204,28 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
             </div>
           </div>
 
-          {/* Advanced Criteria for Rank S Verification */}
+          {/* Enterprise Value: Export MOU Protocol Box */}
+          <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/40 via-purple-950/40 to-slate-900 border border-cyan-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300 uppercase tracking-wide">
+                <Printer className="w-4 h-4 text-cyan-400" />
+                Протокол встречи (MOU) / HR-отчет
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Сводка условий (460 ₽/м², 4 мес., 1.2 млрд CAPEX), HR-метрики и стоп-лексикон сотрудника.
+              </p>
+            </div>
+
+            <button
+              onClick={handleExportProtocol}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,240,255,0.4)] active:scale-95 transition-all shrink-0 cursor-pointer"
+            >
+              <FileDown className="w-4 h-4" />
+              <span>Скачать MOU / PDF</span>
+            </button>
+          </div>
+
+          {/* Advanced Criteria */}
           <div className="grid grid-cols-3 gap-2">
             <div className="p-2.5 rounded-xl bg-[#12141d] border border-[#232736] text-center">
               <div className="text-[10px] text-slate-400 uppercase font-mono">Скрытая боль (Q3)</div>
@@ -319,7 +403,7 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#232736] shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+            className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white cursor-pointer"
           >
             Вернуться в арену
           </button>
@@ -328,7 +412,7 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
               onRestart();
               onClose();
             }}
-            className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#7b2cbf] hover:bg-[#9d4edd] text-white shadow-[0_0_15px_rgba(123,44,191,0.5)] flex items-center gap-2"
+            className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#7b2cbf] hover:bg-[#9d4edd] text-white shadow-[0_0_15px_rgba(123,44,191,0.5)] flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Начать новый раунд
