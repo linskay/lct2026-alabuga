@@ -13,6 +13,7 @@ import { ZopaMapCard } from "./ZopaMapCard";
 import { MethodologyTagBadge } from "./MethodologyTagBadge";
 import { LatencyBadge } from "./LatencyBadge";
 import { OfflineToggle } from "./OfflineToggle";
+import { triggerHaptic } from "../utils/haptics";
 import {
   Send,
   RotateCcw,
@@ -61,6 +62,7 @@ interface ArenaScreenViewProps {
   onOpenDebriefing: () => void;
   onRestart: () => void;
   onOpenConfigurator: () => void;
+  onBackToHome?: () => void;
 }
 
 export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
@@ -88,6 +90,7 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   onOpenDebriefing,
   onRestart,
   onOpenConfigurator,
+  onBackToHome,
 }) => {
   const [inputText, setInputText] = useState("");
   const [lastInsertedTemplate, setLastInsertedTemplate] = useState<string>("");
@@ -179,7 +182,11 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   }
 
   const handleSend = () => {
-    if (isSendDisabled) return;
+    if (isSendDisabled) {
+      triggerHaptic("warning");
+      return;
+    }
+    triggerHaptic("medium");
     onSendMessage(val);
     setInputText("");
     setLastInsertedTemplate("");
@@ -187,6 +194,7 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
 
   const applyHint = (templateText: string) => {
     if (isLoading || isDealClosed || isDealFailed) return;
+    triggerHaptic("selection");
     setInputText(templateText);
     setLastInsertedTemplate(templateText);
   };
@@ -232,9 +240,9 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
           <div className="flex items-center gap-3 min-w-0">
             <button
               id="m3-nav-back-button"
-              onClick={onOpenConfigurator}
+              onClick={onBackToHome || onOpenConfigurator}
               className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all shrink-0 cursor-pointer"
-              title="Назад в Конфигуратор"
+              title="Назад на главную"
             >
               <ArrowLeft className="w-4 h-4 text-cyan-400" />
             </button>
