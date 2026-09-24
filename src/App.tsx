@@ -15,11 +15,21 @@ import { TimeTravelTree } from "./components/TimeTravelTree";
 import { DebriefingModal } from "./components/DebriefingModal";
 import { CaseInfoModal } from "./components/CaseInfoModal";
 import { ScenarioConfiguratorScreen } from "./components/ScenarioConfiguratorScreen";
+import { HomeScreen } from "./components/HomeScreen";
+import { AdminScreen } from "./components/AdminScreen";
+
+export enum Screen {
+  Home = "Home",
+  Arena = "Arena",
+  Admin = "Admin",
+}
 
 export default function App() {
+  // Navigation: start on HomeScreen by default
+  const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.Home);
+
   // Scenario Config (defaults to first preset: Индустриальный парк «Синергия»)
   const [config, setConfig] = useState<AdminScenarioConfig>(PRESET_SCENARIOS[0]);
-  const [isConfiguratorView, setIsConfiguratorView] = useState<boolean>(false);
 
   // Round Timer: default 4 minutes 18 seconds (258s)
   const [timerSeconds, setTimerSeconds] = useState<number>(258);
@@ -518,15 +528,26 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0a0c12] text-slate-100 select-none">
-      {isConfiguratorView ? (
-        <ScenarioConfiguratorScreen
+      {currentScreen === Screen.Home && (
+        <HomeScreen
+          onEnterArena={() => setCurrentScreen(Screen.Arena)}
+          onOpenAdmin={() => setCurrentScreen(Screen.Admin)}
+        />
+      )}
+
+      {currentScreen === Screen.Admin && (
+        <AdminScreen
+          currentConfig={config}
+          onBackToHome={() => setCurrentScreen(Screen.Home)}
           onStartSimulation={(newConfig) => {
             setConfig(newConfig);
-            setIsConfiguratorView(false);
             handleRestart(newConfig);
+            setCurrentScreen(Screen.Arena);
           }}
         />
-      ) : (
+      )}
+
+      {currentScreen === Screen.Arena && (
         /* ARENA COMBAT INTERFACE */
         <ArenaScreenView
           config={config}
@@ -542,11 +563,12 @@ export default function App() {
           onSendMessage={handleSendMessage}
           onRollback={handleRollback}
           onOpenCaseInfo={() => setIsCaseInfoOpen(true)}
-          onOpenAdmin={() => setIsAdminOpen(true)}
+          onOpenAdmin={() => setCurrentScreen(Screen.Admin)}
           onOpenTimeTravel={() => setIsTimeTravelOpen(true)}
           onOpenDebriefing={() => setIsDebriefingOpen(true)}
           onRestart={() => handleRestart()}
-          onOpenConfigurator={() => setIsConfiguratorView(true)}
+          onOpenConfigurator={() => setCurrentScreen(Screen.Admin)}
+          onBackToHome={() => setCurrentScreen(Screen.Home)}
         />
       )}
 

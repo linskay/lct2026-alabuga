@@ -1,8 +1,31 @@
-node_modules/
-build/
+# Web Container Runtime Artifacts (Google AI Studio Web Runner)
+metadata.json
+package.json
+package-lock.json
+bun.lock
+pnpm-lock.yaml
+yarn.lock
+tsconfig.json
+vite.config.ts
+vite.config.js
+esbuild.config.js
+server.ts
+server.js
+index.html
 dist/
-coverage/
-.DS_Store
+node_modules/
 *.log
+.DS_Store
 .env*
 !.env.example
+
+# Gradle & Android Build Artifacts
+.gradle/
+build/
+app/build/
+composeApp/build/
+*.apk
+*.aab
+local.properties
+.idea/
+*.iml

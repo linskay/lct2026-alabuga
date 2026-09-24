@@ -64,8 +64,8 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
         }
       };
 
-      viewer.setAttribute("camera-target", "0m 0.85m 0m");
-      viewer.setAttribute("camera-orbit", "0deg 82deg 88%");
+      viewer.setAttribute("camera-target", "0m 0.55m 0m");
+      viewer.setAttribute("camera-orbit", "0deg 84deg 110%");
       viewer.setAttribute("field-of-view", "32deg");
 
       if (viewer.availableAnimations && viewer.availableAnimations.length > 0) {
@@ -199,8 +199,8 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
             alt={`${config.opponentName} - 3D Виртуальный переговорщик`}
             autoplay
             animation-name={activeAnim}
-            camera-orbit="0deg 82deg 88%"
-            camera-target="0m 0.85m 0m"
+            camera-orbit="0deg 84deg 110%"
+            camera-target="0m 0.55m 0m"
             field-of-view="32deg"
             interaction-prompt="none"
             shadow-intensity="1.2"

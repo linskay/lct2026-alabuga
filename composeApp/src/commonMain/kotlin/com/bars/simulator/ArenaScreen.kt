@@ -330,7 +330,7 @@ fun ArenaScreen(
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                quickArguments.forEach { arg ->
+                for (arg in quickArguments) {
                     SuggestionChip(
                         onClick = { sendMessage(arg) },
                         label = { Text(arg, fontSize = 11.sp, maxLines = 1) },
@@ -338,10 +338,7 @@ fun ArenaScreen(
                             containerColor = DarkSurfaceVariant,
                             labelColor = Color(0xFFCAC4D0)
                         ),
-                        border = SuggestionChipDefaults.suggestionChipBorder(
-                            borderColor = OutlineVariant,
-                            borderWidth = 1.dp
-                        )
+                        border = androidx.compose.foundation.BorderStroke(1.dp, OutlineVariant)
                     )
                 }
             }
