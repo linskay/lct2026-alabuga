@@ -85,18 +85,15 @@ export default function App() {
   const initialOpponentMessage: Message = {
     id: "init_msg_0",
     actor: "OPPONENT",
-    text: "Добрый день. Наша корпорация рассматривает несколько площадок в ПФО. Мы готовы зайти в индустриальный парк «Синергия» на 12 000 м², но ваши базовые ставки аренды завышены минимум на 35%. Требуем скидку до 300 руб/м² и 12 месяцев каникул на пусконаладку. Что скажете?",
+    text: PRESET_SCENARIOS[0].initialOpponentUtterance || "Добрый день. Наша корпорация рассматривает несколько площадок в ПФО. Мы готовы зайти в индустриальный парк «Синергия» на 12 000 м², но ваши базовые ставки аренды завышены минимум на 35%. Требуем скидку до 300 руб/м² и 12 месяцев каникул на пусконаладку. Что скажете?",
     timestamp: Date.now(),
     stepIndex: 0,
     snapshotMetrics: { ...initialMetrics },
     emotion: "attack",
     emotionLabel: "Первый выпад / Давление",
     emotionEmoji: "😠",
-    contextHints: [
-      "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
-      "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем субсидий или мощности]...",
-      "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
-    ],
+    dynamicHints: PRESET_SCENARIOS[0].initialDynamicHints ? [...PRESET_SCENARIOS[0].initialDynamicHints] : [],
+    contextHints: PRESET_SCENARIOS[0].initialDynamicHints ? [...PRESET_SCENARIOS[0].initialDynamicHints] : [],
   };
 
   const [messages, setMessages] = useState<Message[]>([initialBarsWelcome, initialOpponentMessage]);
@@ -180,30 +177,38 @@ export default function App() {
       // If network or server didn't return valid JSON, compute deterministic local fallback
       if (!data || !data.opponent_reply) {
         const lower = text.toLowerCase();
-        let fallbackReply = "Ваше предложение требует дополнительного анализа. 400 ₽ за квадратный метр — наш ориентир, но назовите конкретные встречные уступки по срокам и сетям.";
-        let fallbackFeedback = "Оппонент держит оборону. Удерживайте ставку 460 ₽/м² и проверьте его скрытую потребность по срокам запуска.";
+        const oppName = config.opponentName.split(" ")[0] || "Коллега";
+        let fallbackReply = `Ваше предложение требует детального анализа. Назовите встречные условия и гарантии со стороны ОЭЗ.`;
+        let fallbackFeedback = `Оппонент держит позицию. Опирайтесь на ключевые преимущества ОЭЗ и защищайте BATNA!`;
         let fallbackAnimation = "talk";
         let newTrust = metrics.trust;
         let newTension = metrics.tension;
         let newReadiness = metrics.deal_readiness;
 
-        if (lower.includes("460")) {
-          fallbackReply = "460 ₽/м² — это серьезная планка. Чем вы обоснуете такую цену по сравнению с предложениями в других регионах?";
-          fallbackFeedback = "Позиция по ставке обозначена. Подкрепите 460 ₽ надежностью подстанций ОЭЗ и гарантией ввода корпуса!";
+        if (lower.includes("460") || lower.includes("ставка")) {
+          fallbackReply = `Ставка зафиксирована в нашей финмодели как критическая планка. Чем вы обоснуете такие цифры?`;
+          fallbackFeedback = `Позиция обозначена. Удерживайте порог и предложите альтернативные льготы!`;
           newTrust = Math.min(100, newTrust + 5);
           newReadiness = Math.min(100, newReadiness + 5);
-        } else if (lower.includes("каникул") || lower.includes("срок")) {
-          fallbackReply = "По каникулам мы готовы обсуждать оптимизацию графика, если вы гарантируете шеф-монтаж без задержек.";
-          fallbackFeedback = "Диалог перешел в конструктивное русло. Фиксируйте каникулы не более 4 месяцев.";
+        } else if (lower.includes("каникул") || lower.includes("срок") || lower.includes("дедлайн")) {
+          fallbackReply = `По срокам мы готовы обсуждать оптимизацию графика, если вы гарантируете выполнение условий без срывов.`;
+          fallbackFeedback = `Диалог переходит в конструктивное русло. Зафиксируйте строгие рамки графика.`;
           newTrust = Math.min(100, newTrust + 8);
           newTension = Math.max(0, newTension - 5);
         }
+
+        const generatedFallbackHints = [
+          `${oppName}, мы готовы рассмотреть встречные шаги, если вы гарантируете [укажите обязательство]...`,
+          `Условия ОЭЗ предусматривают регламент. Давайте согласуем компромисс при условии [ваше требование]...`,
+          `Мы ценим партнерство, но красные линии нерушимы. Предлагаем зафиксировать [укажите цифру или льготу]...`,
+        ];
 
         data = {
           opponent_reply: fallbackReply,
           bars_feedback: fallbackFeedback,
           bars_animation: fallbackAnimation,
           metrics: { trust: newTrust, tension: newTension, deal_readiness: newReadiness },
+          dynamic_hints: generatedFallbackHints,
           agenda,
           is_deal_closed: false,
           is_deal_failed: false,
@@ -242,6 +247,13 @@ export default function App() {
         }
       }
 
+      const dynamicHintsList: string[] =
+        Array.isArray(data.dynamic_hints) && data.dynamic_hints.length > 0
+          ? data.dynamic_hints
+          : Array.isArray(data.context_hints) && data.context_hints.length > 0
+          ? data.context_hints
+          : [];
+
       const opponentMessage: Message = {
         id: `msg_opp_${Date.now()}`,
         actor: "OPPONENT",
@@ -254,11 +266,8 @@ export default function App() {
         emotion,
         emotionLabel,
         emotionEmoji,
-        contextHints: data.context_hints || [
-          "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
-          "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
-          "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
-        ],
+        dynamicHints: dynamicHintsList,
+        contextHints: dynamicHintsList,
       };
 
       const newHistory = [...updatedMessages, opponentMessage];
@@ -364,6 +373,8 @@ export default function App() {
       timestamp: Date.now() + 1,
       stepIndex: 0,
       snapshotMetrics: { ...initialMetrics },
+      dynamicHints: activeCfg.initialDynamicHints ? [...activeCfg.initialDynamicHints] : [],
+      contextHints: activeCfg.initialDynamicHints ? [...activeCfg.initialDynamicHints] : [],
     };
 
     setMessages([welcomeBars, resetOpponentMsg]);

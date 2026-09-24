@@ -23,6 +23,7 @@ export interface Message {
   emotionLabel?: string;
   emotionEmoji?: string;
   contextHints?: string[];
+  dynamicHints?: string[];
 }
 
 export interface BatnaConfig {
@@ -53,6 +54,7 @@ export interface AdminScenarioConfig {
   initialContext?: string;
   initialOpponentUtterance?: string;
   initialBarsAdvice?: string;
+  initialDynamicHints?: string[];
   targetKpis?: string[];
   batna: BatnaConfig;
 }

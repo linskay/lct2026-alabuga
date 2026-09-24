@@ -50,5 +50,6 @@ data class ScenarioConfig(
     val toughnessLevel: Int = 85,
     val bluffTendency: Int = 70,
     val difficulty: String = "Прожжённый закупщик",
+    val initialDynamicHints: List<String> = emptyList(),
     val batna: BatnaRules = BatnaRules()
 )

@@ -179,6 +179,12 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
+  // Clear input and template when scenario changes
+  useEffect(() => {
+    setInputText("");
+    setLastInsertedTemplate("");
+  }, [config.id]);
+
   const opponentInitials =
     config.opponentName
       .split(" ")
@@ -187,16 +193,16 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
       .slice(0, 2)
       .toUpperCase() || "ОП";
 
-  // Dynamic context hints: extract from the most recent opponent message
+  // Dynamic context hints: extract strictly from the most recent opponent message or scenario preset
   const latestOpponentMsg = [...messages].reverse().find((m) => m.actor === "OPPONENT");
   const dynamicHints: string[] =
-    latestOpponentMsg?.contextHints && latestOpponentMsg.contextHints.length > 0
+    (latestOpponentMsg?.dynamicHints && latestOpponentMsg.dynamicHints.length > 0)
+      ? latestOpponentMsg.dynamicHints
+      : (latestOpponentMsg?.contextHints && latestOpponentMsg.contextHints.length > 0)
       ? latestOpponentMsg.contextHints
-      : [
-          "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
-          "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
-          "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
-        ];
+      : (config.initialDynamicHints && config.initialDynamicHints.length > 0)
+      ? config.initialDynamicHints
+      : [];
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#07080e] text-slate-100 select-none">
