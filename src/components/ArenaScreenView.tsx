@@ -371,14 +371,25 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
         <div className="lg:col-span-8 flex flex-col h-full min-h-0 gap-3">
           {/* Окно 3D (высота 340px) */}
           <div className="shrink-0">
-            <OpponentVideoWindow
-              config={config}
-              metrics={metrics}
-              barsAnimation={barsAnimation}
-              isLoading={isLoading}
-              isDealClosed={isDealClosed}
-              isDealFailed={isDealFailed}
-            />
+            {(() => {
+              const opponentMessages = messages.filter((m) => m.actor === "OPPONENT");
+              const lastOpponentMsg = opponentMessages[opponentMessages.length - 1];
+              return (
+                <OpponentVideoWindow
+                  config={config}
+                  metrics={metrics}
+                  barsAnimation={barsAnimation}
+                  isLoading={isLoading}
+                  isDealClosed={isDealClosed}
+                  isDealFailed={isDealFailed}
+                  emotion={lastOpponentMsg?.emotion}
+                  emotionLabel={lastOpponentMsg?.emotionLabel}
+                  emotionEmoji={lastOpponentMsg?.emotionEmoji}
+                  isUserTyping={inputText.trim().length > 0}
+                  lastBarsFeedback={barsFeedback}
+                />
+              );
+            })()}
           </div>
 
           {/* Область сообщений (скроллится внутри, ЧИСТЫЙ ЧАТ БЕЗ СОВЕТОВ ВНУТРИ) */}
@@ -745,9 +756,14 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                   LIVE
                 </span>
               </div>
-              <p className="text-xs text-slate-100 leading-relaxed font-sans">
-                {barsFeedback}
-              </p>
+              <div className="flex items-start gap-3">
+                <div className="shrink-0">
+                  <BarsAvatar animation={barsAnimation} size="sm" interactive />
+                </div>
+                <p className="text-xs text-slate-100 leading-relaxed font-sans flex-1">
+                  {barsFeedback}
+                </p>
+              </div>
             </div>
           )}
         </aside>

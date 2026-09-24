@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { BarsAnimationState } from "../types";
+import { resolveRobotAnimation, MIKE_ANIMATIONS } from "../utils/robotAnimations";
+import { triggerHaptic } from "../utils/haptics";
 
 interface BarsAvatarProps {
-  animation: BarsAnimationState;
+  animation: BarsAnimationState | string;
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "hero";
   className?: string;
   showStatusBadge?: boolean;
   interactive?: boolean;
   autoRotate?: boolean;
+  onClick?: () => void;
 }
 
 export const BarsAvatar: React.FC<BarsAvatarProps> = ({
@@ -17,32 +20,23 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
   showStatusBadge = false,
   interactive = false,
   autoRotate = true,
+  onClick,
 }) => {
   const modelViewerRef = useRef<any>(null);
   const [modelError, setModelError] = useState(false);
-  const [activeAnimName, setActiveAnimName] = useState<string>("Idle");
+  const [activeAnimName, setActiveAnimName] = useState<string>(MIKE_ANIMATIONS.idle);
+  const [tempUserAnim, setTempUserAnim] = useState<string | null>(null);
 
-  // Map state to animations in bars.glb: ['Dance', 'Death', 'Idle', 'Jump', 'No', 'Punch', 'Running', 'Sitting', 'Standing', 'ThumbsUp', 'Walking', 'WalkJump', 'Wave', 'Yes']
-  const resolveAnimation = (state: BarsAnimationState, available: string[]): string => {
-    if (state === "talk") {
-      return available.includes("Wave") ? "Wave" : "Idle";
-    }
-    if (state === "warn") {
-      return available.includes("No") ? "No" : "Idle";
-    }
-    if (state === "win") {
-      return available.includes("ThumbsUp") ? "ThumbsUp" : available.includes("Dance") ? "Dance" : "Idle";
-    }
-    return available.includes("Idle") ? "Idle" : available[0] || "Idle";
-  };
-
+  // Sync animation with props and available animations
   useEffect(() => {
     const viewer = modelViewerRef.current;
     if (!viewer) return;
 
+    const animToResolve = tempUserAnim || animation;
+
     const handleModelLoad = () => {
       const available = viewer.availableAnimations || [];
-      const chosen = resolveAnimation(animation, available);
+      const chosen = resolveRobotAnimation(animToResolve, available);
       setActiveAnimName(chosen);
       viewer.animationName = chosen;
       if (viewer.play) {
@@ -58,19 +52,22 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
     return () => {
       viewer.removeEventListener("load", handleModelLoad);
     };
-  }, [animation]);
+  }, [animation, tempUserAnim]);
 
-  useEffect(() => {
-    const viewer = modelViewerRef.current;
-    if (viewer && viewer.availableAnimations) {
-      const chosen = resolveAnimation(animation, viewer.availableAnimations);
-      setActiveAnimName(chosen);
-      viewer.animationName = chosen;
-      if (viewer.play) {
-        viewer.play();
-      }
+  // Click on avatar reaction
+  const handleAvatarClick = () => {
+    triggerHaptic("light");
+    if (onClick) {
+      onClick();
+    } else {
+      // Internal cheerful reaction
+      const isHappy = animation === "win" || animation === "talk";
+      setTempUserAnim(isHappy ? "win" : "talk");
+      setTimeout(() => {
+        setTempUserAnim(null);
+      }, 2200);
     }
-  }, [animation]);
+  };
 
   // Dimensions
   const sizeClasses = {
@@ -82,19 +79,35 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
     hero: "w-64 h-64 sm:w-72 sm:h-72 min-w-[256px] min-h-[256px]",
   }[size];
 
-  const ringGlow = {
-    talk: "border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.5)]",
-    warn: "border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.5)]",
-    win: "border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.5)]",
-    idle: "border-purple-400/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]",
-  }[animation];
+  const getRingGlow = (state: string): string => {
+    const norm = (state || "").toLowerCase();
+    if (norm === "talk" || norm === "wave" || norm === "speaking") {
+      return "border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.5)]";
+    }
+    if (norm === "warn" || norm === "attack" || norm === "danger") {
+      return "border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.5)]";
+    }
+    if (norm === "win" || norm === "compromise" || norm === "victory") {
+      return "border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.5)]";
+    }
+    if (norm === "bluff") {
+      return "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]";
+    }
+    return "border-purple-400/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]";
+  };
 
-  const getGestureTitle = (state: BarsAnimationState): string => {
-    switch (state) {
+  const getGestureTitle = (state: string): string => {
+    const norm = (state || "").toLowerCase();
+    switch (norm) {
       case "talk":
         return "Б.А.Р.С. говорит и жестикулирует";
       case "warn":
         return "Внимание: угроза BATNA!";
+      case "attack":
+        return "Отражение прессинга!";
+      case "bluff":
+        return "Проверка блефа!";
+      case "compromise":
       case "win":
         return "Одобрение условий сделки";
       case "idle":
@@ -103,8 +116,13 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
     }
   };
 
+  const ringGlow = getRingGlow(tempUserAnim || animation);
+
   return (
-    <div className={`relative flex flex-col items-center justify-center shrink-0 ${className}`}>
+    <div
+      onClick={handleAvatarClick}
+      className={`relative flex flex-col items-center justify-center shrink-0 cursor-pointer group active:scale-95 transition-transform ${className}`}
+    >
       {/* Outer Cyber Shield Container */}
       <div
         className={`relative rounded-2xl overflow-hidden border-2 bg-gradient-to-b from-[#1c1b29] via-[#10111a] to-[#0a0b12] ${sizeClasses} ${ringGlow} transition-all duration-300 backdrop-blur-md`}
@@ -124,8 +142,9 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
             rotation-per-second={autoRotate ? "16deg" : "0deg"}
             shadow-intensity="1.5"
             exposure="1.2"
-            camera-orbit="0deg 75deg 105%"
-            camera-target="auto auto auto"
+            environment-image="neutral"
+            camera-orbit="0deg 80deg 75%"
+            camera-target="0m 0.85m 0m"
             style={
               {
                 width: "100%",
@@ -148,12 +167,12 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
         {/* Live Audio / Status Ping */}
         <div className="absolute top-1.5 right-1.5 flex items-center gap-1 pointer-events-none z-10">
           <span
-            className={`w-2.5 h-2.5 rounded-full ${
+            className={`w-2 h-2 rounded-full ${
               animation === "talk"
                 ? "bg-cyan-400 animate-ping"
-                : animation === "warn"
+                : animation === "warn" || animation === "attack"
                 ? "bg-rose-500 animate-pulse"
-                : animation === "win"
+                : animation === "win" || animation === "compromise"
                 ? "bg-emerald-400 animate-pulse"
                 : "bg-purple-400"
             }`}
@@ -163,9 +182,9 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
         {/* Bottom Badge for larger sizes */}
         {(size === "md" || size === "lg" || size === "xl" || size === "hero") && (
           <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 backdrop-blur-sm py-0.5 text-center text-[9px] font-mono text-slate-300 tracking-tight pointer-events-none border-t border-white/10 z-10">
-            {animation === "warn" ? (
+            {animation === "warn" || animation === "attack" ? (
               <span className="text-rose-400 font-bold">! ТРЕВОГА BATNA !</span>
-            ) : animation === "win" ? (
+            ) : animation === "win" || animation === "compromise" ? (
               <span className="text-emerald-400 font-bold">✓ СДЕЛКА СОГЛАСОВАНА</span>
             ) : animation === "talk" ? (
               <span className="text-cyan-400 font-bold">ИНСТРУКТИРУЕТ...</span>

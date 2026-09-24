@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { BarsAnimationState } from "../types";
-import { Sparkles, Volume2, ShieldAlert, CheckCircle2, RotateCw, Hand, ThumbsUp, PartyPopper, Ban } from "lucide-react";
+import { Sparkles, Volume2, ShieldAlert, CheckCircle2, RotateCw, Hand, ThumbsUp, PartyPopper, Ban, Zap } from "lucide-react";
+import { resolveRobotAnimation, MIKE_ANIMATIONS } from "../utils/robotAnimations";
 
 interface BarsHologramStageProps {
   animation: BarsAnimationState;
@@ -20,22 +21,8 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
   const modelViewerRef = useRef<any>(null);
   const [modelError, setModelError] = useState(false);
   const [isRotating, setIsRotating] = useState(true);
-  const [activeGesture, setActiveGesture] = useState<string>("Idle");
+  const [activeGesture, setActiveGesture] = useState<string>(MIKE_ANIMATIONS.idle);
   const [isSpeaking, setIsSpeaking] = useState(false);
-
-  // Map state to animations from bars.glb: ['Dance', 'Death', 'Idle', 'Jump', 'No', 'Punch', 'Running', 'Sitting', 'Standing', 'ThumbsUp', 'Walking', 'WalkJump', 'Wave', 'Yes']
-  const resolveAnimation = (state: BarsAnimationState, available: string[]): string => {
-    if (state === "talk") {
-      return available.includes("Wave") ? "Wave" : "Idle";
-    }
-    if (state === "warn") {
-      return available.includes("No") ? "No" : "Idle";
-    }
-    if (state === "win") {
-      return available.includes("ThumbsUp") ? "ThumbsUp" : available.includes("Dance") ? "Dance" : "Idle";
-    }
-    return available.includes("Idle") ? "Idle" : available[0] || "Idle";
-  };
 
   // Sync animation when prop changes
   useEffect(() => {
@@ -44,7 +31,7 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
 
     const applyAnim = () => {
       const available = viewer.availableAnimations || [];
-      const chosen = resolveAnimation(animation, available);
+      const chosen = resolveRobotAnimation(animation, available);
       setActiveGesture(chosen);
       viewer.animationName = chosen;
       if (viewer.play) {
@@ -67,12 +54,18 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
     }
   }, [animation]);
 
+  const [activeGestureLabel, setActiveGestureLabel] = useState<string>("Спокойствие");
+
   // Manually trigger gestures
-  const triggerGesture = (animName: string) => {
+  const triggerGesture = (animKey: string, label: string = "Жест") => {
+    triggerHaptic("light");
     const viewer = modelViewerRef.current;
     if (!viewer) return;
-    setActiveGesture(animName);
-    viewer.animationName = animName;
+    const available = viewer.availableAnimations || [];
+    const resolved = resolveRobotAnimation(animKey, available);
+    setActiveGesture(resolved);
+    setActiveGestureLabel(label);
+    viewer.animationName = resolved;
     if (viewer.play) {
       viewer.play();
     }
@@ -192,11 +185,12 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
             disable-zoom
             auto-rotate={isRotating ? true : undefined}
             rotation-per-second="18deg"
-            shadow-intensity="1.8"
-            shadow-softness="0.8"
-            exposure="1.25"
-            camera-orbit="0deg 75deg 105%"
-            camera-target="auto auto auto"
+            shadow-intensity="1.5"
+            shadow-softness="0.75"
+            exposure="1.2"
+            environment-image="neutral"
+            camera-orbit="0deg 80deg 75%"
+            camera-target="0m 0.82m 0m"
             style={
               {
                 width: "100%",
@@ -234,7 +228,7 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
 
         {/* Active Gesture Tag */}
         <div className="absolute bottom-3 right-4 px-2.5 py-1 rounded-lg bg-black/60 border border-white/10 backdrop-blur-md pointer-events-none text-[10px] font-mono text-slate-300">
-          ЖЕСТ: <span className="text-cyan-300 font-bold">{activeGesture}</span>
+          ЖЕСТ: <span className="text-cyan-300 font-bold">{activeGestureLabel}</span>
         </div>
       </div>
 
@@ -243,9 +237,9 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
         <span className="text-[10px] text-slate-400 font-mono shrink-0 mr-1 hidden sm:inline">ЖЕСТЫ:</span>
         <div className="flex items-center gap-1.5 w-full justify-between sm:justify-start">
           <button
-            onClick={() => triggerGesture("Wave")}
+            onClick={() => triggerGesture("Wave", "Приветствие")}
             className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1 shrink-0 ${
-              activeGesture === "Wave"
+              activeGestureLabel === "Приветствие"
                 ? "bg-cyan-500/30 text-cyan-200 border border-cyan-400/50"
                 : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"
             }`}
@@ -256,9 +250,9 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
           </button>
 
           <button
-            onClick={() => triggerGesture("No")}
+            onClick={() => triggerGesture("No", "Отказ (BATNA)")}
             className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1 shrink-0 ${
-              activeGesture === "No"
+              activeGestureLabel === "Отказ (BATNA)"
                 ? "bg-rose-500/30 text-rose-200 border border-rose-400/50"
                 : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"
             }`}
@@ -269,9 +263,9 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
           </button>
 
           <button
-            onClick={() => triggerGesture("ThumbsUp")}
+            onClick={() => triggerGesture("ThumbsUp", "Одобрение")}
             className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1 shrink-0 ${
-              activeGesture === "ThumbsUp"
+              activeGestureLabel === "Одобрение"
                 ? "bg-emerald-500/30 text-emerald-200 border border-emerald-400/50"
                 : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"
             }`}
@@ -282,9 +276,9 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
           </button>
 
           <button
-            onClick={() => triggerGesture("Dance")}
+            onClick={() => triggerGesture("Dance", "Триумф сделки")}
             className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1 shrink-0 ${
-              activeGesture === "Dance"
+              activeGestureLabel === "Триумф сделки"
                 ? "bg-purple-500/30 text-purple-200 border border-purple-400/50"
                 : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"
             }`}
@@ -292,6 +286,19 @@ export const BarsHologramStage: React.FC<BarsHologramStageProps> = ({
           >
             <PartyPopper className="w-3 h-3 text-purple-400" />
             <span>Триумф</span>
+          </button>
+
+          <button
+            onClick={() => triggerGesture("Punch", "Атака / Прессинг")}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1 shrink-0 ${
+              activeGestureLabel === "Атака / Прессинг"
+                ? "bg-amber-500/30 text-amber-200 border border-amber-400/50"
+                : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"
+            }`}
+            title="Силовой выпад / Прессинг"
+          >
+            <Zap className="w-3 h-3 text-amber-400" />
+            <span>Прессинг</span>
           </button>
         </div>
       </div>

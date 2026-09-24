@@ -1,15 +1,65 @@
-import React from "react";
-import { Play, Settings, ShieldCheck, Sparkles, Cpu, Award } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { Play, Settings, Cpu, Sparkles } from "lucide-react";
+import { triggerHaptic } from "../utils/haptics";
+import { resolveRobotAnimation, MIKE_ANIMATIONS } from "../utils/robotAnimations";
 
 interface HomeScreenProps {
   onEnterArena: () => void;
   onOpenAdmin: () => void;
 }
 
+const LOBBY_SPEECHES = [
+  "Приветствую в ОЭЗ «Алабуга»! Готовы проверить стойкость перед жесткими закупщиками?",
+  "Помни золотое правило: защищай ставку 460 ₽/м² и выявляй скрытые дедлайны оппонента!",
+  "Не поддавайся на блеф с Калугой: у них дефицит высоковольтных мощностей 110 кВ.",
+  "Жми «Войти в переговорную» — разберем встречные аргументы в реальном времени!",
+  "Наставник Б.А.Р.С. на связи! Твой главный щит на арене — хладнокровие и BATNA.",
+];
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onEnterArena,
   onOpenAdmin,
 }) => {
+  const modelViewerRef = useRef<any>(null);
+  const [activeAnim, setActiveAnim] = useState<string>(MIKE_ANIMATIONS.idle);
+  const [speechText, setSpeechText] = useState<string | null>(null);
+  const speechIndexRef = useRef<number>(0);
+  const timeoutRef = useRef<any>(null);
+
+  const handleRobotClick = () => {
+    triggerHaptic("medium");
+    const nextSpeech = LOBBY_SPEECHES[speechIndexRef.current % LOBBY_SPEECHES.length];
+    speechIndexRef.current += 1;
+    setSpeechText(nextSpeech);
+
+    const viewer = modelViewerRef.current;
+    if (viewer) {
+      const available = viewer.availableAnimations || [];
+      const isWave = speechIndexRef.current % 2 === 1;
+      const chosen = resolveRobotAnimation(isWave ? "wave" : "win", available);
+      setActiveAnim(chosen);
+      viewer.animationName = chosen;
+      if (viewer.play) {
+        viewer.play();
+      }
+    }
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setSpeechText(null);
+      const viewer = modelViewerRef.current;
+      if (viewer) {
+        const available = viewer.availableAnimations || [];
+        const idleAnim = resolveRobotAnimation("idle", available);
+        setActiveAnim(idleAnim);
+        viewer.animationName = idleAnim;
+        if (viewer.play) {
+          viewer.play();
+        }
+      }
+    }, 4000);
+  };
+
   return (
     <main
       role="main"
@@ -57,25 +107,48 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </p>
       </header>
 
-      {/* 3. ЦЕНТРАЛЬНАЯ ЧАСТЬ: 3D-модель робота Б.А.Р.С. смещена ближе к кнопкам (без полос/прогресс-баров) */}
-      <div className="relative z-10 w-full max-w-sm flex-1 flex flex-col items-center justify-end my-0 py-0 min-h-0 overflow-hidden">
-        {/* Мягкое фоновое рассеянное свечение (без четких линий и полосок) */}
+      {/* 3. ЦЕНТРАЛЬНАЯ ЧАСТЬ: 3D-модель робота Б.А.Р.С. смещена ближе к кнопкам */}
+      <div className="relative z-10 w-full max-w-sm flex-1 flex flex-col items-center justify-end my-0 py-0 min-h-0 overflow-visible">
+        {/* Мягкое фоновое рассеянное свечение */}
         <div className="absolute w-52 h-52 rounded-full bg-gradient-to-tr from-[#7b2cbf]/35 via-purple-600/20 to-[#00f0ff]/20 blur-3xl pointer-events-none" />
 
-        {/* 3D-моделька с правильным центрированием и расположением ближе к кнопкам */}
-        <div className="w-full h-full relative flex items-center justify-center pointer-events-none">
+        {/* Голографический речевой баллон наставника Б.А.Р.С. при клике */}
+        {speechText && (
+          <div className="absolute -top-4 inset-x-2 z-30 flex justify-center animate-in fade-in slide-in-from-bottom-2 duration-300 pointer-events-none">
+            <div className="max-w-xs px-3.5 py-2 rounded-2xl bg-black/85 border border-cyan-400/60 shadow-[0_0_30px_rgba(0,240,255,0.4)] backdrop-blur-xl text-center">
+              <span className="text-[9px] text-cyan-400 font-mono font-bold tracking-wider uppercase block mb-0.5 flex items-center justify-center gap-1">
+                <Sparkles className="w-2.5 h-2.5" />
+                СОВЕТ НАСТАВНИКА Б.А.Р.С.
+              </span>
+              <p className="text-xs text-white leading-snug font-sans">
+                «{speechText}»
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* 3D-моделька с кликом и реакцией */}
+        <div
+          onClick={handleRobotClick}
+          className="w-full h-full relative flex items-center justify-center cursor-pointer group active:scale-98 transition-transform"
+          title="Нажмите на робота Б.А.Р.С., чтобы услышать тактический инсайт!"
+        >
           <model-viewer
             id="bars-lobby-avatar"
+            ref={modelViewerRef}
             src="./bars.glb"
-            alt="Робот-наставник Б.А.Р.С. ОЭЗ Алабуга"
+            alt="Робот-наставник Б.А.Р.С. ОЭЗ Алабуга (Radical Robot Mike)"
             autoplay
-            animation-name="Idle"
-            camera-orbit="0deg 84deg 110%"
-            camera-target="0m 0.52m 0m"
+            animation-name={activeAnim}
+            camera-orbit="0deg 82deg 72%"
+            camera-target="0m 0.82m 0m"
             interaction-prompt="none"
-            shadow-intensity="1.2"
-            shadow-softness="0.9"
-            exposure="1.15"
+            shadow-intensity="1.5"
+            shadow-softness="0.75"
+            exposure="1.2"
+            environment-image="neutral"
+            auto-rotate
+            rotation-per-second="10deg"
             style={
               {
                 width: "100%",
@@ -91,15 +164,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         {/* Компактный бейдж статуса под роботом */}
-        <div className="relative z-20 -mt-3 mb-1 px-3 py-0.5 rounded-full bg-slate-950/80 border border-purple-500/30 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
+        <div
+          onClick={handleRobotClick}
+          className="relative z-20 -mt-3 mb-1 px-3 py-0.5 rounded-full bg-slate-950/80 border border-purple-500/30 backdrop-blur-md flex items-center gap-1.5 shadow-lg cursor-pointer hover:border-cyan-400/50 transition-colors"
+        >
           <Cpu className="w-3 h-3 text-[#00f0ff]" />
           <span className="text-[10px] font-mono text-slate-300 font-semibold">
-            Б.А.Р.С. <span className="text-purple-400">ONLINE</span>
+            Б.А.Р.С. <span className="text-purple-400">ONLINE</span> • НАЖМИТЕ ДЛЯ СОВЕТА
           </span>
         </div>
       </div>
 
-      {/* 4. НИЖНЯЯ ЧАСТЬ: Ровно 2 крупные удобные кнопки на всю ширину */}
+      {/* 4. НИЖНЯЯ ЧАСТЬ: 2 крупные удобные кнопки на всю ширину */}
       <footer className="relative z-10 w-full max-w-md space-y-2.5 pb-1 sm:pb-2 shrink-0">
         {/* Главная кнопка действия (Primary CTA) */}
         <button

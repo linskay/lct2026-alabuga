@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { BarsAnimationState } from "../types";
+import { resolveRobotAnimation, MIKE_ANIMATIONS } from "../utils/robotAnimations";
 
 interface BarsRobotViewProps {
   animation: BarsAnimationState;
@@ -9,21 +10,7 @@ interface BarsRobotViewProps {
 export const BarsRobotView: React.FC<BarsRobotViewProps> = ({ animation, className = "" }) => {
   const modelViewerRef = useRef<any>(null);
   const [modelError, setModelError] = useState(false);
-
-  // Map application states to RobotExpressive animations
-  const getAnimationName = (state: BarsAnimationState): string => {
-    switch (state) {
-      case "talk":
-        return "Wave";
-      case "warn":
-        return "No";
-      case "win":
-        return "ThumbsUp";
-      case "idle":
-      default:
-        return "Idle";
-    }
-  };
+  const [activeAnim, setActiveAnim] = useState<string>(MIKE_ANIMATIONS.idle);
 
   const getStatusBadge = (state: BarsAnimationState) => {
     switch (state) {
@@ -69,10 +56,20 @@ export const BarsRobotView: React.FC<BarsRobotViewProps> = ({ animation, classNa
   useEffect(() => {
     const viewer = modelViewerRef.current;
     if (viewer) {
-      const anim = getAnimationName(animation);
-      viewer.animationName = anim;
-      if (viewer.play) {
-        viewer.play();
+      const apply = () => {
+        const available = viewer.availableAnimations || [];
+        const chosen = resolveRobotAnimation(animation, available);
+        setActiveAnim(chosen);
+        viewer.animationName = chosen;
+        if (viewer.play) {
+          viewer.play();
+        }
+      };
+
+      if (viewer.availableAnimations && viewer.availableAnimations.length > 0) {
+        apply();
+      } else {
+        viewer.addEventListener("load", apply, { once: true });
       }
     }
   }, [animation]);
@@ -92,13 +89,17 @@ export const BarsRobotView: React.FC<BarsRobotViewProps> = ({ animation, classNa
           src="/bars.glb"
           alt="Б.А.Р.С. 3D Ассистент (ОЭЗ Алабуга)"
           autoplay
-          animation-name={getAnimationName(animation)}
+          animation-name={activeAnim}
           camera-controls
           disable-zoom
           auto-rotate
           rotation-per-second="10deg"
           shadow-intensity="1.5"
-          exposure="1.1"
+          shadow-softness="0.75"
+          exposure="1.2"
+          environment-image="neutral"
+          camera-orbit="0deg 80deg 75%"
+          camera-target="0m 0.82m 0m"
           style={{ width: "100%", height: "100%", "--poster-color": "transparent" } as any}
           onError={() => setModelError(true)}
         />
