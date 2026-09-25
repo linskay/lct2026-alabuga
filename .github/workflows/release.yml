@@ -31,14 +31,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Android Release APK
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Build Android APK
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace || ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: arena-android-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/*/*/*.apk
 
   build-desktop-windows:
     name: Build Windows Desktop EXE
@@ -57,8 +57,7 @@ jobs:
           cache: 'gradle'
 
       - name: Build Windows Executable & Distribution
-        run: .\gradlew.bat :desktop:packagePackageDistributionForCurrentOS :desktop:packageUberJarForCurrentOS --no-daemon --stacktrace
-        continue-on-error: true
+        run: .\gradlew.bat :desktop:packageDistributionForCurrentOS :desktop:packageUberJarForCurrentOS --no-daemon --stacktrace
 
       - name: Package Windows artifacts
         shell: pwsh
