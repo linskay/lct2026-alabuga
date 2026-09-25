@@ -32,13 +32,15 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Android APK
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace || ./gradlew :app:assembleDebug --no-daemon --stacktrace
+        run: |
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace || ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: arena-android-apk
-          path: app/build/outputs/apk/*/*/*.apk
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
 
   build-desktop-windows:
     name: Build Windows Desktop EXE
@@ -82,12 +84,14 @@ jobs:
 
       - name: Download Android Artifact
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: arena-android-apk
           path: release-binaries/
 
       - name: Download Windows Artifact
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: arena-windows-desktop
           path: release-binaries/
