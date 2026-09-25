@@ -3,8 +3,6 @@ import { AdminScenarioConfig, NegotiationMetrics, BarsAnimationState } from "../
 import { Mic, Sparkles, Hand, Shield, ArrowRightLeft, Zap } from "lucide-react";
 import { resolveRobotAnimation, MIKE_ANIMATIONS, getEmotionMetadata } from "../utils/robotAnimations";
 import { triggerHaptic } from "../utils/haptics";
-import { BarsAvatar } from "./BarsAvatar";
-
 
 interface OpponentVideoWindowProps {
   config: AdminScenarioConfig;
@@ -344,13 +342,12 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
   return (
     <div
       id="opponent-stage"
-      className={`relative w-full h-[320px] rounded-3xl overflow-hidden border transition-all duration-700 ease-out flex items-center justify-center bg-[#090a10] shadow-[0_12px_45px_rgba(0,0,0,0.7)] group select-none shrink-0 ${className}`}
+      className={`relative w-full h-[380px] rounded-3xl overflow-hidden border transition-all duration-700 ease-out flex items-center justify-center bg-[#090a10] shadow-[0_12px_45px_rgba(0,0,0,0.7)] group select-none ${className}`}
       style={{
         borderColor: borderRgba,
         boxShadow: `0 12px 45px rgba(0,0,0,0.7), 0 0 35px ${borderRgba}`,
       }}
     >
-
       {/* 1. Фоновое объемное световое пятно (Glow Spot) */}
       <div
         className="absolute w-[360px] h-[360px] rounded-full blur-[100px] pointer-events-none transition-all duration-700 opacity-60"
@@ -363,22 +360,50 @@ export const OpponentVideoWindow: React.FC<OpponentVideoWindowProps> = ({
       <div className="absolute bottom-0 inset-x-0 h-28 bg-gradient-to-t from-[#06070c] via-[#0e101c]/80 to-transparent pointer-events-none z-10" />
       <div className="absolute bottom-4 w-72 h-10 rounded-[100%] border border-cyan-400/20 bg-cyan-500/5 shadow-[0_0_40px_rgba(0,240,255,0.15)] pointer-events-none" />
 
-      {/* 2. Аватар робота Б.А.Р.С. в окне видеосвязи */}
-      <div
-        onClick={handleModelClick}
-        className="w-full h-full relative flex items-center justify-center cursor-pointer transition-transform duration-300 active:scale-[0.99] z-10 py-2"
-        title="Нажмите на робота Б.А.Р.С. для тактической проверки реакции"
-      >
-        <BarsAvatar
-          animation={userInteractionAnim || emotion || barsAnimation || "idle"}
-          size="hero"
-          showStatusBadge={false}
-          interactive={true}
+      {/* 2. 3D-модель (Radical Robot Mike) в окне видеосвязи */}
+      {!modelError ? (
+        <div
           onClick={handleModelClick}
-        />
-      </div>
-
-
+          className="w-full h-full relative flex items-center justify-center cursor-pointer transition-transform duration-300 active:scale-[0.99]"
+          title="Нажмите на оппонента для тактической проверки реакции"
+        >
+          <model-viewer
+            id="opponent-3d"
+            ref={modelViewerRef}
+            src="/bars.glb"
+            alt={`${config.opponentName} - 3D Виртуальный переговорщик`}
+            autoplay
+            animation-name={activeAnim}
+            camera-orbit="0deg 82deg 75%"
+            camera-target="0m 0.85m 0m"
+            field-of-view="35deg"
+            interaction-prompt="none"
+            shadow-intensity="1.5"
+            shadow-softness="0.75"
+            exposure="1.2"
+            environment-image="neutral"
+            style={
+              {
+                pointerEvents: "none",
+                width: "100%",
+                height: "100%",
+                position: "relative",
+                "--poster-color": "transparent",
+              } as any
+            }
+            onError={() => setModelError(true)}
+          >
+            <div slot="progress-bar" style={{ display: "none" }} />
+          </model-viewer>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center p-6 text-center z-10">
+          <div className="w-20 h-20 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 text-xl font-bold font-mono shadow-[0_0_30px_rgba(0,240,255,0.3)]">
+            {config.opponentName.slice(0, 2).toUpperCase()}
+          </div>
+          <p className="text-xs text-slate-300 mt-3 font-medium">{config.opponentName}</p>
+        </div>
+      )}
 
       {/* 3. Голографический речевой баллон при интерактивном клике пользователя */}
       {speechBubbleText && (

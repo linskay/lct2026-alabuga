@@ -4,7 +4,6 @@ import { Sparkles, Volume2, ShieldAlert, CheckCircle2, RotateCw, Hand, ThumbsUp,
 import { resolveRobotAnimation, MIKE_ANIMATIONS } from "../utils/robotAnimations";
 import { triggerHaptic } from "../utils/haptics";
 
-
 interface BarsHologramStageProps {
   animation: BarsAnimationState;
   feedbackText: string;
