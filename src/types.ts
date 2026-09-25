@@ -35,6 +35,14 @@ export interface BatnaConfig {
   redLines: string[];
 }
 
+export interface AgendaTopicItem {
+  id: string;
+  title: string;
+  target: string;
+  status: "agreed" | "in_progress" | "disputed";
+  detail?: string;
+}
+
 export interface AdminScenarioConfig {
   id: string;
   title: string;
@@ -55,6 +63,7 @@ export interface AdminScenarioConfig {
   initialOpponentUtterance?: string;
   initialBarsAdvice?: string;
   initialDynamicHints?: string[];
+  agendaTopics?: AgendaTopicItem[];
   targetKpis?: string[];
   batna: BatnaConfig;
 }
@@ -66,6 +75,7 @@ export interface NegotiationSessionSnapshot {
   lastBarsFeedback: string;
   lastBarsAnimation: BarsAnimationState;
   agenda?: NegotiationAgenda;
+  agendaTopics?: AgendaTopicItem[];
   timestamp: number;
 }
 
@@ -97,7 +107,7 @@ export interface GeminiResponse {
 export type AgendaItemStatus = "agreed" | "in_progress" | "disputed";
 
 export interface AgendaItem {
-  id: "rate" | "grace_period" | "power_capex";
+  id: "rate" | "grace_period" | "power_capex" | string;
   title: string;
   status: AgendaItemStatus;
   detail: string;
@@ -107,6 +117,7 @@ export interface NegotiationAgenda {
   rate: AgendaItem;
   grace_period: AgendaItem;
   power_capex: AgendaItem;
+  [key: string]: AgendaItem;
 }
 
 export interface DebriefingAnalytics {

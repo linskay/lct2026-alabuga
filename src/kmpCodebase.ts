@@ -9,10 +9,10 @@ export interface CodeFile {
 
 export const KMP_FILES: CodeFile[] = [
   {
-    path: "composeApp/build.gradle.kts",
+    path: "app/build.gradle.kts",
     filename: "build.gradle.kts",
     language: "kotlin",
-    description: "Конфигурация сборки Compose Multiplatform (Android, iOS, Wasm, Desktop)",
+    description: "Конфигурация сборки нативного Android приложения (SDK 26-35, Compose Material 3)",
     category: "Gradle",
     content: `plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -1644,8 +1644,8 @@ AlabugaNegotiationArena/
 ├── build.gradle.kts                      # Root Gradle configuration
 ├── settings.gradle.kts                   # Project & plugin repos
 ├── gradle/libs.versions.toml             # Version catalog (Ktor 3, Compose MP, Serialization)
-└── composeApp/
-    ├── build.gradle.kts                  # KMP targets (androidTarget, iosArm64, wasmJs)
+└── app/
+    ├── build.gradle.kts                  # Android Target (SDK 26-35, Jetpack Compose Material 3)
     └── src/
         ├── commonMain/                   # 100% общий код (UI, Network, Models, MVI)
         │   ├── kotlin/org/alabuga/arena/

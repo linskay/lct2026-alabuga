@@ -1,5 +1,6 @@
 package ru.alabuga.arena.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -7,6 +8,13 @@ data class NegotiationMetrics(
     val trust: Int = 55,
     val tension: Int = 35,
     val dealReadiness: Int = 40
+)
+
+@Serializable
+data class MetricsDelta(
+    val trust: Int = 0,
+    val tension: Int = 0,
+    @SerialName("deal_readiness") val dealReadiness: Int = 0
 )
 
 @Serializable
@@ -52,4 +60,15 @@ data class ScenarioConfig(
     val difficulty: String = "Прожжённый закупщик",
     val initialDynamicHints: List<String> = emptyList(),
     val batna: BatnaRules = BatnaRules()
+)
+
+@Serializable
+data class OpponentReplyDto(
+    @SerialName("opponent_reply") val opponentReply: String,
+    @SerialName("bars_feedback") val barsFeedback: String,
+    @SerialName("bars_animation") val barsAnimation: String = "talk",
+    @SerialName("metrics_delta") val metricsDelta: MetricsDelta = MetricsDelta(),
+    @SerialName("dynamic_hints") val dynamicHints: List<String> = emptyList(),
+    @SerialName("is_deal_closed") val isDealClosed: Boolean = false,
+    @SerialName("is_deal_failed") val isDealFailed: Boolean = false
 )

@@ -131,3 +131,35 @@
   display: none; /* Chrome, Safari, Opera */
 }
 
+/* HomeScreen Robot Keyframes (ipesterev) */
+@keyframes home-robot-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.01); }
+}
+
+@keyframes home-robot-wave {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  15% { transform: translateY(-4px) rotate(-2deg) scale(1.03); }
+  30% { transform: translateY(-2px) rotate(2deg) scale(1.02); }
+  45% { transform: translateY(-5px) rotate(-1deg) scale(1.04); }
+  60% { transform: translateY(-3px) rotate(1deg) scale(1.02); }
+  80% { transform: translateY(-1px) rotate(0deg) scale(1.01); }
+}
+
+@keyframes home-robot-victory {
+  0%, 100% { transform: translateY(0) scale(1); filter: brightness(1.1); }
+  25% { transform: translateY(-10px) scale(1.06); filter: brightness(1.3) drop-shadow(0 0 20px rgba(16,185,129,0.5)); }
+  50% { transform: translateY(-4px) scale(1.02); }
+  75% { transform: translateY(-8px) scale(1.05); filter: brightness(1.25) drop-shadow(0 0 15px rgba(0,240,255,0.5)); }
+}
+
+@keyframes home-pedestal-glow {
+  0%, 100% { box-shadow: 0 0 30px rgba(123,44,191,0.3), 0 0 60px rgba(123,44,191,0.1); }
+  50% { box-shadow: 0 0 40px rgba(0,240,255,0.3), 0 0 80px rgba(123,44,191,0.2); }
+}
+
+@keyframes bars-visor-scan {
+  0%, 100% { top: 15%; opacity: 0.3; }
+  50% { top: 75%; opacity: 0.8; }
+}
+

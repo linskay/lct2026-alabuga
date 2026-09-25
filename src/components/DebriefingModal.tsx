@@ -172,9 +172,11 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="p-3 rounded-xl bg-[#1a1d29]/70 border border-[#232736]">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span className="flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#00f0ff]" />
-                Защита BATNA (460 ₽/м²)
+              <span className="flex items-center gap-1 truncate max-w-[190px]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#00f0ff] shrink-0" />
+                <span className="truncate">
+                  Защита BATNA {scenario?.batna?.minPricePerSqm ? `(${scenario.batna.minPricePerSqm} ₽/м²)` : scenario?.sphere?.includes("HR") ? "(лимит +20%)" : ""}
+                </span>
               </span>
               <span className="font-bold text-[#00f0ff] font-mono">{analytics.batnaScore}%</span>
             </div>
@@ -203,7 +205,7 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
         {/* Advanced Criteria */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="p-2.5 rounded-xl bg-[#12141d] border border-[#232736] text-center">
-            <div className="text-[10px] text-slate-400 uppercase font-mono">Скрытая боль (Q3)</div>
+            <div className="text-[10px] text-slate-400 uppercase font-mono">Истинная потребность</div>
             <div className="text-xs font-bold mt-1">
               {analytics.hiddenNeedsDiscovered ? (
                 <span className="text-emerald-400 flex items-center justify-center gap-1">
@@ -262,7 +264,7 @@ export const DebriefingModal: React.FC<DebriefingModalProps> = ({
               Протокол встречи (MOU) / HR-отчет
             </div>
             <p className="text-[11px] text-slate-300 mt-0.5">
-              Сводка условий (460 ₽/м², 4 мес., 1.2 млрд CAPEX), HR-метрики и стоп-лексикон сотрудника.
+              Сводка условий ({scenario?.sphere?.includes("HR") ? "оклад, R&D лидерство, дежурства" : scenario?.batna?.minPricePerSqm ? "ставка, каникулы, CAPEX" : "согласованные вехи"}), HR-метрики и соглашение сторон.
             </p>
           </div>
 
