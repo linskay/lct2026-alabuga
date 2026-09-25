@@ -9,10 +9,10 @@ export interface CodeFile {
 
 export const KMP_FILES: CodeFile[] = [
   {
-    path: "app/build.gradle.kts",
+    path: "composeApp/build.gradle.kts",
     filename: "build.gradle.kts",
     language: "kotlin",
-    description: "Конфигурация сборки нативного Android приложения (SDK 26-35, Compose Material 3)",
+    description: "Конфигурация сборки Compose Multiplatform (Android, iOS, Wasm, Desktop)",
     category: "Gradle",
     content: `plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -180,6 +180,34 @@ data class NegotiationMetrics(
 }
 
 /**
+ * Тег методологии переговоров (SPIN / Гарвард / BATNA / Ошибка)
+ */
+@Serializable
+data class MethodologyTag(
+    val category: String, // "SPIN" | "HARVARD" | "BATNA" | "ERROR" | "TACTIC"
+    val tag: String,
+    val description: String,
+    val type: String // "positive" | "warning" | "danger" | "info"
+)
+
+/**
+ * Интерактивная карта ZOPA (Zone of Possible Agreement)
+ */
+@Serializable
+data class ZopaState(
+    val buyerMin: Int = 300,
+    val buyerMax: Int = 420,
+    val sellerMin: Int = 460,
+    val sellerMax: Int = 500,
+    val isOverlap: Boolean = false,
+    val overlapMin: Int? = null,
+    val overlapMax: Int? = null,
+    val currentOffer: Int? = 300,
+    val status: String = "narrowing", // "expanding" | "narrowing" | "deadlock" | "agreed"
+    val changeReason: String? = null
+)
+
+/**
  * Отдельная реплика переговорного процесса
  */
 @Serializable
@@ -191,7 +219,8 @@ data class Message(
     val stepIndex: Int,
     val snapshotMetrics: NegotiationMetrics = NegotiationMetrics(),
     val tacticalNote: String? = null,
-    val barsAnimation: BarsAnimationState = BarsAnimationState.IDLE
+    val barsAnimation: BarsAnimationState = BarsAnimationState.IDLE,
+    val methodologyTag: MethodologyTag? = null
 )
 
 /**
@@ -269,6 +298,50 @@ data class SessionSnapshot(
 )
 
 /**
+ * Провайдеры языковых моделей (LLM)
+ */
+@Serializable
+enum class LlmProvider {
+    @SerialName("openrouter") OPENROUTER,
+    @SerialName("gemini") GEMINI,
+    @SerialName("local") LOCAL_DOCKER,
+    @SerialName("fallback") OFFLINE_AUTONOMOUS
+}
+
+/**
+ * Достижение (Ачивка) переговорной сессии ОЭЗ «Алабуга»
+ */
+@Serializable
+data class Achievement(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val description: String,
+    val imageUrl: String,
+    val isUnlocked: Boolean,
+    val tier: String, // "legendary" | "epic" | "rare"
+    val conditionText: String
+)
+
+/**
+ * Итоговая аналитика дебрифинга с ачивками
+ */
+@Serializable
+data class DebriefingAnalytics(
+    val finalOutcome: String,
+    val totalSteps: Int,
+    val timeTravelUsedCount: Int,
+    val batnaScore: Int,
+    val stressManagementScore: Int,
+    val overallRating: String,
+    val barsExecutiveSummary: String,
+    val keyStrengths: List<String>,
+    val areasForGrowth: List<String>,
+    val hurriedWarning: String? = null,
+    val achievements: List<Achievement> = emptyList()
+)
+
+/**
  * Общее состояние переговорной сессии
  */
 @Serializable
@@ -282,7 +355,8 @@ data class NegotiationSessionState(
     val isDealFailed: Boolean = false,
     val isLoading: Boolean = false,
     val historySnapshots: List<SessionSnapshot> = emptyList(),
-    val currentStepIndex: Int = 0
+    val currentStepIndex: Int = 0,
+    val zopa: ZopaState = ZopaState()
 )
 `,
   },
@@ -331,11 +405,18 @@ interface NegotiationRepository {
 }
 
 /**
- * Реализация на базе Ktor Client с авто-переключением на автономный MockEngine
+ * Реализация на базе Ktor Client с поддержкой мульти-провайдера:
+ * - OpenRouter (Claude 3.5 Sonnet / DeepSeek R1)
+ * - Google Gemini
+ * - Локальная модель в Docker (Ollama / vLLM)
+ * - Автономный MockEngine (оффлайн режим)
  */
 class KtorNegotiationRepository(
-    private val baseUrl: String = "https://api.alabuga.ru/v1/arena",
-    private val apiKey: String? = null,
+    private val baseUrl: String = "http://127.0.0.1:3000/api",
+    private val provider: LlmProvider = LlmProvider.OPENROUTER,
+    private val openRouterApiKey: String? = null,
+    private val geminiApiKey: String? = null,
+    private val localLlmUrl: String = "http://127.0.0.1:11434/v1",
     private val forceOfflineMode: Boolean = false
 ) : NegotiationRepository {
 
@@ -360,14 +441,14 @@ class KtorNegotiationRepository(
         )
     }
 
-    // Боевой клиент Ktor
+    // Боевой клиент Ktor с поддержкой OpenRouter, Gemini и Local
     private val liveClient by lazy {
         HttpClient {
             install(ContentNegotiation) {
                 json(json)
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 15_000
+                requestTimeoutMillis = 30_000
                 connectTimeoutMillis = 10_000
             }
             install(Logging) {
@@ -375,7 +456,17 @@ class KtorNegotiationRepository(
             }
             defaultRequest {
                 contentType(ContentType.Application.Json)
-                apiKey?.let { header("Authorization", "Bearer \$it") }
+                when (provider) {
+                    LlmProvider.OPENROUTER -> {
+                        openRouterApiKey?.let { header("Authorization", "Bearer \$it") }
+                        header("HTTP-Referer", "https://alabuga.ru")
+                        header("X-Title", "Alabuga Negotiation Arena")
+                    }
+                    LlmProvider.GEMINI -> {
+                        geminiApiKey?.let { header("x-goog-api-key", it) }
+                    }
+                    else -> {}
+                }
             }
         }
     }
@@ -400,7 +491,7 @@ class KtorNegotiationRepository(
             currentMetrics = currentMetrics
         )
 
-        if (forceOfflineMode || apiKey.isNullOrBlank()) {
+        if (forceOfflineMode || provider == LlmProvider.OFFLINE_AUTONOMOUS) {
             return@withContext runCatching {
                 offlineClient.post("/negotiate") {
                     setBody(requestPayload)
@@ -408,14 +499,14 @@ class KtorNegotiationRepository(
             }
         }
 
-        // Попытка обращения к боевому серверу с прозрачным fallback на локальный AI-эмулятор
+        // Обращение к шлюзу с прозрачным fallback на локальный AI-эмулятор
         try {
             val response = liveClient.post("\$baseUrl/negotiate") {
                 setBody(requestPayload)
             }.body<GeminiResponse>()
             Result.success(response)
         } catch (e: Exception) {
-            // Элегантный fallback: при сетевой ошибке генерируем локальный ответ, не ломая UX
+            // Элегантный fallback: при сетевой ошибке генерируем локальный ответ
             val fallback = generateAutonomousResponse(requestPayload)
             Result.success(fallback)
         }
@@ -1644,8 +1735,8 @@ AlabugaNegotiationArena/
 ├── build.gradle.kts                      # Root Gradle configuration
 ├── settings.gradle.kts                   # Project & plugin repos
 ├── gradle/libs.versions.toml             # Version catalog (Ktor 3, Compose MP, Serialization)
-└── app/
-    ├── build.gradle.kts                  # Android Target (SDK 26-35, Jetpack Compose Material 3)
+└── composeApp/
+    ├── build.gradle.kts                  # KMP targets (androidTarget, iosArm64, wasmJs)
     └── src/
         ├── commonMain/                   # 100% общий код (UI, Network, Models, MVI)
         │   ├── kotlin/org/alabuga/arena/

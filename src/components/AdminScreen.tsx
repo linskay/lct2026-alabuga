@@ -17,7 +17,6 @@ import {
   ArrowLeft,
   Play,
 } from "lucide-react";
-import { AlabugaLogo } from "./AlabugaLogo";
 
 interface AdminScreenProps {
   currentConfig?: AdminScenarioConfig;
@@ -87,6 +86,7 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({
         title: `AI Кейс: ${config.sphere}`,
         name: `AI Кейс: ${config.sphere}`,
         sphere: config.sphere,
+
         opponentRole:
           config.sphere === "B2B / Инвесторы ОЭЗ"
             ? "Генеральный директор агрохолдинга"
@@ -156,8 +156,8 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({
 ${config.batna.redLines.map((r, idx) => `${idx + 1}. ${r}`).join("\n")}
 
 ПРАВИЛА ЛОГИЧЕСКОГО АНАЛИЗА РЕПЛИК:
-1. Аргументированная защита BATNA ОЭЗ — удержание позиции и рост доверия.
-2. Не уступать без встречного размена условий.`;
+1. Отрицания игрока («не согласен», «не подписываем», «460 ₽/м² фиксированно») — удержание позиции.
+2. Не уступать без встречного давления.`;
 
   return (
     <div className="relative min-h-screen w-full bg-[#07080D] text-slate-100 overflow-y-auto p-4 sm:p-6 lg:p-8 select-none">
@@ -179,15 +179,13 @@ ${config.batna.redLines.map((r, idx) => `${idx + 1}. ${r}`).join("\n")}
         {/* TOP HEADER WITH BACK BUTTON */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#202538]">
           <div className="flex items-center gap-3.5">
-            {/* КНОПКА НАЗАД НА ГЛАВНУЮ С ФИРМЕННЫМ ЛОГОТИПОМ ОЭЗ «АЛАБУГА» */}
+            {/* КНОПКА НАЗАД НА ГЛАВНУЮ */}
             <button
               onClick={onBackToHome}
-              className="px-3.5 py-2 rounded-xl border border-cyan-500/30 bg-slate-900/80 hover:bg-slate-800/90 text-slate-200 hover:text-white transition-all flex items-center gap-2 text-xs font-semibold shadow-[0_0_12px_rgba(0,240,255,0.2)] hover:border-cyan-400 group cursor-pointer"
-              title="Выйти на главную страницу"
+              className="px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white transition-all flex items-center gap-2 text-xs font-semibold shadow-sm hover:border-[#7b2cbf]/50"
             >
-              <ArrowLeft className="w-4 h-4 text-[#00f0ff] group-hover:-translate-x-0.5 transition-transform" />
-              <AlabugaLogo size={16} fill="#00F0FF" className="transition-transform group-hover:scale-110 drop-shadow-[0_0_6px_rgba(0,240,255,0.5)]" />
-              <span className="font-mono uppercase text-[11px] tracking-wider text-cyan-300">Главная</span>
+              <ArrowLeft className="w-4 h-4 text-[#00f0ff]" />
+              <span>Назад на главную</span>
             </button>
 
             <div className="hidden sm:flex w-10 h-10 rounded-xl bg-gradient-to-br from-[#7b2cbf]/30 via-[#240046]/40 to-[#00f0ff]/20 border border-[#7b2cbf]/60 items-center justify-center text-[#00f0ff] shadow-[0_0_20px_rgba(123,44,191,0.35)]">
@@ -266,7 +264,7 @@ ${config.batna.redLines.map((r, idx) => `${idx + 1}. ${r}`).join("\n")}
                       <span className="text-slate-400">{preset.sphere.split(" / ")[0]}</span>
                     </div>
                     <h3 className="font-bold text-sm text-white line-clamp-1">
-                      {preset.name || preset.title}
+                      {preset.name}
                     </h3>
                     <p className="text-xs text-slate-300 mt-1 line-clamp-2">
                       {preset.opponentName} ({preset.opponentRole})

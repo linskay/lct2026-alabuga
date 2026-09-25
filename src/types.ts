@@ -10,6 +10,26 @@ export interface NegotiationMetrics {
   deal_readiness: number; // 0..100
 }
 
+export interface MethodologyTag {
+  category: "SPIN" | "HARVARD" | "BATNA" | "ERROR" | "TACTIC";
+  tag: string;
+  description: string;
+  type: "positive" | "warning" | "danger" | "info";
+}
+
+export interface ZopaState {
+  buyerMin: number;       // Мин. предложение оппонента (₽/м²)
+  buyerMax: number;       // Макс. предел оппонента (₽/м²)
+  sellerMin: number;      // BATNA ОЭЗ (мин. допустимая) (₽/м²)
+  sellerMax: number;      // Базовая ставка ОЭЗ (₽/м²)
+  isOverlap: boolean;     // Есть ли пересечение (Зона возможного соглашения)
+  overlapMin?: number;    // Нижняя граница ZOPA
+  overlapMax?: number;    // Верхняя граница ZOPA
+  currentOffer?: number;  // Текущая обсуждаемая ставка
+  status: "expanding" | "narrowing" | "deadlock" | "agreed";
+  changeReason?: string;
+}
+
 export interface Message {
   id: string;
   actor: ActorRole;
@@ -19,52 +39,44 @@ export interface Message {
   snapshotMetrics: NegotiationMetrics;
   tacticalNote?: string;
   barsAnimation?: BarsAnimationState;
+  methodologyTag?: MethodologyTag;
   emotion?: "attack" | "compromise" | "bluff" | "neutral";
   emotionLabel?: string;
   emotionEmoji?: string;
   contextHints?: string[];
-  dynamicHints?: string[];
 }
 
 export interface BatnaConfig {
   minPricePerSqm: number;
   maxGracePeriodMonths: number;
-  taxHolidayYears?: number;
-  minJobCreation?: number;
-  minCapexMillionRub?: number;
+  taxHolidayYears: number;
+  minJobCreation: number;
+  minCapexMillionRub: number;
   redLines: string[];
-}
-
-export interface AgendaTopicItem {
-  id: string;
-  title: string;
-  target: string;
-  status: "agreed" | "in_progress" | "disputed";
-  detail?: string;
 }
 
 export interface AdminScenarioConfig {
   id: string;
   title: string;
   name?: string;
-  sphere?: "B2B / Инвесторы ОЭЗ" | "Закупки и тендеры" | "HR / Наем топов" | "Внутренний спор" | string;
+  sphere: "B2B / Инвесторы ОЭЗ" | "Закупки и тендеры" | "HR / Наем топов" | "Внутренний спор" | string;
+
   opponentRole: string;
   opponentName: string;
   opponentCompany: string;
-  opponentPersonality?: string;
+  opponentPersonality: string;
   personalityTone: "Агрессивный / Прессинг" | "Скрытный манипулятор" | "Бюрократ / Регламент" | "Эмоциональный / Шантаж" | string;
-  hiddenGoal?: string;
-  opponentBatna?: string;
-  toughnessLevel?: number; // 0..100
-  bluffTendency?: number;  // 0..100
-  difficulty: DifficultyLevel | string;
+
+  hiddenGoal: string;
+  opponentBatna: string;
+  toughnessLevel: number; // 0..100
+  bluffTendency: number;  // 0..100
+  difficulty: DifficultyLevel;
   zoneCluster: string;
-  initialContext?: string;
+  initialContext: string;
   initialOpponentUtterance?: string;
   initialBarsAdvice?: string;
-  initialDynamicHints?: string[];
-  agendaTopics?: AgendaTopicItem[];
-  targetKpis?: string[];
+  targetKpis: string[];
   batna: BatnaConfig;
 }
 
@@ -75,7 +87,6 @@ export interface NegotiationSessionSnapshot {
   lastBarsFeedback: string;
   lastBarsAnimation: BarsAnimationState;
   agenda?: NegotiationAgenda;
-  agendaTopics?: AgendaTopicItem[];
   timestamp: number;
 }
 
@@ -102,12 +113,17 @@ export interface GeminiResponse {
   manipulation_type?: "none" | "bluff" | "authority_press" | "hurry_trap";
   hidden_need_revealed?: boolean;
   active_counter_offer?: number;
+  methodology_tag?: MethodologyTag;
+  zopa?: ZopaState;
+  latency_ms?: number;
+  model_name?: string;
+  provider_name?: string;
 }
 
 export type AgendaItemStatus = "agreed" | "in_progress" | "disputed";
 
 export interface AgendaItem {
-  id: "rate" | "grace_period" | "power_capex" | string;
+  id: "rate" | "grace_period" | "power_capex";
   title: string;
   status: AgendaItemStatus;
   detail: string;
@@ -117,7 +133,17 @@ export interface NegotiationAgenda {
   rate: AgendaItem;
   grace_period: AgendaItem;
   power_capex: AgendaItem;
-  [key: string]: AgendaItem;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  imageUrl: string;
+  isUnlocked: boolean;
+  tier: "legendary" | "epic" | "rare";
+  conditionText: string;
 }
 
 export interface DebriefingAnalytics {
@@ -137,6 +163,7 @@ export interface DebriefingAnalytics {
   manipulationsHandledCount: number;
   hiddenNeedsDiscovered: boolean;
   mutualTradeOffsEnforced: boolean;
+  achievements: Achievement[];
 }
 
 declare global {

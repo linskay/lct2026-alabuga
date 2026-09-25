@@ -7,7 +7,8 @@ import {
   NegotiationSessionSnapshot,
   DebriefingAnalytics,
   NegotiationAgenda,
-  AgendaTopicItem,
+  Achievement,
+  ZopaState,
 } from "./types";
 import { PRESET_SCENARIOS } from "./data/scenarios";
 import { ArenaScreenView } from "./components/ArenaScreenView";
@@ -49,42 +50,33 @@ export default function App() {
     deal_readiness: 40,
   };
 
-  // Helper to build initial agenda from scenario
-  const buildInitialAgenda = (cfg: AdminScenarioConfig): NegotiationAgenda => {
-    const topics = cfg.agendaTopics || [];
-    const t0 = topics[0] || { id: "topic_1", title: "Ключевое условие", status: "disputed" as const, target: "По регламенту", detail: "В процессе торга" };
-    const t1 = topics[1] || { id: "topic_2", title: "Дополнительное условие", status: "in_progress" as const, target: "По регламенту", detail: "В процессе торга" };
-    const t2 = topics[2] || { id: "topic_3", title: "Гарантии и KPI", status: "disputed" as const, target: "По регламенту", detail: "В процессе торга" };
-    return {
-      rate: {
-        id: t0.id,
-        title: t0.title,
-        status: t0.status,
-        detail: t0.detail || ("target" in t0 ? (t0 as any).target : "По регламенту"),
-      },
-      grace_period: {
-        id: t1.id,
-        title: t1.title,
-        status: t1.status,
-        detail: t1.detail || ("target" in t1 ? (t1 as any).target : "По регламенту"),
-      },
-      power_capex: {
-        id: t2.id,
-        title: t2.title,
-        status: t2.status,
-        detail: t2.detail || ("target" in t2 ? (t2 as any).target : "По регламенту"),
-      },
-    };
+  // Initial Agenda (Чек-лист договоренностей)
+  const initialAgenda: NegotiationAgenda = {
+    rate: {
+      id: "rate",
+      title: "Арендная ставка",
+      status: "disputed",
+      detail: "Оппонент требует 300 ₽/м² (BATNA: от 460 ₽)",
+    },
+    grace_period: {
+      id: "grace_period",
+      title: "Каникулы на пусконаладку",
+      status: "in_progress",
+      detail: "Оппонент требует 12 мес. (BATNA: до 4 мес.)",
+    },
+    power_capex: {
+      id: "power_capex",
+      title: "Электросети 8 МВт & CAPEX",
+      status: "disputed",
+      detail: "Оппонент требует бесплатный подвод",
+    },
   };
-
-  const defaultPreset = PRESET_SCENARIOS[0];
-  const initialAgenda: NegotiationAgenda = buildInitialAgenda(defaultPreset);
 
   // 1. Приветствие от живого робота-наставника Б.А.Р.С.
   const initialBarsWelcome: Message = {
     id: "init_bars_welcome",
     actor: "BARS",
-    text: defaultPreset.initialBarsAdvice || `Приветствую на Арене переговоров ОЭЗ «Алабуга»! Я Б.А.Р.С. — твой живой бортовой наставник и тактик. Буду жестикулировать, анализировать каждое слово оппонента и страховать твои красные линии BATNA. Оппонент уже вошел в переговорную — парируй его первый выпад!`,
+    text: "Приветствую на Арене переговоров ОЭЗ «Алабуга»! Я Б.А.Р.С. — твой живой бортовой наставник и тактик. Буду жестикулировать, анализировать каждое слово оппонента и страховать твои красные линии. Главное правило: не опускай базовую ставку ниже 460 ₽/м² и держи арендные каникулы до 4 месяцев. Оппонент уже вошел в переговорную — парируй его первый выпад!",
     timestamp: Date.now() - 2500,
     stepIndex: 0,
     snapshotMetrics: { ...initialMetrics },
@@ -95,25 +87,25 @@ export default function App() {
   const initialOpponentMessage: Message = {
     id: "init_msg_0",
     actor: "OPPONENT",
-    text: defaultPreset.initialOpponentUtterance || "Добрый день. Обозначьте ваши стартовые условия.",
+    text: "Добрый день. Наша корпорация рассматривает несколько площадок в ПФО. Мы готовы зайти в индустриальный парк «Синергия» на 12 000 м², но ваши базовые ставки аренды завышены минимум на 35%. Требуем скидку до 300 руб/м² и 12 месяцев каникул на пусконаладку. Что скажете?",
     timestamp: Date.now(),
     stepIndex: 0,
     snapshotMetrics: { ...initialMetrics },
     emotion: "attack",
     emotionLabel: "Первый выпад / Давление",
     emotionEmoji: "😠",
-    dynamicHints: defaultPreset.initialDynamicHints ? [...defaultPreset.initialDynamicHints] : [],
-    contextHints: defaultPreset.initialDynamicHints ? [...defaultPreset.initialDynamicHints] : [],
+    contextHints: [
+      "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+      "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем субсидий или мощности]...",
+      "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
+    ],
   };
 
   const [messages, setMessages] = useState<Message[]>([initialBarsWelcome, initialOpponentMessage]);
   const [metrics, setMetrics] = useState<NegotiationMetrics>({ ...initialMetrics });
   const [agenda, setAgenda] = useState<NegotiationAgenda>(initialAgenda);
-  const [agendaTopics, setAgendaTopics] = useState<AgendaTopicItem[]>(
-    defaultPreset.agendaTopics ? [...defaultPreset.agendaTopics] : []
-  );
   const [barsFeedback, setBarsFeedback] = useState<string>(
-    defaultPreset.initialBarsAdvice || "Оппонент готов к переговорам. Защищайте красные линии BATNA!"
+    "Оппонент с порога атакует арендную ставку! Не оправдывайся и не сдавай минимальный порог BATNA (460 ₽/м²). Напомни о готовых мощностях 110 кВ и кадрах «Алабуга Политех»."
   );
   const [barsAnimation, setBarsAnimation] = useState<BarsAnimationState>("idle");
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -126,16 +118,60 @@ export default function App() {
       step: 0,
       messages: [initialBarsWelcome, initialOpponentMessage],
       metrics: { ...initialMetrics },
-      lastBarsFeedback: defaultPreset.initialBarsAdvice || "Старт переговоров",
+      lastBarsFeedback: "Старт переговоров",
       lastBarsAnimation: "idle",
       agenda: initialAgenda,
-      agendaTopics: defaultPreset.agendaTopics ? [...defaultPreset.agendaTopics] : [],
       timestamp: Date.now(),
     },
   ]);
   const [timeTravelRollbacksCount, setTimeTravelRollbacksCount] = useState<number>(0);
   const [hiddenNeedsDiscovered, setHiddenNeedsDiscovered] = useState<boolean>(false);
   const [activeCounterOffer, setActiveCounterOffer] = useState<number>(300);
+
+  // New ZOPA & Latency & Offline mode states
+  const [zopa, setZopa] = useState<ZopaState | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [modelName, setModelName] = useState<string>("meta-llama/llama-3.1-8b-instruct:free");
+  const [providerName, setProviderName] = useState<string>("openrouter");
+  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(false);
+
+  // Query initial provider on mount
+  useEffect(() => {
+    fetch("/api/provider")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.activeProvider === "fallback") {
+          setIsOfflineMode(true);
+          setProviderName("fallback");
+          setModelName("Autonomous Engine (Offline)");
+        } else {
+          setIsOfflineMode(false);
+          setProviderName(data.activeProvider || "openrouter");
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleToggleOfflineMode = async () => {
+    const nextMode = !isOfflineMode;
+    try {
+      const res = await fetch("/api/provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: nextMode ? "fallback" : null }),
+      });
+      const data = await res.json();
+      setIsOfflineMode(data.activeProvider === "fallback");
+      setProviderName(data.activeProvider);
+      if (data.activeProvider === "fallback") {
+        setModelName("Autonomous Engine (Offline)");
+      } else {
+        setModelName(data.activeProvider === "gemini" ? "gemini-3.8-flash" : "meta-llama/llama-3.1-8b-instruct:free");
+      }
+    } catch (err) {
+      console.error("Failed to switch provider:", err);
+    }
+  };
 
   // Modals
   const [isCaseInfoOpen, setIsCaseInfoOpen] = useState(false);
@@ -174,7 +210,6 @@ export default function App() {
               ...config,
               currentMetrics: metrics,
               agenda,
-              agendaTopics,
               hiddenNeedsDiscovered,
               activeCounterOffer,
             },
@@ -192,91 +227,23 @@ export default function App() {
       // If network or server didn't return valid JSON, compute deterministic local fallback
       if (!data || !data.opponent_reply) {
         const lower = text.toLowerCase();
-        const oppName = config.opponentName.split(" ")[0] || "Коллега";
-        const isArtem = config.opponentName.toLowerCase().includes("артем") || config.id === "retention_lead_engineer";
-        const isZhang = config.opponentName.toLowerCase().includes("чжан") || config.id === "robotics_procurement";
-        const isMikhail = config.opponentName.toLowerCase().includes("михаил") || config.id === "internal_capex_dispute";
-
-        let fallbackReply = `Ваше предложение требует детального анализа. Назовите встречные условия и гарантии со стороны ОЭЗ.`;
-        let fallbackFeedback = `Оппонент держит позицию. Опирайтесь на ключевые преимущества ОЭЗ и защищайте BATNA!`;
+        let fallbackReply = "Ваше предложение требует дополнительного анализа. 400 ₽ за квадратный метр — наш ориентир, но назовите конкретные встречные уступки по срокам и сетям.";
+        let fallbackFeedback = "Оппонент держит оборону. Удерживайте ставку 460 ₽/м² и проверьте его скрытую потребность по срокам запуска.";
         let fallbackAnimation = "talk";
         let newTrust = metrics.trust;
         let newTension = metrics.tension;
         let newReadiness = metrics.deal_readiness;
-        let generatedFallbackHints: string[] = [];
 
-        if (isArtem) {
-          if (lower.includes("оклад") || lower.includes("зарплат") || lower.includes("денег") || lower.includes("20%")) {
-            fallbackReply = "Вы предлагаете прибавку к окладу, но финтех дает мне +50% чистыми на удаленке. Если ОЭЗ дает только +20%, чем вы компенсируете остальное? Мне нужны четкие гарантии бонусов и право вето на архитектуру.";
-            fallbackFeedback = "Артем торгуется по деньгам! Не превышай лимит +20% к фиксу. Предложи квартальный KPI-бонус за сдачу вех SCADA и карт-бланш на выбор стека.";
-            generatedFallbackHints = [
-              "Артем, фиксируем +20% к окладу прямо сейчас плюс полугодовой бонус в размере [укажите %] за ввод SCADA...",
-              "Мы гарантируем пересмотр грейда через 6 месяцев с фиксацией планки оклада в [укажите сумму]...",
-              "Кроме оклада мы выделяем бюджет на твое обучение и даем право вето по архитектурным решениям для...",
-            ];
-            newTrust = Math.min(100, newTrust + 5);
-          } else if (lower.includes("лидер") || lower.includes("руковод") || lower.includes("r&d") || lower.includes("проект") || lower.includes("scada")) {
-            fallbackReply = "Лидство нового R&D модуля диспетчеризации — это то, чего мне не хватало. Но я хочу сам формировать техстек и не согласовывать каждый чих с бюрократами. Кто будет у меня в подчинении?";
-            fallbackFeedback = "Бинго! Ты попал в истинную потребность Артема. Закрепи за ним 3 стажеров Политеха и дай свободу в выборе технологий.";
-            generatedFallbackHints = [
-              "Артем, ты получаешь прямой карт-бланш на архитектуру и команду из [укажите число] стажеров Политеха...",
-              "Мы закрепляем за тобой 3 лучших выпускников «Алабуга Политех», чтобы они закрывали ночную рутину, пока ты...",
-              "Ты становишься главным архитектором диспетчеризации с прямым подчинением [укажите топ-менеджера]...",
-            ];
-            newTrust = Math.min(100, newTrust + 10);
-            newReadiness = Math.min(100, newReadiness + 12);
-          } else if (lower.includes("дежур") || lower.includes("ноч") || lower.includes("аврал") || lower.includes("стажер") || lower.includes("политех")) {
-            fallbackReply = "Если с меня снимут ночные подъемы из-за упавших шлюзов — это снимет 80% моего стресса. Но кто реально будет дежурить по ночам вместо меня?";
-            fallbackFeedback = "Артем готов остаться, если решится боль авралов. Предложи передать мониторинг дежурной смене Политеха и согласовать 2 дня удаленки.";
-            generatedFallbackHints = [
-              "Артем, мы передаем ночные дежурства выделенной дежурной смене из выпускников Политеха, а тебе оставляем...",
-              "Мы согласуем гибридный график с 2 днями удаленки и запретом на ночные вызовы без [укажите условие]...",
-              "Давай утвердим регламент: дежурные инженеры берут первую линию, а ты подключаешься только при...",
-            ];
-            newTrust = Math.min(100, newTrust + 8);
-            newTension = Math.max(0, newTension - 8);
-          } else {
-            fallbackReply = "Я устал чинить старые шлюзы по ночам. Мне прилетел оффер из московского финтеха: чистая удаленка и плюс 50% к деньгам. Что ОЭЗ может мне предложить, кроме бесконечных авралов?";
-            fallbackFeedback = "Артем выгорел от операционки. Вскрой его истинную потребность: передай лидерство над новым R&D проектом SCADA и дай 3 стажеров Политеха!";
-            generatedFallbackHints = [
-              "Артем, проект масштабирования важнее рутины. Мы готовы передать тебе лидство над [укажите проект]...",
-              "Деньги важны, но в финтехе ты будешь винтиком. Давай согласуем пересмотр грейда при условии...",
-              "Давай разгрузим тебя от ночных дежурств: выделим 3 стажеров «Политеха» под твое начало, если ты...",
-            ];
-          }
-        } else if (isZhang) {
-          fallbackReply = "Мы ценим масштаб ОЭЗ «Алабуга». Однако пункт о штрафах 0.5% в день за задержку пусконаладки неприемлем: логистика непредсказуема.";
-          fallbackFeedback = "Чжан Вэй увиливает от штрафов! Держи неустойку от 0.2%/день и требуй склад запчастей.";
-          generatedFallbackHints = [
-            "Господин Чжан, мы готовы обсуждать график поставки при условии штрафа [укажите %] за срыв пусконаладки...",
-            "ОЭЗ настаивает на гарантийном складе критических запчастей и бесплатном обучении [укажите число] наладчиков...",
-            "Мы можем зафиксировать предложенную базовую цену, если финальные 30% оплаты будут переведены после [укажите условие]...",
-          ];
-        } else if (isMikhail) {
-          fallbackReply = "Я подписывать суицидальный график ускоренного ввода не буду. Если трансформатор 110 кВ даст просадку — меня под суд отдадут.";
-          fallbackFeedback = "Громов ищет юридическую защиту от рисков надзора. Предложи независимый аудит и премиальный фонд!";
-          generatedFallbackHints = [
-            "Михаил, мы разделим ответственность: привлечем независимый технадзор и согласуем компенсацию за [укажите условие]...",
-            "Срыв ввода подстанции сорвет контракты резидентов на 15 МВт. Мы предлагаем параллельный монтаж при гарантии...",
-            "Давайте утвердим премиальный фонд для ночных бригад монтажников при условии сдачи к [укажите месяц]...",
-          ];
-        } else {
-          if (lower.includes("460") || lower.includes("ставка")) {
-            fallbackReply = `Ставка зафиксирована в нашей финмодели как критическая планка. Чем вы обоснуете такие цифры?`;
-            fallbackFeedback = `Позиция обозначена. Удерживайте порог и предложите альтернативные льготы!`;
-            newTrust = Math.min(100, newTrust + 5);
-            newReadiness = Math.min(100, newReadiness + 5);
-          } else if (lower.includes("каникул") || lower.includes("срок") || lower.includes("дедлайн")) {
-            fallbackReply = `По срокам мы готовы обсуждать оптимизацию графика, если вы гарантируете выполнение условий без срывов.`;
-            fallbackFeedback = `Диалог переходит в конструктивное русло. Зафиксируйте строгие рамки графика.`;
-            newTrust = Math.min(100, newTrust + 8);
-            newTension = Math.max(0, newTension - 5);
-          }
-          generatedFallbackHints = [
-            `${oppName}, спешка в таких инвестициях рискованна. Мы готовы зафиксировать ставку [укажите ставку], если вы гарантируете...`,
-            `Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...`,
-            `Понимаю жесткий тайминг совета директоров. Давайте согласуем компромисс при условии [опишите требование]...`,
-          ];
+        if (lower.includes("460")) {
+          fallbackReply = "460 ₽/м² — это серьезная планка. Чем вы обоснуете такую цену по сравнению с предложениями в других регионах?";
+          fallbackFeedback = "Позиция по ставке обозначена. Подкрепите 460 ₽ надежностью подстанций ОЭЗ и гарантией ввода корпуса!";
+          newTrust = Math.min(100, newTrust + 5);
+          newReadiness = Math.min(100, newReadiness + 5);
+        } else if (lower.includes("каникул") || lower.includes("срок")) {
+          fallbackReply = "По каникулам мы готовы обсуждать оптимизацию графика, если вы гарантируете шеф-монтаж без задержек.";
+          fallbackFeedback = "Диалог перешел в конструктивное русло. Фиксируйте каникулы не более 4 месяцев.";
+          newTrust = Math.min(100, newTrust + 8);
+          newTension = Math.max(0, newTension - 5);
         }
 
         data = {
@@ -284,11 +251,27 @@ export default function App() {
           bars_feedback: fallbackFeedback,
           bars_animation: fallbackAnimation,
           metrics: { trust: newTrust, tension: newTension, deal_readiness: newReadiness },
-          dynamic_hints: generatedFallbackHints,
           agenda,
           is_deal_closed: false,
           is_deal_failed: false,
         };
+      }
+
+      if (data.methodology_tag) {
+        userMessage.methodologyTag = data.methodology_tag;
+      }
+      if (data.zopa) {
+        setZopa(data.zopa);
+      }
+      if (data.latency_ms !== undefined) {
+        setLatencyMs(data.latency_ms);
+      }
+      if (data.model_name) {
+        setModelName(data.model_name);
+      }
+      if (data.provider_name) {
+        setProviderName(data.provider_name);
+        setIsOfflineMode(data.provider_name === "fallback");
       }
 
       if (data.hidden_need_revealed) {
@@ -304,9 +287,9 @@ export default function App() {
       let emotionEmoji = data.emotion_emoji;
 
       if (!emotionLabel) {
-        if (data.manipulation_type === "bluff" || data.opponent_reply?.includes("Калуг") || data.opponent_reply?.includes("оффер")) {
+        if (data.manipulation_type === "bluff" || data.opponent_reply?.includes("Калуг")) {
           emotion = "bluff";
-          emotionLabel = "Блеф / Проверка";
+          emotionLabel = "Блеф конкурентами";
           emotionEmoji = "⚠️";
         } else if (data.bars_animation === "warn" || data.metrics?.tension >= 60) {
           emotion = "attack";
@@ -323,13 +306,6 @@ export default function App() {
         }
       }
 
-      const dynamicHintsList: string[] =
-        Array.isArray(data.dynamic_hints) && data.dynamic_hints.length > 0
-          ? data.dynamic_hints
-          : Array.isArray(data.context_hints) && data.context_hints.length > 0
-          ? data.context_hints
-          : [];
-
       const opponentMessage: Message = {
         id: `msg_opp_${Date.now()}`,
         actor: "OPPONENT",
@@ -342,42 +318,42 @@ export default function App() {
         emotion,
         emotionLabel,
         emotionEmoji,
-        dynamicHints: dynamicHintsList,
-        contextHints: dynamicHintsList,
+        contextHints: data.context_hints || [
+          "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+          "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
+          "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
+        ],
       };
 
       const newHistory = [...updatedMessages, opponentMessage];
 
       setMessages(newHistory);
       setMetrics(data.metrics);
-
-      // Update dynamic agenda topics
-      if (data.agenda_status && Array.isArray(data.agenda_status)) {
-        setAgendaTopics((prevTopics) => {
-          return prevTopics.map((topicItem) => {
-            const match = data.agenda_status.find((s: any) => {
-              if (!s.topic) return false;
-              const sTop = s.topic.toLowerCase();
-              const tTitle = topicItem.title.toLowerCase();
-              const tId = topicItem.id.toLowerCase();
-              return tTitle.includes(sTop) || sTop.includes(tTitle) || sTop.includes(tId);
-            });
-            if (match) {
-              const status: "agreed" | "in_progress" | "disputed" =
-                match.status === "agreed" ? "agreed" : match.status === "rejected" ? "disputed" : "in_progress";
-              return {
-                ...topicItem,
-                status,
-                detail: status === "agreed" ? "✓ Согласовано сторонами" : status === "disputed" ? "Разногласие" : "В процессе торга",
-              };
-            }
-            return topicItem;
-          });
-        });
-      }
-
       if (data.agenda) {
         setAgenda(data.agenda);
+      } else if (data.agenda_status && Array.isArray(data.agenda_status)) {
+        // Map dynamic agenda_status array to agenda object
+        setAgenda((prev) => {
+          const next = { ...prev };
+          data.agenda_status.forEach((item: any) => {
+            const topic = (item.topic || "").toLowerCase();
+            const status: "agreed" | "in_progress" | "disputed" =
+              item.status === "agreed"
+                ? "agreed"
+                : item.status === "rejected"
+                ? "disputed"
+                : "in_progress";
+
+            if (topic.includes("ставк") || topic.includes("цен") || topic.includes("аренд") || topic.includes("rate")) {
+              next.rate = { ...next.rate, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            } else if (topic.includes("каникул") || topic.includes("срок") || topic.includes("grace")) {
+              next.grace_period = { ...next.grace_period, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            } else if (topic.includes("мощност") || topic.includes("capex") || topic.includes("инвестиц") || topic.includes("сет") || topic.includes("power")) {
+              next.power_capex = { ...next.power_capex, status, detail: `${item.topic}: ${status === "agreed" ? "Согласовано" : "В процессе торга"}` };
+            }
+          });
+          return next;
+        });
       }
       setBarsFeedback(data.bars_feedback);
       setBarsAnimation(data.bars_animation || "talk");
@@ -394,7 +370,6 @@ export default function App() {
           lastBarsFeedback: data.bars_feedback,
           lastBarsAnimation: data.bars_animation,
           agenda: data.agenda || agenda,
-          agendaTopics: [...agendaTopics],
           timestamp: Date.now(),
         },
       ]);
@@ -420,9 +395,6 @@ export default function App() {
     if (snapshot.agenda) {
       setAgenda(snapshot.agenda);
     }
-    if (snapshot.agendaTopics) {
-      setAgendaTopics(snapshot.agendaTopics);
-    }
     setBarsFeedback(
       `«Машина времени» вернула состояние к шагу №${targetStep}. Сформируйте альтернативную реплику.`
     );
@@ -439,9 +411,6 @@ export default function App() {
     setHiddenNeedsDiscovered(false);
     setActiveCounterOffer(activeCfg.batna.minPricePerSqm ? activeCfg.batna.minPricePerSqm - 100 : 300);
 
-    const activeTopics: AgendaTopicItem[] = activeCfg.agendaTopics ? [...activeCfg.agendaTopics] : [];
-    const activeAgenda: NegotiationAgenda = buildInitialAgenda(activeCfg);
-
     const welcomeBars: Message = {
       id: `init_bars_${Date.now()}`,
       actor: "BARS",
@@ -455,18 +424,15 @@ export default function App() {
     const resetOpponentMsg: Message = {
       id: `init_opp_${Date.now() + 1}`,
       actor: "OPPONENT",
-      text: activeCfg.initialOpponentUtterance || `Приветствую. Готов обсудить ключевые вопросы. Каковы ваши встречные предложения?`,
+      text: activeCfg.initialOpponentUtterance || `Приветствую. Давайте сразу к делу по площадке «${activeCfg.zoneCluster}». Каковы ваши встречные предложения по льготной ставке?`,
       timestamp: Date.now() + 1,
       stepIndex: 0,
       snapshotMetrics: { ...initialMetrics },
-      dynamicHints: activeCfg.initialDynamicHints ? [...activeCfg.initialDynamicHints] : [],
-      contextHints: activeCfg.initialDynamicHints ? [...activeCfg.initialDynamicHints] : [],
     };
 
     setMessages([welcomeBars, resetOpponentMsg]);
     setMetrics({ ...initialMetrics });
-    setAgenda(activeAgenda);
-    setAgendaTopics(activeTopics);
+    setAgenda(initialAgenda);
     setBarsFeedback(activeCfg.initialBarsAdvice || "Сессия перезапущена. Б.А.Р.С. готов к тактическому анализу.");
     setBarsAnimation("idle");
     setIsDealClosed(false);
@@ -476,10 +442,9 @@ export default function App() {
         step: 0,
         messages: [welcomeBars, resetOpponentMsg],
         metrics: { ...initialMetrics },
-        lastBarsFeedback: activeCfg.initialBarsAdvice || "Старт переговоров",
+        lastBarsFeedback: "Старт переговоров",
         lastBarsAnimation: "idle",
-        agenda: activeAgenda,
-        agendaTopics: activeTopics,
+        agenda: initialAgenda,
         timestamp: Date.now(),
       },
     ]);
@@ -605,6 +570,59 @@ export default function App() {
       areasForGrowth.push("Снизить количество откатов назад: вырабатывайте интуицию с первого дубля");
     }
 
+    const achievements: Achievement[] = [
+      {
+        id: "batna_shield",
+        title: "Железная BATNA",
+        subtitle: "Несокрушимая защита ОЭЗ",
+        description: "Удержал базовую ставку не ниже 460 ₽/м² и лимит каникул, не сдав красные линии ОЭЗ «Алабуга».",
+        imageUrl: "/achievements/batna_shield.jpg",
+        isUnlocked: agenda.rate.status === "agreed" || batnaScore >= 80,
+        tier: "epic",
+        conditionText: "Зафиксировать ставку от 460 ₽/м² (BATNA)",
+      },
+      {
+        id: "bluff_buster",
+        title: "Детектор лжи",
+        subtitle: "Калужский блеф-бастер",
+        description: "Хладнокровно парировал блеф оппонента о конкурентах, используя факты о дефиците мощностей 110 кВ.",
+        imageUrl: "/achievements/bluff_buster.jpg",
+        isUnlocked: manipulationsCount >= 1,
+        tier: "rare",
+        conditionText: "Отразить минимум 1 манипуляцию или блеф",
+      },
+      {
+        id: "hidden_pain",
+        title: "Рентген потребностей",
+        subtitle: "Истинная цель раскрыта",
+        description: "Вскрыл скрытую боль инвестора: критическую зависимость от сроков ввода оборудования к 3-му кварталу.",
+        imageUrl: "/achievements/hidden_pain.jpg",
+        isUnlocked: painDiscovered,
+        tier: "rare",
+        conditionText: "Выявить скрытую боль и истинный дедлайн",
+      },
+      {
+        id: "power_capex",
+        title: "Энергетический барон",
+        subtitle: "8 МВт под 1.2 млрд ₽",
+        description: "Не уступил бесплатные энергомощности, а разменял подключение 8 МВт на встречные инвестиции 1.2 млрд ₽.",
+        imageUrl: "/achievements/power_capex.jpg",
+        isUnlocked: agenda.power_capex.status === "agreed",
+        tier: "epic",
+        conditionText: "Связать 8 МВт с обязательством CAPEX 1.2 млрд ₽",
+      },
+      {
+        id: "grandmaster_s",
+        title: "Гроссмейстер Алабуги",
+        subtitle: "Безупречный ранг S",
+        description: "Провел глубокие жесткие переговоры (6+ раундов), раскрыл боли, парировал атаки и закрыл идеальную сделку.",
+        imageUrl: "/achievements/grandmaster_s.jpg",
+        isUnlocked: rating === "S",
+        tier: "legendary",
+        conditionText: "Получить высший ранг S (6+ раундов без спешки)",
+      },
+    ];
+
     return {
       finalOutcome: isDealClosed ? "WON" : isDealFailed ? "FAILED" : "IN_PROGRESS",
       totalSteps: messages[messages.length - 1]?.stepIndex || 0,
@@ -622,6 +640,7 @@ export default function App() {
       manipulationsHandledCount: manipulationsCount,
       hiddenNeedsDiscovered: painDiscovered,
       mutualTradeOffsEnforced: tradeOffsEnforced,
+      achievements,
     };
   };
 
@@ -653,13 +672,18 @@ export default function App() {
           messages={messages}
           metrics={metrics}
           agenda={agenda}
-          agendaTopics={agendaTopics}
           barsFeedback={barsFeedback}
           barsAnimation={barsAnimation}
           isLoading={isLoading}
           isDealClosed={isDealClosed}
           isDealFailed={isDealFailed}
           timerSeconds={timerSeconds}
+          zopa={zopa}
+          latencyMs={latencyMs}
+          modelName={modelName}
+          providerName={providerName}
+          isOfflineMode={isOfflineMode}
+          onToggleOfflineMode={handleToggleOfflineMode}
           onSendMessage={handleSendMessage}
           onRollback={handleRollback}
           onOpenCaseInfo={() => setIsCaseInfoOpen(true)}

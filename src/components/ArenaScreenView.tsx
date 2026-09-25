@@ -5,9 +5,14 @@ import {
   NegotiationMetrics,
   NegotiationAgenda,
   BarsAnimationState,
-  AgendaTopicItem,
+  ZopaState,
 } from "../types";
+import { BarsAvatar } from "./BarsAvatar";
 import { OpponentVideoWindow } from "./OpponentVideoWindow";
+import { ZopaMapCard } from "./ZopaMapCard";
+import { MethodologyTagBadge } from "./MethodologyTagBadge";
+import { LatencyBadge } from "./LatencyBadge";
+import { OfflineToggle } from "./OfflineToggle";
 import { triggerHaptic } from "../utils/haptics";
 import {
   Send,
@@ -22,22 +27,33 @@ import {
   AlertTriangle,
   ArrowLeft,
   Activity,
+  Mic,
+  SlidersHorizontal,
+  Check,
+  ArrowRightLeft,
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  X,
 } from "lucide-react";
-import { AlabugaLogo } from "./AlabugaLogo";
 
 interface ArenaScreenViewProps {
   config: AdminScenarioConfig;
   messages: Message[];
   metrics: NegotiationMetrics;
   agenda: NegotiationAgenda;
-  agendaTopics?: AgendaTopicItem[];
   barsFeedback: string;
   barsAnimation: BarsAnimationState;
   isLoading: boolean;
   isDealClosed: boolean;
   isDealFailed: boolean;
   timerSeconds: number;
+  zopa: ZopaState | null;
+  latencyMs: number | null;
+  modelName: string;
+  providerName: string;
+  isOfflineMode: boolean;
+  onToggleOfflineMode: () => void;
   onSendMessage: (text: string) => void;
   onRollback: (step: number) => void;
   onOpenCaseInfo: () => void;
@@ -54,13 +70,18 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   messages,
   metrics,
   agenda,
-  agendaTopics,
   barsFeedback,
   barsAnimation,
   isLoading,
   isDealClosed,
   isDealFailed,
   timerSeconds,
+  zopa,
+  latencyMs,
+  modelName,
+  providerName,
+  isOfflineMode,
+  onToggleOfflineMode,
   onSendMessage,
   onRollback,
   onOpenCaseInfo,
@@ -74,7 +95,8 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
   const [inputText, setInputText] = useState("");
   const [lastInsertedTemplate, setLastInsertedTemplate] = useState<string>("");
   const [showTelemetrySheet, setShowTelemetrySheet] = useState(false);
-  const [telemetryTab, setTelemetryTab] = useState<"metrics" | "batna" | "agenda">("metrics");
+  const [telemetryTab, setTelemetryTab] = useState<"metrics" | "zopa" | "batna" | "agenda">("metrics");
+  const [isBarsHudExpanded, setIsBarsHudExpanded] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chipsRowRef = useRef<HTMLDivElement | null>(null);
@@ -183,12 +205,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
-  // Clear input and template when scenario changes
-  useEffect(() => {
-    setInputText("");
-    setLastInsertedTemplate("");
-  }, [config.id]);
-
   const opponentInitials =
     config.opponentName
       .split(" ")
@@ -197,25 +213,15 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
       .slice(0, 2)
       .toUpperCase() || "ОП";
 
-  // Dynamic context hints: extract strictly from the most recent opponent message or scenario preset
+  // Dynamic context hints: extract from the most recent opponent message
   const latestOpponentMsg = [...messages].reverse().find((m) => m.actor === "OPPONENT");
   const dynamicHints: string[] =
-    (latestOpponentMsg?.dynamicHints && latestOpponentMsg.dynamicHints.length > 0)
-      ? latestOpponentMsg.dynamicHints
-      : (latestOpponentMsg?.contextHints && latestOpponentMsg.contextHints.length > 0)
+    latestOpponentMsg?.contextHints && latestOpponentMsg.contextHints.length > 0
       ? latestOpponentMsg.contextHints
-      : (config.initialDynamicHints && config.initialDynamicHints.length > 0)
-      ? config.initialDynamicHints
-      : [];
-
-  // Dynamic agenda topics list for current scenario
-  const currentAgendaList: AgendaTopicItem[] =
-    agendaTopics && agendaTopics.length > 0
-      ? agendaTopics
-      : config.agendaTopics && config.agendaTopics.length > 0
-      ? config.agendaTopics
       : [
-          { id: "topic_1", title: "Ключевые условия", target: "По регламенту", status: "disputed", detail: "В процессе торга" },
+          "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
+          "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
+          "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
         ];
 
   return (
@@ -229,24 +235,34 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
         id="m3-top-app-bar"
         className="sticky top-0 z-30 glass-panel border-b border-white/[0.08] min-h-[58px] shrink-0"
       >
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
-          {/* Слева: Логотип ОЭЗ «Алабуга» + инфо о собеседнике (БЕЗ ДУБЛИРУЮЩИХСЯ ИНДИКАТОРОВ) */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            {/* Кнопка выхода на главную */}
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          {/* Слева: Логотип ОЭЗ «Алабуга» + инфо о кейсе и оппоненте */}
+          <div className="flex items-center gap-3 min-w-0">
             <button
               id="m3-nav-back-button"
               onClick={onBackToHome || onOpenConfigurator}
-              className="group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 active:bg-slate-950 border border-cyan-500/30 hover:border-cyan-400 active:scale-95 transition-all shrink-0 cursor-pointer shadow-[0_0_12px_rgba(0,240,255,0.2)]"
-              title="Выйти на главную страницу"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/10 active:scale-95 transition-all shrink-0 cursor-pointer"
+              title="Назад на главную"
             >
-              <ArrowLeft className="w-3.5 h-3.5 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
-              <AlabugaLogo size={18} fill="#00F0FF" className="transition-transform group-hover:scale-110 drop-shadow-[0_0_6px_rgba(0,240,255,0.5)]" />
-              <span className="hidden md:inline text-[11px] font-mono font-bold tracking-wider text-cyan-300 uppercase">
-                Главная
-              </span>
+              <ArrowLeft className="w-4 h-4 text-cyan-400" />
             </button>
 
-            <div className="h-6 w-[1px] bg-white/10 mx-0.5 hidden sm:block" />
+            {/* Официальный бейдж-логотип ОЭЗ «Алабуга» */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500/20 via-purple-500/20 to-indigo-600/30 border border-cyan-400/40 flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.25)]">
+                <span className="text-[11px] font-black tracking-tighter text-cyan-300 font-mono">ОЭЗ</span>
+              </div>
+              <div className="hidden sm:flex flex-col">
+                <span className="text-xs font-black tracking-wider text-white uppercase font-sans">
+                  Алабуга
+                </span>
+                <span className="text-[9px] text-cyan-400/80 font-mono tracking-widest uppercase">
+                  Арена переговоров
+                </span>
+              </div>
+            </div>
+
+            <div className="h-6 w-[1px] bg-white/10 mx-1 hidden sm:block" />
 
             {/* Opponent Identity Avatar */}
             <div className="relative shrink-0 hidden xs:block">
@@ -256,7 +272,6 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-cyan-400 border border-[#07080e] shadow-[0_0_6px_#00f0ff] animate-pulse" />
             </div>
 
-            {/* Имя и должность оппонента */}
             <div className="min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-2">
                 <span className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px] sm:max-w-[240px]">
@@ -272,86 +287,110 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </div>
           </div>
 
-          {/* Справа: Аккуратный Figma-стек кнопок действий с фиксированными padding и font-size */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Единая группа управляющих кнопок */}
-            <div className="flex items-center gap-1 sm:gap-1.5 p-1 rounded-xl bg-slate-950/70 border border-white/10 shadow-inner">
-              {/* Мобильная кнопка Тактики (без процентов) */}
-              <button
-                id="m3-telemetry-badge-button"
-                onClick={() => setShowTelemetrySheet(true)}
-                className="h-8 px-2.5 rounded-lg bg-white/[0.05] hover:bg-white/10 active:scale-95 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-white/5 lg:hidden"
-                title="Тактический центр"
-              >
-                <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="text-[11px]">Тактика</span>
-              </button>
+          {/* Справа: Единая аккуратная группа кнопок (Откат, Дебрифинг, Сценарий, Таймер, Инфо) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 bg-white/[0.03] p-1 rounded-full border border-white/[0.08] shadow-inner">
+            {/* Mobile Telemetry */}
+            <button
+              id="m3-telemetry-badge-button"
+              onClick={() => setShowTelemetrySheet(true)}
+              className="h-8 px-2.5 rounded-full glass-pill hover:bg-white/10 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer lg:hidden"
+              title="Открыть полную телеметрию"
+            >
+              <Activity className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-bold text-cyan-300 font-mono">{metrics.trust}%</span>
+            </button>
 
-              {/* Кнопка Откат */}
-              <button
-                onClick={onOpenTimeTravel}
-                className="h-8 px-3 rounded-lg bg-white/[0.05] hover:bg-white/10 active:scale-95 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-white/5"
-                title="Откатить раунд назад"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                <span>Откат</span>
-              </button>
+            {/* Кнопка Откат (Time Travel) */}
+            <button
+              onClick={onOpenTimeTravel}
+              className="h-8 px-3 rounded-full glass-pill hover:bg-white/15 text-slate-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-white/10"
+              title="Машина времени: откатить раунд назад"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Откат</span>
+            </button>
 
-              {/* Кнопка Дебрифинг */}
-              <button
-                onClick={onOpenDebriefing}
-                className="h-8 px-3 rounded-lg bg-white/[0.05] hover:bg-white/10 active:scale-95 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-white/5"
-                title="Итоговый дебрифинг и протокол MOU"
-              >
-                <Award className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Дебрифинг</span>
-              </button>
+            {/* Кнопка Дебрифинг */}
+            <button
+              onClick={onOpenDebriefing}
+              className="h-8 px-3 rounded-full glass-pill hover:bg-white/15 text-slate-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-white/10"
+              title="Итоговый дебрифинг и протокол MOU"
+            >
+              <Award className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Дебрифинг</span>
+            </button>
 
-              {/* Кнопка Сценарий */}
-              <button
-                onClick={onOpenConfigurator}
-                className="h-8 px-3 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 active:scale-95 text-purple-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-purple-500/30"
-                title="Выбрать другой сценарий переговоров"
-              >
-                <Sliders className="w-3.5 h-3.5 text-purple-300" />
-                <span>Сценарий</span>
-              </button>
+            {/* Кнопка Сценарий (Кейсы) */}
+            <button
+              onClick={onOpenConfigurator}
+              className="h-8 px-3 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-[0_0_15px_rgba(123,44,191,0.35)] cursor-pointer"
+              title="Выбрать другой сценарий переговоров"
+            >
+              <Sliders className="w-3.5 h-3.5 text-cyan-300" />
+              <span className="hidden md:inline">Сценарий</span>
+            </button>
 
-              {/* Кнопка Диспозиция (Инфо) */}
-              <button
-                id="m3-info-button"
-                onClick={onOpenCaseInfo}
-                className="h-8 px-2.5 rounded-lg bg-white/[0.05] hover:bg-white/10 active:scale-95 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer border border-white/5"
-                title="Диспозиция кейса"
-              >
-                <Info className="w-3.5 h-3.5 text-cyan-300" />
-                <span className="hidden sm:inline">Инфо</span>
-              </button>
-            </div>
+          {/* Offline / Live Demo 1-Click Toggle */}
+          <OfflineToggle
+            isOffline={isOfflineMode}
+            onToggle={onToggleOfflineMode}
+            isLoading={isLoading}
+          />
 
-            {/* Таймер раунда */}
-            <div className="h-8 px-3 rounded-xl bg-[#090b14] border border-cyan-500/30 flex items-center gap-1.5 text-xs font-mono text-cyan-300 shadow-inner">
-              <Clock className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-              <span className="font-semibold">{formatTimer(timerSeconds)}</span>
-            </div>
+          {/* Latency & Model Badge */}
+          <div className="hidden sm:flex">
+            <LatencyBadge
+              latencyMs={latencyMs}
+              providerName={providerName}
+              modelName={modelName}
+            />
+          </div>
+
+          {/* Кнопка Диспозиция (Инфо) */}
+          <button
+            id="m3-info-button"
+            onClick={onOpenCaseInfo}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 hover:text-white glass-pill hover:bg-white/15 active:scale-95 transition-all cursor-pointer border border-white/10"
+            title="Диспозиция кейса"
+          >
+            <Info className="w-3.5 h-3.5 text-purple-300" />
+          </button>
+
+          {/* Timer Pill */}
+          <div className="h-9 px-3 rounded-full bg-[#1d1b20] border border-[#49454f]/40 flex items-center gap-1.5 text-xs font-mono text-[#00f0ff]">
+            <Clock className="w-3 h-3 text-[#00f0ff] animate-pulse" />
+            <span>{formatTimer(timerSeconds)}</span>
+          </div>
           </div>
         </div>
       </header>
 
       {/* ================= STRICT 2-COLUMN MAIN WORKSPACE (70% Чат / 30% Тактика) ================= */}
-      <main className="max-w-7xl w-full mx-auto px-3 sm:px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-70px)] overflow-hidden">
+      <main className="max-w-7xl w-full mx-auto px-3 sm:px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0 overflow-hidden">
         {/* ЛЕВАЯ КОЛОНКА (70%): Видео собеседника + Чат диалога */}
         <div className="lg:col-span-8 flex flex-col h-full min-h-0 gap-3">
-          {/* Окно 3D (высота 340px) */}
+          {/* Окно робота Б.А.Р.С. */}
           <div className="shrink-0">
-            <OpponentVideoWindow
-              config={config}
-              metrics={metrics}
-              barsAnimation={barsAnimation}
-              isLoading={isLoading}
-              isDealClosed={isDealClosed}
-              isDealFailed={isDealFailed}
-            />
+
+            {(() => {
+              const opponentMessages = messages.filter((m) => m.actor === "OPPONENT");
+              const lastOpponentMsg = opponentMessages[opponentMessages.length - 1];
+              return (
+                <OpponentVideoWindow
+                  config={config}
+                  metrics={metrics}
+                  barsAnimation={barsAnimation}
+                  isLoading={isLoading}
+                  isDealClosed={isDealClosed}
+                  isDealFailed={isDealFailed}
+                  emotion={lastOpponentMsg?.emotion}
+                  emotionLabel={lastOpponentMsg?.emotionLabel}
+                  emotionEmoji={lastOpponentMsg?.emotionEmoji}
+                  isUserTyping={inputText.trim().length > 0}
+                  lastBarsFeedback={barsFeedback}
+                />
+              );
+            })()}
           </div>
 
           {/* Область сообщений (скроллится внутри, ЧИСТЫЙ ЧАТ БЕЗ СОВЕТОВ ВНУТРИ) */}
@@ -441,7 +480,13 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                   key={msg.id}
                   className="animate-message-in flex flex-col items-end my-2 group self-end max-w-[90%] sm:max-w-[85%]"
                 >
-                  <div className="text-[11px] font-medium mb-1 px-1 flex items-center gap-1.5 text-cyan-300">
+                  {/* BARS Methodology Tag (SPIN / Harvard / BATNA / Error) */}
+                  {isUser && msg.methodologyTag && (
+                    <MethodologyTagBadge tag={msg.methodologyTag} />
+                  )}
+
+                  {/* Sender Name */}
+                  <div className="text-[11px] font-medium mb-1 px-1 text-[#d0bcff]">
                     <span>Вы (ОЭЗ «Алабуга»)</span>
                   </div>
 
@@ -637,77 +682,33 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
             </div>
           </div>
 
-          {/* 2. ТАКТИЧЕСКИЙ СОВЕТ Б.А.Р.С. (ВЫНЕСЕН НАВЕРХ СРАЗУ ПОД ИНДИКАТОРЫ) */}
-          {barsFeedback && (
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/60 via-purple-950/50 to-slate-900/90 border border-cyan-400/50 space-y-2.5 shadow-[0_4px_30px_rgba(0,240,255,0.18)]">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5 font-mono uppercase tracking-wide">
-                  <Sparkles className="w-4 h-4 text-cyan-400" />
-                  Тактический совет Б.А.Р.С.
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-400/40 animate-pulse">
-                  LIVE • НАСТАВНИК
-                </span>
-              </div>
-              <p className="text-sm text-slate-100 leading-relaxed font-sans font-medium">
-                «{barsFeedback}»
-              </p>
-            </div>
-          )}
+          {/* M3 Dynamic ZOPA Map Card (Zone of Possible Agreement) */}
+          <ZopaMapCard zopa={zopa} minPriceBatna={config.batna.minPricePerSqm} />
 
-          {/* 3. Повестка встречи (ДИНАМИЧЕСКАЯ ПОД ТЕКУЩИЙ СЦЕНАРИЙ) */}
-          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-2.5 shadow-inner">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-bold text-white font-mono uppercase tracking-wider">
-                Повестка встречи:
-              </div>
-              <span className="text-[10px] font-mono text-cyan-400">
-                {currentAgendaList.filter((i) => i.status === "agreed").length} / {currentAgendaList.length}
-              </span>
-            </div>
-            <div className="space-y-2 text-xs">
-              {currentAgendaList.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-2"
-                >
-                  <div className="min-w-0 flex flex-col">
-                    <span className="text-slate-200 font-medium truncate">{item.title}</span>
-                    <span className="text-[10px] text-slate-400 font-mono truncate">{item.detail || item.target}</span>
-                  </div>
-                  <span
-                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                      item.status === "agreed"
-                        ? "text-emerald-300 bg-emerald-500/15 border-emerald-500/30"
-                        : item.status === "in_progress"
-                        ? "text-amber-300 bg-amber-500/15 border-amber-500/30"
-                        : "text-rose-300 bg-rose-500/15 border-rose-500/30"
-                    }`}
-                  >
-                    {item.status === "agreed"
-                      ? "✓ Согласовано"
-                      : item.status === "in_progress"
-                      ? "В процессе"
-                      : "Разногласие"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 4. Красные линии (BATNA ОЭЗ) */}
-          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3 shadow-inner">
-            <div className="flex items-center justify-between text-xs font-bold text-white">
+          {/* 2. Красные линии (BATNA ОЭЗ) */}
+          <div className="p-4 rounded-2xl bg-[#1d1b20] border border-[#49454f]/40 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-bold text-[#e6e0e9]">
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-cyan-400" />
                 Красные линии (BATNA)
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30 font-mono">
-                {config.sphere?.includes("HR") ? "HR ОЭЗ" : "ОЭЗ"}
+                ОЭЗ
               </span>
             </div>
 
-            <div className="space-y-1.5 pt-1 text-xs">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
+                <span className="text-[10px] text-slate-400 block font-mono">МИН. СТАВКА:</span>
+                <span className="font-bold text-white text-sm">{config.batna.minPricePerSqm} ₽/м²</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
+                <span className="text-[10px] text-slate-400 block font-mono">МАКС. КАНИКУЛЫ:</span>
+                <span className="font-bold text-white text-sm">{config.batna.maxGracePeriodMonths} мес.</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 pt-2 border-t border-white/[0.06] text-xs">
               {config.batna.redLines.map((line, idx) => (
                 <div key={idx} className="flex items-start gap-2 text-slate-300 text-[11px]">
                   <span className="text-rose-400 font-bold shrink-0">✕</span>
@@ -716,6 +717,56 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Повестка встречи */}
+          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-2.5 shadow-inner">
+            <div className="text-xs font-bold text-white font-mono uppercase tracking-wider">
+              Повестка встречи:
+            </div>
+            <div className="space-y-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+                <span className="text-slate-200">Ставка: {config.batna.minPricePerSqm} ₽/м²</span>
+                <span className={agenda.rate.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                  {agenda.rate.status === "agreed" ? "✓ Согласовано" : "В процессе"}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+                <span className="text-slate-200">Каникулы: {config.batna.maxGracePeriodMonths} мес.</span>
+                <span className={agenda.grace_period.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                  {agenda.grace_period.status === "agreed" ? "✓ Согласовано" : "В процессе"}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+                <span className="text-slate-200">Сети под инвестиции</span>
+                <span className={agenda.power_capex.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                  {agenda.power_capex.status === "agreed" ? "✓ Согласовано" : "В процессе"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. ТАКТИЧЕСКИЙ СОВЕТ Б.А.Р.С. (ЕДИНСТВЕННОЕ МЕСТО ОТОБРАЖЕНИЯ СОВЕТА!) */}
+          {barsFeedback && (
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/50 via-purple-950/40 to-slate-900/80 border border-cyan-500/40 space-y-2.5 shadow-[0_4px_25px_rgba(0,240,255,0.12)]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5 font-mono uppercase tracking-wide">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  Тактический совет Б.А.Р.С.
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-400/30">
+                  LIVE
+                </span>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="shrink-0">
+                  <BarsAvatar animation={barsAnimation} size="sm" interactive />
+                </div>
+                <p className="text-xs text-slate-100 leading-relaxed font-sans flex-1">
+                  {barsFeedback}
+                </p>
+              </div>
+            </div>
+          )}
         </aside>
       </main>
 
@@ -743,8 +794,8 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               </button>
             </div>
 
-            {/* Mobile Tab Selectors */}
-            <div className="flex rounded-full bg-white/5 p-1 border border-white/10">
+            {/* M3 Tabs: Metrics / ZOPA / BATNA / Agenda */}
+            <div className="grid grid-cols-4 gap-1 p-1 rounded-full bg-[#1d1b20]">
               <button
                 onClick={() => setTelemetryTab("metrics")}
                 className={`flex-1 py-1.5 rounded-full text-xs font-medium transition-all ${
@@ -752,6 +803,16 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
                 }`}
               >
                 Индикаторы
+              </button>
+              <button
+                onClick={() => setTelemetryTab("zopa")}
+                className={`py-2 rounded-full text-xs font-semibold transition-all ${
+                  telemetryTab === "zopa"
+                    ? "bg-[#4f378b] text-[#eaddff] shadow-sm"
+                    : "text-[#cac4d0] hover:text-white"
+                }`}
+              >
+                ZOPA
               </button>
               <button
                 onClick={() => setTelemetryTab("batna")}
@@ -824,25 +885,24 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               </div>
             )}
 
+            {telemetryTab === "zopa" && (
+              <div className="pt-1">
+                <ZopaMapCard zopa={zopa} minPriceBatna={config.batna.minPricePerSqm} />
+              </div>
+            )}
+
             {telemetryTab === "batna" && (
               <div className="space-y-3 py-2 text-xs">
-                {config.batna.minPricePerSqm > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
-                      <span className="text-[10px] text-slate-400 block font-mono">МИН. СТАВКА:</span>
-                      <span className="font-bold text-white text-sm">{config.batna.minPricePerSqm} ₽/м²</span>
-                    </div>
-                    <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
-                      <span className="text-[10px] text-slate-400 block font-mono">МАКС. КАНИКУЛЫ:</span>
-                      <span className="font-bold text-white text-sm">{config.batna.maxGracePeriodMonths} мес.</span>
-                    </div>
-                  </div>
-                ) : (
+                <div className="grid grid-cols-2 gap-2">
                   <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
-                    <span className="text-[10px] text-slate-400 block font-mono uppercase">Ключевой регламент BATNA:</span>
-                    <span className="font-bold text-white text-xs">{config.batna.redLines[0] || "Соблюдение регламентов ОЭЗ"}</span>
+                    <span className="text-[10px] text-slate-400 block font-mono">МИН. СТАВКА:</span>
+                    <span className="font-bold text-white text-sm">{config.batna.minPricePerSqm} ₽/м²</span>
                   </div>
-                )}
+                  <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                    <span className="text-[10px] text-slate-400 block font-mono">МАКС. КАНИКУЛЫ:</span>
+                    <span className="font-bold text-white text-sm">{config.batna.maxGracePeriodMonths} мес.</span>
+                  </div>
+                </div>
                 <div className="space-y-1.5 pt-2">
                   {config.batna.redLines.map((line, idx) => (
                     <div key={idx} className="flex items-start gap-2 text-slate-300 text-[11px]">
@@ -856,32 +916,24 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
 
             {telemetryTab === "agenda" && (
               <div className="space-y-2 py-2 text-xs">
-                {currentAgendaList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between gap-2"
-                  >
-                    <div className="min-w-0 flex flex-col">
-                      <span className="text-slate-200 font-medium truncate">{item.title}</span>
-                      <span className="text-[10px] text-slate-400 font-mono truncate">{item.detail || item.target}</span>
-                    </div>
-                    <span
-                      className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                        item.status === "agreed"
-                          ? "text-emerald-300 bg-emerald-500/15 border-emerald-500/30"
-                          : item.status === "in_progress"
-                          ? "text-amber-300 bg-amber-500/15 border-amber-500/30"
-                          : "text-rose-300 bg-rose-500/15 border-rose-500/30"
-                      }`}
-                    >
-                      {item.status === "agreed"
-                        ? "✓ Согласовано"
-                        : item.status === "in_progress"
-                        ? "В процессе"
-                        : "Разногласие"}
-                    </span>
-                  </div>
-                ))}
+                <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-200">Ставка: {config.batna.minPricePerSqm} ₽/м²</span>
+                  <span className={agenda.rate.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                    {agenda.rate.status === "agreed" ? "✓ Согласовано" : "В процессе"}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-200">Каникулы: {config.batna.maxGracePeriodMonths} мес.</span>
+                  <span className={agenda.grace_period.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                    {agenda.grace_period.status === "agreed" ? "✓ Согласовано" : "В процессе"}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                  <span className="text-slate-200">Сети под инвестиции</span>
+                  <span className={agenda.power_capex.status === "agreed" ? "text-cyan-300 font-bold" : "text-amber-400"}>
+                    {agenda.power_capex.status === "agreed" ? "✓ Согласовано" : "В процессе"}
+                  </span>
+                </div>
               </div>
             )}
           </div>

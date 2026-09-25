@@ -29,4 +29,6 @@ dependencyResolutionManagement {
 }
 
 include(":app")
+include(":desktop")
+
 

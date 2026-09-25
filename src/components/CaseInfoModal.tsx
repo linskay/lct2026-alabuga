@@ -88,18 +88,16 @@ export const CaseInfoModal: React.FC<CaseInfoModalProps> = ({ config, isOpen, on
             <div className="text-xs font-bold uppercase tracking-wider text-rose-400 mb-2 flex items-center gap-1.5">
               <ShieldAlert className="w-4 h-4 text-rose-500" /> Защита BATNA ОЭЗ
             </div>
-            {config.batna.minPricePerSqm > 0 ? (
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono mb-3">
-                <div className="bg-black/50 p-2.5 rounded-lg border border-rose-950">
-                  <span className="text-slate-400 text-[10px] block">МИН. АРЕНДНАЯ СТАВКА:</span>
-                  <span className="text-white font-bold text-sm">{config.batna.minPricePerSqm} ₽/м²</span>
-                </div>
-                <div className="bg-black/50 p-2.5 rounded-lg border border-rose-950">
-                  <span className="text-slate-400 text-[10px] block">МАКС. КАНИКУЛЫ:</span>
-                  <span className="text-white font-bold text-sm">{config.batna.maxGracePeriodMonths} месяца</span>
-                </div>
+            <div className="grid grid-cols-2 gap-3 text-xs font-mono mb-3">
+              <div className="bg-black/50 p-2.5 rounded-lg border border-rose-950">
+                <span className="text-slate-400 text-[10px] block">МИН. АРЕНДНАЯ СТАВКА:</span>
+                <span className="text-white font-bold text-sm">{config.batna.minPricePerSqm} ₽/м²</span>
               </div>
-            ) : null}
+              <div className="bg-black/50 p-2.5 rounded-lg border border-rose-950">
+                <span className="text-slate-400 text-[10px] block">МАКС. КАНИКУЛЫ:</span>
+                <span className="text-white font-bold text-sm">{config.batna.maxGracePeriodMonths} месяца</span>
+              </div>
+            </div>
             <div className="space-y-1">
               <span className="text-[11px] text-slate-400 block mb-1">Красные линии:</span>
               {config.batna.redLines.map((line, idx) => (
