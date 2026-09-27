@@ -376,19 +376,19 @@ fun ArenaScreen(
                 ) {
                     // Плашка Б.А.Р.С. и атмосферы
                     Surface(
-                        modifier = Modifier.fillMaxWidth().height(210.dp),
+                        modifier = Modifier.fillMaxWidth().height(230.dp),
                         shape = RoundedCornerShape(20.dp),
                         color = Color(0xFF090A10),
                         border = androidx.compose.foundation.BorderStroke(1.5.dp, atmosphereColor.copy(alpha = 0.8f))
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxSize().padding(10.dp),
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
                             BarsRobotCanvasView(
                                 animationState = barsAnimation,
-                                modifier = Modifier.fillMaxWidth().height(140.dp)
+                                modifier = Modifier.fillMaxWidth().height(165.dp)
                             )
 
                             Spacer(modifier = Modifier.height(4.dp))

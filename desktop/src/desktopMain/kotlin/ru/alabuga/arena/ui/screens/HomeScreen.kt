@@ -10,8 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,16 +29,37 @@ fun HomeScreen(
     onOpenAdmin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var robotAnimation by remember { mutableStateOf("idle") }
+    var speechText by remember { mutableStateOf<String?>(null) }
+    var speechIndex by remember { mutableStateOf(0) }
+
+    val speeches = remember {
+        listOf(
+            "Приветствую в ОЭЗ «Алабуга»! Готовы проверить стойкость перед жесткими закупщиками?",
+            "Помни золотое правило: защищай ставку 460 ₽/м² и выявляй скрытые дедлайны оппонента!",
+            "Не поддавайся на блеф с Калугой: у них дефицит высоковольтных мощностей 110 кВ.",
+            "Жми «Войти в переговорную» — разберем встречные аргументы в реальном времени!",
+            "Наставник Б.А.Р.С. на связи! Твой главный щит на арене — хладнокровие и BATNA."
+        )
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.7f,
+        initialValue = 0.35f,
+        targetValue = 0.75f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
+            animation = tween(2200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "glowAlpha"
     )
+
+    val handleRobotClick = {
+        val nextIndex = speechIndex + 1
+        speechIndex = nextIndex
+        speechText = speeches[nextIndex % speeches.size]
+        robotAnimation = if (nextIndex % 2 == 1) "talk" else "win"
+    }
 
     Box(
         modifier = modifier
@@ -151,14 +171,47 @@ fun HomeScreen(
                         )
                 )
 
-                // Виртуальный 2D Canvas робот Б.А.Р.С.
+                // Виртуальный 3D-кибернетический робот Б.А.Р.С.
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
+                    // Речевой баллон тактического совета при клике
+                    if (speechText != null) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color(0xFF090A12).copy(alpha = 0.95f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F0FF).copy(alpha = 0.7f)),
+                            shadowElevation = 12.dp,
+                            modifier = Modifier.padding(bottom = 8.dp).widthIn(max = 380.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "СОВЕТ НАСТАВНИКА Б.А.Р.С.",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF00F0FF),
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "«${speechText}»",
+                                    fontSize = 12.sp,
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+
                     BarsRobotCanvasView(
-                        animationState = "idle",
-                        modifier = Modifier.size(240.dp)
+                        animationState = robotAnimation,
+                        modifier = Modifier.size(240.dp),
+                        onClick = handleRobotClick
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -169,7 +222,7 @@ fun HomeScreen(
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.5f))
                     ) {
                         Text(
-                            text = "БОРТОВОЙ НАСТАВНИК «Б.А.Р.С.» ONLINE",
+                            text = "3D БОРТОВОЙ НАСТАВНИК «Б.А.Р.С.» ONLINE",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFFE2E8F0),

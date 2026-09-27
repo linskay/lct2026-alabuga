@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -84,15 +85,15 @@ fun AdminScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
+                LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    ScenarioPresets.list.forEach { preset ->
+                    items(ScenarioPresets.list) { preset ->
                         val isSelected = preset.id == config.id
                         Surface(
                             modifier = Modifier
-                                .weight(1f)
+                                .width(240.dp)
                                 .clickable {
                                     config = preset
                                     toughness = preset.toughnessLevel.toFloat()
