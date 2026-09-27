@@ -109,6 +109,21 @@ data class ZopaState(
     val changeReason: String = "Оппонент удерживает заниженную планку (300 ₽/м²), коридор сделки пока закрыт."
 )
 
+enum class AchievementTier {
+    LEGENDARY, EPIC, RARE
+}
+
+@Serializable
+data class Achievement(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val description: String,
+    val isUnlocked: Boolean,
+    val tier: AchievementTier = AchievementTier.RARE,
+    val conditionText: String
+)
+
 data class DebriefingReport(
     val finalOutcome: String = "WON", // WON, FAILED, IN_PROGRESS
     val totalSteps: Int = 0,
@@ -119,5 +134,7 @@ data class DebriefingReport(
     val barsExecutiveSummary: String = "Переговоры завершены успешно. BATNA ОЭЗ защищена, ставка удержана выше минимального порога.",
     val manipulationsHandledCount: Int = 2,
     val hiddenNeedsDiscovered: Boolean = true,
-    val mutualTradeOffsEnforced: Boolean = true
+    val mutualTradeOffsEnforced: Boolean = true,
+    val achievements: List<Achievement> = emptyList()
 )
+

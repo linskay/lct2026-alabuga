@@ -62,6 +62,22 @@ data class ScenarioConfig(
     val batna: BatnaRules = BatnaRules()
 )
 
+enum class AchievementTier {
+    LEGENDARY, EPIC, RARE
+}
+
+@Serializable
+data class Achievement(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val description: String,
+    val isUnlocked: Boolean,
+    val tier: AchievementTier = AchievementTier.RARE,
+    val conditionText: String
+)
+
+
 @Serializable
 data class OpponentReplyDto(
     @SerialName("opponent_reply") val opponentReply: String,
