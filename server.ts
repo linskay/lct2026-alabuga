@@ -1333,9 +1333,15 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: "spa",
     });
+    // Explicitly serve static assets from public/ (GLB models, images, achievements)
+    app.use(express.static(path.resolve(process.cwd(), "public")));
     app.use(vite.middlewares);
 
     app.get("*", async (req, res, next) => {
+      // Do not serve index.html for static file requests (.glb, .svg, .jpg, .png, etc.)
+      if (req.path.match(/\.(glb|gltf|bin|jpg|jpeg|png|svg|webp|ico|json|css|js|map)$/i)) {
+        return res.status(404).send("Not found");
+      }
       try {
         const url = req.originalUrl;
         const indexPath = path.resolve(process.cwd(), "index.html");
