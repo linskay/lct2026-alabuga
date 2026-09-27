@@ -1,19 +1,97 @@
 name: Build & Publish Release (APK + EXE)
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Запускается при каждом пуше в main.
+# 1. tag-release   — вычисляет следующий патч-тег (v0.1.X → v0.1.X+1),
+#                    пушит его в репо, удаляет старые релизы (оставляет 5).
+# 2. build-android / build-desktop-windows — собирают артефакты.
+# 3. publish-release — создаёт GitHub Release с файлами.
+# ──────────────────────────────────────────────────────────────────────────────
 on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write   # нужно для создания тегов и управления релизами
 
 jobs:
+  # ──────────────────────────────────────────────────────────────────
+  # JOB 1: авто-тег + очистка старых релизов
+  # ──────────────────────────────────────────────────────────────────
+  tag-release:
+    name: 🏷️ Auto-tag & Cleanup
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.bump.outputs.new_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # нужна полная история для чтения тегов
+
+      - name: Bump patch version and push tag
+        id: bump
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Берём последний семантический тег вида v<major>.<minor>.<patch>
+          LAST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+
+          if [ -z "$LAST_TAG" ]; then
+            # Тегов нет — стартуем с v0.1.0
+            NEW_TAG="v0.1.0"
+          else
+            # Парсим компоненты
+            MAJOR=$(echo "$LAST_TAG" | cut -d. -f1 | tr -d 'v')
+            MINOR=$(echo "$LAST_TAG" | cut -d. -f2)
+            PATCH=$(echo "$LAST_TAG" | cut -d. -f3)
+            NEW_PATCH=$((PATCH + 1))
+            NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+          fi
+
+          echo "Last tag : ${LAST_TAG:-<none>}"
+          echo "New tag  : ${NEW_TAG}"
+          echo "new_tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+
+          # Создаём аннотированный тег и пушим
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEW_TAG" -m "Auto-release ${NEW_TAG}"
+          git push origin "$NEW_TAG"
+
+      - name: Delete old releases (keep latest 5)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Получаем список всех релизов, отсортированных по дате создания (новые сначала)
+          RELEASES=$(gh release list --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[].tagName')
+
+          echo "All releases:"
+          echo "$RELEASES"
+
+          # Пропускаем первые 5, остальные удаляем
+          COUNT=0
+          KEEP=5
+          while IFS= read -r TAG; do
+            COUNT=$((COUNT + 1))
+            if [ "$COUNT" -gt "$KEEP" ]; then
+              echo "🗑️  Deleting release + tag: ${TAG}"
+              gh release delete "$TAG" --yes --cleanup-tag || true
+            else
+              echo "✅ Keeping release: ${TAG}"
+            fi
+          done <<< "$RELEASES"
+
+  # ──────────────────────────────────────────────────────────────────
+  # JOB 2: сборка Android APK
+  # ──────────────────────────────────────────────────────────────────
   build-android:
-    name: Build Android APK
+    name: 🤖 Build Android APK
+    needs: tag-release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -33,7 +111,8 @@ jobs:
 
       - name: Build Android APK
         run: |
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace || ./gradlew :app:assembleRelease --no-daemon --stacktrace
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace \
+            || ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -42,8 +121,12 @@ jobs:
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
 
+  # ──────────────────────────────────────────────────────────────────
+  # JOB 3: сборка Windows Desktop
+  # ──────────────────────────────────────────────────────────────────
   build-desktop-windows:
-    name: Build Windows Desktop EXE
+    name: 🪟 Build Windows Desktop EXE
+    needs: tag-release
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -74,9 +157,12 @@ jobs:
           name: arena-windows-desktop
           path: bin-dist/*
 
+  # ──────────────────────────────────────────────────────────────────
+  # JOB 4: публикация релиза на GitHub
+  # ──────────────────────────────────────────────────────────────────
   publish-release:
-    name: Publish GitHub Release
-    needs: [build-android, build-desktop-windows]
+    name: 🚀 Publish GitHub Release
+    needs: [tag-release, build-android, build-desktop-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -96,25 +182,11 @@ jobs:
           name: arena-windows-desktop
           path: release-binaries/
 
-      - name: Set Release Tag
-        id: vars
-        run: |
-          if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "release_name=Релиз ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            DATE_STR=$(date +'%Y.%m.%d-%H%M')
-            TAG_NAME="release-main-${DATE_STR}"
-            echo "tag=${TAG_NAME}" >> $GITHUB_OUTPUT
-            echo "release_name=Сборка main (${DATE_STR}) [${SHORT_SHA}]" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create / Update GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.vars.outputs.tag }}
-          name: "Арена Переговоров ОЭЗ «Алабуга» — ${{ steps.vars.outputs.release_name }}"
+          tag_name: ${{ needs.tag-release.outputs.new_tag }}
+          name: "Арена Переговоров ОЭЗ «Алабуга» — ${{ needs.tag-release.outputs.new_tag }}"
           draft: false
           prerelease: false
           generate_release_notes: true
