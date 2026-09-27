@@ -1,0 +1,6 @@
+{
+  "name": "Арена переговоров | ОЭЗ Алабуга (KMP)",
+  "description": "Кроссплатформенный симулятор переговоров ОЭЗ «Алабуга» на Kotlin Multiplatform (Compose MP, Android/iOS/Wasm) с ИИ-оппонентом, роботом-наставником Б.А.Р.С. и машиной времени",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

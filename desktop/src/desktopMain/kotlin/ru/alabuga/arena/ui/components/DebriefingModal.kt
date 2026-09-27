@@ -230,6 +230,151 @@ fun DebriefingModal(
                     }
                 }
 
+                // Секция достижений (Ачивки ОЭЗ «Алабуга»)
+                if (report.achievements.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFF10121A),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2B3046))
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.EmojiEvents,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFBBF24),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            "ДОСТИЖЕНИЯ РАУНДА (ОЭЗ «АЛАБУГА»)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            "Геймификация тактических побед и удержания BATNA",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFF7B2CBF).copy(alpha = 0.2f),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        text = "${report.achievements.count { it.isUnlocked }} / ${report.achievements.size} открыто",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFD8B4FE),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                report.achievements.forEach { ach ->
+                                    val tierColor = when (ach.tier) {
+                                        ru.alabuga.arena.model.AchievementTier.LEGENDARY -> Color(0xFFF59E0B)
+                                        ru.alabuga.arena.model.AchievementTier.EPIC -> Color(0xFFA855F7)
+                                        ru.alabuga.arena.model.AchievementTier.RARE -> Color(0xFF06B6D4)
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (ach.isUnlocked) tierColor.copy(alpha = 0.12f) else Color(0xFF0B0C10),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (ach.isUnlocked) tierColor.copy(alpha = 0.5f) else Color(0xFF1E2235)
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (ach.isUnlocked) tierColor.copy(alpha = 0.2f) else Color(0xFF1A1D2E))
+                                                    .border(1.dp, if (ach.isUnlocked) tierColor else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (ach.isUnlocked) Icons.Default.CheckCircle else Icons.Default.Shield,
+                                                    contentDescription = null,
+                                                    tint = if (ach.isUnlocked) tierColor else Color.Gray,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Text(
+                                                        ach.title,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (ach.isUnlocked) Color.White else Color(0xFF94A3B8)
+                                                    )
+                                                    Surface(
+                                                        shape = RoundedCornerShape(4.dp),
+                                                        color = tierColor.copy(alpha = 0.2f)
+                                                    ) {
+                                                        Text(
+                                                            ach.tier.name,
+                                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = tierColor,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    ach.subtitle,
+                                                    fontSize = 10.sp,
+                                                    color = Color(0xFF94A3B8)
+                                                )
+                                                Text(
+                                                    ach.description,
+                                                    fontSize = 10.sp,
+                                                    color = Color(0xFFCBD5E1),
+                                                    lineHeight = 13.sp
+                                                )
+                                                Text(
+                                                    if (ach.isUnlocked) "✓ Разблокировано" else "Цель: ${ach.conditionText}",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (ach.isUnlocked) Color(0xFF34D399) else Color(0xFF64748B),
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+
                 // Кнопки действий
                 Row(
                     modifier = Modifier.fillMaxWidth(),

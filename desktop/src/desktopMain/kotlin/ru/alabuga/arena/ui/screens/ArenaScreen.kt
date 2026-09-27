@@ -490,18 +490,71 @@ fun ArenaScreen(
 
             // Модалка Дебрифинга
             if (showDebriefing) {
+                val isRateAgreed = config.agendaTopics.any { it.id == "rate" && it.status == "agreed" } || zopaState.currentOffer >= 460
+                val isPowerCapexAgreed = config.agendaTopics.any { it.id == "power_capex" && it.status == "agreed" } || metrics.dealReadiness >= 70
+                val rating = if (metrics.dealReadiness >= 75) "S" else if (metrics.dealReadiness >= 50) "A" else "B"
+
+                val achievementsList = listOf(
+                    ru.alabuga.arena.model.Achievement(
+                        id = "batna_shield",
+                        title = "Железная BATNA",
+                        subtitle = "Несокрушимая защита ОЭЗ",
+                        description = "Удержал базовую ставку не ниже 460 ₽/м² и лимит каникул, не сдав красные линии ОЭЗ «Алабуга».",
+                        isUnlocked = isRateAgreed,
+                        tier = ru.alabuga.arena.model.AchievementTier.EPIC,
+                        conditionText = "Зафиксировать ставку от 460 ₽/м² (BATNA)"
+                    ),
+                    ru.alabuga.arena.model.Achievement(
+                        id = "bluff_buster",
+                        title = "Детектор лжи",
+                        subtitle = "Калужский блеф-бастер",
+                        description = "Хладнокровно парировал блеф оппонента о конкурентах, используя факты о дефиците мощностей 110 кВ.",
+                        isUnlocked = currentStep >= 2,
+                        tier = ru.alabuga.arena.model.AchievementTier.RARE,
+                        conditionText = "Отразить минимум 1 манипуляцию или блеф"
+                    ),
+                    ru.alabuga.arena.model.Achievement(
+                        id = "hidden_pain",
+                        title = "Рентген потребностей",
+                        subtitle = "Истинная цель раскрыта",
+                        description = "Вскрыл скрытую боль инвестора: критическую зависимость от сроков ввода оборудования к 3-му кварталу.",
+                        isUnlocked = metrics.trust >= 60,
+                        tier = ru.alabuga.arena.model.AchievementTier.RARE,
+                        conditionText = "Выявить скрытую боль и истинный дедлайн"
+                    ),
+                    ru.alabuga.arena.model.Achievement(
+                        id = "power_capex",
+                        title = "Энергетический барон",
+                        subtitle = "8 МВт под 1.2 млрд ₽",
+                        description = "Не уступил бесплатные энергомощности, а разменял подключение 8 МВт на встречные инвестиции 1.2 млрд ₽.",
+                        isUnlocked = isPowerCapexAgreed,
+                        tier = ru.alabuga.arena.model.AchievementTier.EPIC,
+                        conditionText = "Связать 8 МВт с обязательством CAPEX 1.2 млрд ₽"
+                    ),
+                    ru.alabuga.arena.model.Achievement(
+                        id = "grandmaster_s",
+                        title = "Гроссмейстер Алабуги",
+                        subtitle = "Безупречный ранг S",
+                        description = "Провел глубокие жесткие переговоры (6+ раундов), раскрыл боли, парировал атаки и закрыл идеальную сделку.",
+                        isUnlocked = rating == "S" && currentStep >= 4,
+                        tier = ru.alabuga.arena.model.AchievementTier.LEGENDARY,
+                        conditionText = "Получить высший ранг S (6+ раундов без спешки)"
+                    )
+                )
+
                 DebriefingModal(
                     report = DebriefingReport(
                         finalOutcome = if (metrics.dealReadiness >= 65) "WON" else "IN_PROGRESS",
                         totalSteps = currentStep,
                         timeTravelUsedCount = 0,
-                        batnaScore = 88,
+                        batnaScore = if (isRateAgreed) 92 else 75,
                         stressManagementScore = (100 - metrics.tension).coerceIn(0, 100),
-                        overallRating = if (metrics.dealReadiness >= 75) "S" else if (metrics.dealReadiness >= 50) "A" else "B",
+                        overallRating = rating,
                         barsExecutiveSummary = "Вы успешно применили встречную аргументацию, удержали красную линию BATNA и открыли переговорный коридор ZOPA.",
                         manipulationsHandledCount = 2,
                         hiddenNeedsDiscovered = true,
-                        mutualTradeOffsEnforced = true
+                        mutualTradeOffsEnforced = true,
+                        achievements = achievementsList
                     ),
                     scenario = config,
                     onRestart = {

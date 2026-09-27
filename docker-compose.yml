@@ -1,0 +1,55 @@
+
+# =============================================================================
+# Docker Compose: Арена переговоров ОЭЗ «Алабуга»
+# =============================================================================
+# Быстрый запуск сервиса:
+#   docker compose up -d --build
+#
+# Запуск вместе с локальной нейросетью (Ollama) в закрытом контуре:
+#   docker compose --profile local-llm up -d --build
+# =============================================================================
+
+services:
+  # Основное веб-приложение симулятора переговоров
+  arena-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alabuga-negotiation-arena
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      # Если запущен сервис local-llm, контейнер свяжется с ним по имени сервиса
+      - LOCAL_LLM_URL=http://local-llm:11434/v1
+    networks:
+      - arena-network
+
+  # Опциональный контейнер локальной модели (для работы без интернета)
+  # Активируется флагом: --profile local-llm
+  local-llm:
+    image: ollama/ollama:latest
+    container_name: alabuga-local-llm
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - arena-network
+    profiles:
+      - local-llm
+      - all
+
+networks:
+  arena-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+    driver: local

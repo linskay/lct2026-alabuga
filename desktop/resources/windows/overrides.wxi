@@ -1,0 +1,6 @@
+<Include>
+  <?ifdef JpProductLanguage ?>
+    <?undef JpProductLanguage ?>
+  <?endif ?>
+  <?define JpProductLanguage=1049 ?>
+</Include>
