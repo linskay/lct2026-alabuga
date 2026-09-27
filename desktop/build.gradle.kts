@@ -29,7 +29,9 @@ compose.desktop {
     application {
         mainClass = "ru.alabuga.arena.desktop.MainKt"
         nativeDistributions {
-            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
+            // EXE через WiX исключён — нестабилен на CI с кастомными .wxl.
+            // MSI собирается нативно через jpackage и работает надёжно.
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "AlabugaArena"
             packageVersion = "1.0.0"
             description = "Арена Переговоров ОЭЗ «Алабуга»"

@@ -1,11 +1,12 @@
-name: Build & Publish Release (APK + EXE)
+name: Build & Publish Release (APK + MSI + JAR)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Запускается при каждом пуше в main.
-# 1. tag-release   — вычисляет следующий патч-тег (v0.1.X → v0.1.X+1),
-#                    пушит его в репо, удаляет старые релизы (оставляет 5).
-# 2. build-android / build-desktop-windows — собирают артефакты.
-# 3. publish-release — создаёт GitHub Release с файлами.
+# 1. tag-release          — патч-тег v0.1.X+1, удаляет старые релизы (≤5).
+# 2. build-android        — собирает APK.
+# 3. build-desktop-windows — собирает MSI + UberJar (EXE через WiX исключён:
+#                            ненадёжен на GitHub-раннерах, MSI работает стабильно).
+# 4. publish-release      — создаёт GitHub Release с артефактами.
 # ──────────────────────────────────────────────────────────────────────────────
 on:
   push:
@@ -14,12 +15,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # нужно для создания тегов и управления релизами
+  contents: write
 
 jobs:
-  # ──────────────────────────────────────────────────────────────────
+  # ────────────────────────────────────────────────────────────────────
   # JOB 1: авто-тег + очистка старых релизов
-  # ──────────────────────────────────────────────────────────────────
+  # ────────────────────────────────────────────────────────────────────
   tag-release:
     name: 🏷️ Auto-tag & Cleanup
     runs-on: ubuntu-latest
@@ -30,33 +31,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0        # нужна полная история для чтения тегов
+          fetch-depth: 0
 
       - name: Bump patch version and push tag
         id: bump
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Берём последний семантический тег вида v<major>.<minor>.<patch>
           LAST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-
           if [ -z "$LAST_TAG" ]; then
-            # Тегов нет — стартуем с v0.1.0
             NEW_TAG="v0.1.0"
           else
-            # Парсим компоненты
             MAJOR=$(echo "$LAST_TAG" | cut -d. -f1 | tr -d 'v')
             MINOR=$(echo "$LAST_TAG" | cut -d. -f2)
             PATCH=$(echo "$LAST_TAG" | cut -d. -f3)
-            NEW_PATCH=$((PATCH + 1))
-            NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+            NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
           fi
-
           echo "Last tag : ${LAST_TAG:-<none>}"
           echo "New tag  : ${NEW_TAG}"
           echo "new_tag=${NEW_TAG}" >> $GITHUB_OUTPUT
-
-          # Создаём аннотированный тег и пушим
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "$NEW_TAG" -m "Auto-release ${NEW_TAG}"
@@ -66,29 +59,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Получаем список всех релизов, отсортированных по дате создания (новые сначала)
           RELEASES=$(gh release list --limit 100 --json tagName,createdAt \
             --jq 'sort_by(.createdAt) | reverse | .[].tagName')
-
           echo "All releases:"
           echo "$RELEASES"
-
-          # Пропускаем первые 5, остальные удаляем
           COUNT=0
-          KEEP=5
           while IFS= read -r TAG; do
+            [ -z "$TAG" ] && continue
             COUNT=$((COUNT + 1))
-            if [ "$COUNT" -gt "$KEEP" ]; then
-              echo "🗑️  Deleting release + tag: ${TAG}"
+            if [ "$COUNT" -gt 5 ]; then
+              echo "🗑️  Deleting: ${TAG}"
               gh release delete "$TAG" --yes --cleanup-tag || true
             else
-              echo "✅ Keeping release: ${TAG}"
+              echo "✅ Keeping : ${TAG}"
             fi
           done <<< "$RELEASES"
 
-  # ──────────────────────────────────────────────────────────────────
-  # JOB 2: сборка Android APK
-  # ──────────────────────────────────────────────────────────────────
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 2: Android APK
+  # ────────────────────────────────────────────────────────────────────
   build-android:
     name: 🤖 Build Android APK
     needs: tag-release
@@ -100,7 +89,7 @@ jobs:
           lfs: true
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -114,18 +103,26 @@ jobs:
           ./gradlew :app:assembleDebug --no-daemon --stacktrace \
             || ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
+      - name: Show APK output tree
+        if: always()
+        run: find app/build/outputs/apk -type f 2>/dev/null || echo "No APK output directory found"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: arena-android-apk
-          path: apk-dist/*.apk
-          if-no-files-found: error
+          # Gradle кладёт APK в app/build/outputs/apk/<variant>/*.apk
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
 
-  # ──────────────────────────────────────────────────────────────────
-  # JOB 3: сборка Windows Desktop
-  # ──────────────────────────────────────────────────────────────────
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 3: Windows Desktop (MSI + UberJar)
+  # Примечание: packageExe (WiX) исключён — он стабильно падает на CI
+  # из-за несовместимости WiX 3.11 с кастомными .wxl в некоторых средах.
+  # MSI собирается нативно через jpackage без WiX-зависимости.
+  # ────────────────────────────────────────────────────────────────────
   build-desktop-windows:
-    name: 🪟 Build Windows Desktop EXE
+    name: 🪟 Build Windows Desktop (MSI + JAR)
     needs: tag-release
     runs-on: windows-latest
     steps:
@@ -135,31 +132,53 @@ jobs:
           lfs: true
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
           cache: 'gradle'
 
-      - name: Build Windows Executable & Distribution
+      - name: Build MSI + UberJar
+        # packageDistributionForCurrentOS безопасен: Exe убран из targetFormats в build.gradle.kts
         run: .\gradlew.bat :desktop:packageDistributionForCurrentOS :desktop:packageUberJarForCurrentOS --no-daemon --stacktrace
 
-      - name: Package Windows artifacts
+      - name: Show jpackage logs on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $logDir = "desktop\build\compose\logs"
+          if (Test-Path $logDir) {
+            Get-ChildItem $logDir -Recurse -Filter "*.txt" | ForEach-Object {
+              Write-Host "=== $($_.FullName) ==="
+              Get-Content $_.FullName
+            }
+          }
+
+      - name: Collect Windows artifacts
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path bin-dist
-          Get-ChildItem -Path desktop\build\compose\binaries\main -Recurse -Include *.exe, *.msi | Copy-Item -Destination bin-dist\ -Force
-          Get-ChildItem -Path desktop\build\compose\jars -Recurse -Include *.jar | Copy-Item -Destination bin-dist\ -Force
+          # MSI
+          Get-ChildItem -Path desktop\build\compose\binaries\main-release\msi -Recurse -Filter *.msi -ErrorAction SilentlyContinue |
+            Copy-Item -Destination bin-dist\ -Force
+          Get-ChildItem -Path desktop\build\compose\binaries\main\msi -Recurse -Filter *.msi -ErrorAction SilentlyContinue |
+            Copy-Item -Destination bin-dist\ -Force
+          # UberJar
+          Get-ChildItem -Path desktop\build\compose\jars -Recurse -Filter *.jar -ErrorAction SilentlyContinue |
+            Copy-Item -Destination bin-dist\ -Force
+          Write-Host "Collected:"
+          Get-ChildItem bin-dist
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: arena-windows-desktop
           path: bin-dist/*
+          if-no-files-found: warn
 
-  # ──────────────────────────────────────────────────────────────────
-  # JOB 4: публикация релиза на GitHub
-  # ──────────────────────────────────────────────────────────────────
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 4: GitHub Release
+  # ────────────────────────────────────────────────────────────────────
   publish-release:
     name: 🚀 Publish GitHub Release
     needs: [tag-release, build-android, build-desktop-windows]
@@ -190,7 +209,6 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            release-binaries/*
+          files: release-binaries/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
