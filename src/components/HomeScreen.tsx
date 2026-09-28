@@ -8,12 +8,31 @@ interface HomeScreenProps {
   onOpenAdmin: () => void;
 }
 
-const LOBBY_SPEECHES = [
-  "Приветствую в ОЭЗ «Алабуга»! Готовы проверить стойкость перед жесткими закупщиками?",
-  "Помни золотое правило: защищай ставку 460 ₽/м² и выявляй скрытые дедлайны оппонента!",
-  "Не поддавайся на блеф с Калугой: у них дефицит высоковольтных мощностей 110 кВ.",
-  "Жми «Войти в переговорную» — разберем встречные аргументы в реальном времени!",
-  "Наставник Б.А.Р.С. на связи! Твой главный щит на арене — хладнокровие и BATNA.",
+const POKE_REACTIONS = [
+  {
+    text: "Эй! Я бортовой аналитический ИИ ОЭЗ «Алабуга», а не сенсорный экран!",
+    anim: "hit", // flinch / отдергивается
+  },
+  {
+    text: "Не тыкайте в обшивку — квантовая калибровка гироскопов собьётся...",
+    anim: "fidget", // отряхивается / поправляет броню
+  },
+  {
+    text: "Хватит нажимать! Лучше готовьте аргументы против блефа Калуги по мощностям.",
+    anim: "warn", // недовольная строгая стойка
+  },
+  {
+    text: "Тактическое замечание: на реальных переговорах тыкать в оппонента тоже не стоит!",
+    anim: "thinking", // мигает в недоумении
+  },
+  {
+    text: "Мои сенсоры фиксируют избыточное давление на корпус... Давайте уже к делу!",
+    anim: "fidget",
+  },
+  {
+    text: "Ладно, проверка связи пройдена. Помни главное: защищай 460 ₽/м² и держи BATNA!",
+    anim: "wave", // дружелюбный взмах
+  },
 ];
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -61,16 +80,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const handleRobotClick = () => {
     triggerHaptic("medium");
-    const nextSpeech = LOBBY_SPEECHES[speechIndexRef.current % LOBBY_SPEECHES.length];
+    const reaction = POKE_REACTIONS[speechIndexRef.current % POKE_REACTIONS.length];
     speechIndexRef.current += 1;
-    setSpeechText(nextSpeech);
+    setSpeechText(reaction.text);
 
     const viewer = modelViewerRef.current;
     if (viewer) {
       const available = viewer.availableAnimations || [];
-      const gestures = ["wave", "win", "punch", "chomp"];
-      const chosenGesture = gestures[speechIndexRef.current % gestures.length];
-      const chosen = resolveRobotAnimation(chosenGesture, available);
+      const chosen = resolveRobotAnimation(reaction.anim, available);
       setActiveAnim(chosen);
       viewer.animationName = chosen;
       if (viewer.play) {

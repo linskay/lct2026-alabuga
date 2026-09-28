@@ -365,9 +365,9 @@ export default function App() {
       } else if (data.methodology_tag?.category === "ERROR") {
         nextRobotAnim = "warn";
       } else if (data.manipulation_type === "bluff" || emotion === "bluff") {
-        nextRobotAnim = "chomp";
+        nextRobotAnim = "warn";
       } else if (emotion === "attack" || (data.metrics && data.metrics.tension >= 65)) {
-        nextRobotAnim = "punch";
+        nextRobotAnim = "warn";
       } else if (data.methodology_tag?.type === "positive") {
         nextRobotAnim = "wave";
       } else {
