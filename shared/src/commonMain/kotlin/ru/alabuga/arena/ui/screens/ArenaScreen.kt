@@ -9,6 +9,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -27,6 +29,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -34,7 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.alabuga.arena.model.*
-import ru.alabuga.arena.ui.components.BarsRobotView
+import ru.alabuga.arena.ui.components.BarsRobotCanvasView
 import ru.alabuga.arena.ui.components.DebriefingModal
 import ru.alabuga.arena.ui.components.TimeTravelModal
 import ru.alabuga.arena.ui.components.ZopaMapCard
@@ -87,11 +90,12 @@ fun ArenaScreen(
         )
     }
 
-    // Dynamic background color based on tension (0-100: purple -> neon red)
+    // Dynamic background color based on tension (0: deep violet #7B2CBF -> 100: scarlet red #EF4444)
     val atmosphereColor by animateColorAsState(
         targetValue = when {
             metrics.tension >= 70 -> Color(0xFFEF4444)
-            metrics.tension >= 45 -> Color(0xFFC026D3)
+            metrics.tension >= 45 -> Color(0xFFDC2626)
+            metrics.tension >= 25 -> Color(0xFF9333EA)
             else -> Color(0xFF7B2CBF)
         },
         animationSpec = tween(600),
@@ -107,6 +111,13 @@ fun ArenaScreen(
         lastInsertedTemplate.isNotEmpty() && trimmed == lastInsertedTemplate.trim()
     }
     val canSend = trimmed.isNotEmpty() && !hasPlaceholders && !isExactTemplate
+
+    val sendInteractionSource = remember { MutableInteractionSource() }
+    val isSendPressed by sendInteractionSource.collectIsPressedAsState()
+    val sendScale by animateFloatAsState(
+        targetValue = if (isSendPressed) 0.92f else 1f,
+        label = "sendScale"
+    )
 
     Scaffold(
         topBar = {
@@ -143,7 +154,6 @@ fun ArenaScreen(
                     }
                 },
                 actions = {
-                    // Кнопка быстрого скачивания PDF результатов
                     IconButton(onClick = { showDebriefing = true }) {
                         Icon(imageVector = Icons.Default.FileDownload, contentDescription = "Скачать PDF результатов", tint = Color(0xFF00FFCC))
                     }
@@ -165,73 +175,60 @@ fun ArenaScreen(
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            // Центральная рабочая зона с полями padding(horizontal = 40.dp) для собранного кинематографичного UX
+            // Центрированный рабочий контейнер с жестким ограничением ширины max = 1180.dp
             Row(
                 modifier = modifier
-                    .fillMaxSize()
-                    .widthIn(max = 1440.dp)
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
+                    .fillMaxHeight()
+                    .widthIn(max = 1180.dp)
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // ЛЕВАЯ ЧАСТЬ (65%, max 960dp): Оппонент с встроенным стресс-HUD, Чат диалогов, Карусель чипсов, Ввод
+                // ЛЕВАЯ ЧАСТЬ (65%): Окно оппонента с роботом-аватаром и стресс-индикатором + Чат диалогов + Ввод
                 Column(
                     modifier = Modifier
                         .weight(0.65f)
-                        .fillMaxHeight()
-                        .widthIn(max = 960.dp),
+                        .fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // 1. Камера оппонента (Cyber-Glass, скругления 20dp, бордер 1dp альфа 0.08f)
+                    // 1. Окно прямого эфира оппонента (с интерактивным роботом Б.А.Р.С. и стресс-баром)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(0.36f)
+                            .weight(0.38f)
                             .clip(RoundedCornerShape(20.dp))
                             .background(Color(0xFF0F1016).copy(alpha = 0.85f))
                             .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(20.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Радиальный фон с мягким отблеском
+                        // Фон
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
                                     Brush.radialGradient(
                                         listOf(
-                                            atmosphereColor.copy(alpha = 0.12f),
+                                            atmosphereColor.copy(alpha = 0.15f),
                                             Color.Transparent
                                         )
                                     )
                                 )
                         )
 
-                        // Центральный аватар оппонента
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = messages.lastOrNull { it.actor == MessageActor.OPPONENT }?.emotionEmoji ?: "👤",
-                                fontSize = 48.sp
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "${config.opponentName} • ${messages.lastOrNull { it.actor == MessageActor.OPPONENT }?.emotionLabel ?: "Прямой контакт"}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFCBD5E1)
-                            )
-                        }
+                        // 3D/Canvas Робот наставник / визуал оппонента прямо в кейсе
+                        BarsRobotCanvasView(
+                            animationState = if (metrics.tension >= 60) "warn" else if (metrics.dealReadiness >= 65) "win" else "talk",
+                            modifier = Modifier.fillMaxSize()
+                        )
 
-                        // ВСТРОЕННЫЙ СТРЕСС-HUD ОППОНЕНТА (наложен прямо на сцену)
+                        // ИНДИКАТОР СТРЕССА: от фиолетового (0%) до ало-красного (100%)
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF0A0C16).copy(alpha = 0.9f),
-                            border = BorderStroke(1.dp, atmosphereColor.copy(alpha = 0.35f))
+                            color = Color(0xFF0A0C16).copy(alpha = 0.92f),
+                            border = BorderStroke(1.dp, atmosphereColor.copy(alpha = 0.4f))
                         ) {
                             Row(
                                 modifier = Modifier
@@ -241,7 +238,7 @@ fun ArenaScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "НАПРЯЖЕНИЕ ОППОНЕНТА [ ${metrics.tension}% ]",
+                                    text = "НАПРЯЖЕНИЕ [ ${metrics.tension}% ]",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = atmosphereColor,
@@ -249,18 +246,18 @@ fun ArenaScreen(
                                 )
                                 Box(
                                     modifier = Modifier
-                                        .width(140.dp)
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(3.dp))
+                                        .width(150.dp)
+                                        .height(7.dp)
+                                        .clip(RoundedCornerShape(4.dp))
                                         .background(Color(0xFF1E2640))
                                 ) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxHeight()
-                                            .fillMaxWidth(metrics.tension / 100f)
+                                            .fillMaxWidth((metrics.tension / 100f).coerceIn(0.05f, 1f))
                                             .background(
                                                 Brush.horizontalGradient(
-                                                    listOf(Color(0xFF00F0FF), atmosphereColor)
+                                                    listOf(Color(0xFF7B2CBF), Color(0xFFEF4444))
                                                 )
                                             )
                                     )
@@ -269,12 +266,12 @@ fun ArenaScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // 2. Чат диалогов (крупные шрифты bodyLarge 16sp, titleMedium 18sp)
+                    // 2. Чат сообщений (крупные контрастные шрифты 16sp / 24sp)
                     LazyColumn(
                         modifier = Modifier
-                            .weight(0.44f)
+                            .weight(0.42f)
                             .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -293,7 +290,7 @@ fun ArenaScreen(
                                         shape = RoundedCornerShape(20.dp),
                                         color = if (isUser) Color(0xFF1B233D) else Color(0xFF0F1016).copy(alpha = 0.85f),
                                         border = BorderStroke(1.dp, Color.White.copy(alpha = if (isUser) 0.15f else 0.08f)),
-                                        modifier = Modifier.widthIn(max = 600.dp)
+                                        modifier = Modifier.widthIn(max = 620.dp)
                                     ) {
                                         Column(modifier = Modifier.padding(16.dp)) {
                                             Text(
@@ -308,7 +305,7 @@ fun ArenaScreen(
                                                 text = msg.text,
                                                 fontSize = 16.sp,
                                                 color = Color(0xFFF1F5F9),
-                                                lineHeight = 23.sp
+                                                lineHeight = 24.sp
                                             )
                                         }
                                     }
@@ -317,22 +314,22 @@ fun ArenaScreen(
                         }
                     }
 
-                    // 3. Подсказки и поле ввода (прибиты к низу)
+                    // 3. Подсказки и крупное окно ввода (стиль Google AI Studio)
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) {
-                        // Карусель подсказок (Glassmorphism чипсы над инпутом)
+                        // Лаконичные чипсы с подсказками
                         val hints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints ?: emptyList()
                         if (hints.isNotEmpty()) {
                             LazyRow(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 items(hints) { hint ->
                                     Surface(
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = Color(0xFF0F172A).copy(alpha = 0.85f),
-                                        border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.45f)),
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Color(0xFF131728),
+                                        border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.4f)),
                                         modifier = Modifier.clickable {
                                             inputText = hint
                                             lastInsertedTemplate = hint
@@ -341,17 +338,17 @@ fun ArenaScreen(
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Lightbulb,
                                                 contentDescription = null,
                                                 tint = Color(0xFF00FFCC),
-                                                modifier = Modifier.size(14.dp)
+                                                modifier = Modifier.size(13.dp)
                                             )
                                             Text(
                                                 text = hint,
-                                                fontSize = 13.sp,
+                                                fontSize = 12.sp,
                                                 color = Color(0xFFE2E8F0),
                                                 maxLines = 1
                                             )
@@ -364,99 +361,113 @@ fun ArenaScreen(
                         if (hasPlaceholders || isExactTemplate) {
                             Text(
                                 text = "Заполните параметры [в скобках] перед отправкой!",
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 color = Color(0xFFFBBF24),
                                 fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(bottom = 6.dp)
+                                modifier = Modifier.padding(bottom = 4.dp)
                             )
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        // Крупное окно ввода (стиль Google AI Studio, высота и шрифт 16sp)
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = Color(0xFF0F121F),
+                            border = BorderStroke(1.dp, if (canSend) Color(0xFF00F0FF).copy(alpha = 0.6f) else Color(0xFF282F48)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            OutlinedTextField(
-                                value = inputText,
-                                onValueChange = { inputText = it },
-                                placeholder = { Text("Введите встречный аргумент...", fontSize = 14.sp) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(16.dp),
-                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = Color.White),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color(0xFF00F0FF),
-                                    unfocusedBorderColor = Color(0xFF1E2640),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedContainerColor = Color(0xFF0F121F),
-                                    unfocusedContainerColor = Color(0xFF0F121F)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                TextField(
+                                    value = inputText,
+                                    onValueChange = { inputText = it },
+                                    placeholder = { Text("Введите встречный аргумент или выберите тактическую подсказку...", fontSize = 15.sp, color = Color(0xFF64748B)) },
+                                    modifier = Modifier.weight(1f),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = Color.White, lineHeight = 22.sp),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        disabledContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        disabledIndicatorColor = Color.Transparent,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    maxLines = 3
                                 )
-                            )
 
-                            IconButton(
-                                onClick = {
-                                    if (canSend) {
-                                        val userText = trimmed
-                                        inputText = ""
-                                        lastInsertedTemplate = ""
+                                IconButton(
+                                    onClick = {
+                                        if (canSend) {
+                                            val userText = trimmed
+                                            inputText = ""
+                                            lastInsertedTemplate = ""
 
-                                        currentStep++
-                                        val newTrust = (metrics.trust + 5).coerceAtMost(100)
-                                        val newTension = (metrics.tension - 4).coerceAtLeast(10)
-                                        val newReadiness = (metrics.dealReadiness + 8).coerceAtMost(100)
-                                        metrics = NegotiationMetrics(newTrust, newTension, newReadiness)
+                                            currentStep++
+                                            val newTrust = (metrics.trust + 5).coerceAtMost(100)
+                                            val newTension = (metrics.tension - 4).coerceAtLeast(10)
+                                            val newReadiness = (metrics.dealReadiness + 8).coerceAtMost(100)
+                                            metrics = NegotiationMetrics(newTrust, newTension, newReadiness)
 
-                                        messages.add(
-                                            Message(
-                                                id = "user_${currentStep}_${Random.nextInt(100000)}",
-                                                actor = MessageActor.USER,
-                                                text = userText,
-                                                stepIndex = currentStep,
-                                                snapshotMetrics = metrics
-                                            )
-                                        )
-
-                                        latestBarsAdvice = "Отличная контратака! Оппонент вынужден сдвинуть ценовые рамки. Не отдавайте каникулы без встречного CAPEX."
-
-                                        val oppOffer = (zopaState.currentOffer + 30).coerceAtMost(460)
-                                        val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
-                                        zopaState = zopaState.copy(
-                                            buyerMax = oppOffer,
-                                            currentOffer = oppOffer,
-                                            isOverlap = isOverlapNow,
-                                            overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
-                                            overlapMax = if (isOverlapNow) oppOffer else null,
-                                            changeReason = if (isOverlapNow) "Коридор сделки открыт! Стороны сошлись в цене от 460 ₽/м²." else "Оппонент повысил предложение до $oppOffer ₽/м² взамен на встречные условия."
-                                        )
-
-                                        messages.add(
-                                            Message(
-                                                id = "opp_${currentStep}_${Random.nextInt(100000)}",
-                                                actor = MessageActor.OPPONENT,
-                                                text = "Ваши доводы имеют смысл. Если вы подтверждаете мощности в срок, мы готовы скорректировать предложение до $oppOffer ₽/м².",
-                                                stepIndex = currentStep,
-                                                snapshotMetrics = metrics,
-                                                emotionEmoji = "🤝",
-                                                emotionLabel = "Сближение позиций",
-                                                contextHints = listOf(
-                                                    "Мы фиксируем ставку $oppOffer ₽/м² при встречном условии [гарантия]...",
-                                                    "Давайте зафиксируем график поэтапного ввода мощностей..."
+                                            messages.add(
+                                                Message(
+                                                    id = "user_${currentStep}_${Random.nextInt(100000)}",
+                                                    actor = MessageActor.USER,
+                                                    text = userText,
+                                                    stepIndex = currentStep,
+                                                    snapshotMetrics = metrics
                                                 )
                                             )
-                                        )
-                                    }
-                                },
-                                enabled = canSend,
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(if (canSend) Color(0xFF00F0FF) else Color(0xFF1E2640))
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Send,
-                                    contentDescription = "Отправить",
-                                    tint = if (canSend) Color(0xFF07080D) else Color.Gray
-                                )
+
+                                            latestBarsAdvice = "Отличная контратака! Оппонент начинает двигаться по ставке. Удерживай планку и защищай BATNA."
+
+                                            val oppOffer = (zopaState.currentOffer + 30).coerceAtMost(460)
+                                            val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
+                                            zopaState = zopaState.copy(
+                                                buyerMax = oppOffer,
+                                                currentOffer = oppOffer,
+                                                isOverlap = isOverlapNow,
+                                                overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
+                                                overlapMax = if (isOverlapNow) oppOffer else null,
+                                                changeReason = if (isOverlapNow) "Коридор сделки открыт! Стороны сошлись в цене от 460 ₽/м²." else "Оппонент повысил предложение до $oppOffer ₽/м² взамен на встречные условия."
+                                            )
+
+                                            messages.add(
+                                                Message(
+                                                    id = "opp_${currentStep}_${Random.nextInt(100000)}",
+                                                    actor = MessageActor.OPPONENT,
+                                                    text = "Ваши доводы имеют смысл. Если вы подтверждаете мощности в срок, мы готовы скорректировать предложение до $oppOffer ₽/м².",
+                                                    stepIndex = currentStep,
+                                                    snapshotMetrics = metrics,
+                                                    emotionEmoji = "🤝",
+                                                    emotionLabel = "Сближение позиций",
+                                                    contextHints = listOf(
+                                                        "Мы фиксируем ставку $oppOffer ₽/м² при встречном условии [гарантия]...",
+                                                        "Давайте зафиксируем график поэтапного ввода мощностей..."
+                                                    )
+                                                )
+                                            )
+                                        }
+                                    },
+                                    interactionSource = sendInteractionSource,
+                                    enabled = canSend,
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .scale(sendScale)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (canSend) Color(0xFF00F0FF) else Color(0xFF1E2640))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = "Отправить",
+                                        tint = if (canSend) Color(0xFF07080D) else Color.Gray
+                                    )
+                                }
                             }
                         }
                     }
@@ -469,7 +480,7 @@ fun ArenaScreen(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // 1. Карточка «Б.А.Р.С. СОВЕТ» (Glassmorphism темно-фиолетовый с размытием)
+                    // 1. Карточка «Б.А.Р.С. СОВЕТ»
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),

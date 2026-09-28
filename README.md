@@ -1,90 +1,89 @@
-# 🦾 Арена переговоров — Kotlin Multiplatform & Compose
+<div align="center">
 
-[![Команда: No PHP - No problems](https://img.shields.io/badge/Team-No%20PHP%20--%20No%20problems-7b2cbf?style=for-the-badge&logo=target)](https://github.com)
+# 🦾 АРЕНА ПЕРЕГОВОРОВ • ОЭЗ «АЛАБУГА»
+### *Интерактивный AI-тренажер жестких B2B-сделок с 3D-наставником Б.А.Р.С.*
+
+[![Команда](https://img.shields.io/badge/Команда-NO%20PHP%20--%20NO%20PROBLEMS%20--%202026-7B2CBF?style=for-the-badge&logo=kotlin&logoColor=white)](https://github.com/linskay/lct2026-alabuga)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.10-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![Jetpack Compose](https://img.shields.io/badge/Compose-Multiplatform-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
-[![Android APK Target](https://img.shields.io/badge/Android-APK_Build-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/)
-[![Desktop Target](https://img.shields.io/badge/Desktop-MSI%20%7C%20JAR-blue?style=for-the-badge&logo=windows&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
-[![Web Wasm Target](https://img.shields.io/badge/Web-Wasm%20%28Compose%29-654FF0?style=for-the-badge&logo=webassembly&logoColor=white)](https://kotl.in/wasm)
-[![CI/CD](https://img.shields.io/badge/GitHub_Actions-Automated_Release-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com)
+[![Compose Multiplatform](https://img.shields.io/badge/Compose-Multiplatform%201.7.3-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
+[![WebAssembly](https://img.shields.io/badge/WebAssembly-Wasm_GC-654FF0?style=for-the-badge&logo=webassembly&logoColor=white)](https://kotl.in/wasm)
+[![Android](https://img.shields.io/badge/Android-APK%20(Edge--to--Edge)-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/)
+[![Desktop](https://img.shields.io/badge/Desktop-Windows%20MSI%20%7C%20JAR-0078D7?style=for-the-badge&logo=windows&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
 
-Корпоративный интерактивный AI-полигон и симулятор жестких коммерческих переговоров ОЭЗ «Алабуга» на чистом нативном стеке **Kotlin Multiplatform / Compose Multiplatform (Material 3)**.
+<br/>
+
+> **«Учись побеждать в B2B-сделках без уступок. Защищай BATNA, держи красные линии ОЭЗ и заключай стратегические контракты в реальном времени!»**
+
+</div>
 
 ---
 
-## 🏛️ Единая архитектура репозитория (Clean KMP Architecture)
+## ⚡ Ключевые преимущества и ВАУ-эффекты
+
+- 🤖 **Интерактивный 3D-наставник Б.А.Р.С.**:
+  - Высокодетализированная модель с плавными невербальными реакциями на ход переговоров (`wave`, `nod`, `tilt`, `talk`, `idle`).
+  - Мягкая радиальная подложка, кинематографичная эллиптическая тень и отсутствие фокус-рамок на десктопе и мобильных устройствах.
+- 🎯 **Боевой экран «Арена» в пропорции 65% / 35%**:
+  - **Live-окно оппонента**: встроенный стресс-индикатор (HUD) с динамической цветовой шкалой от спокойного фиолетового ($0\%$) до тревожного ало-красного ($100\%$).
+  - **История диалога Cyber-Glass**: контрастная типографика (16–17sp), полупрозрачные бордеры, отсутствие перегруженности.
+  - **Широкая строка ввода**: просторное поле в стиле *Google AI Studio* с поддержкой быстрых динамических чипсов-подсказок.
+  - **Тактический центр**: отдельная плашка советов Б.А.Р.С., телеметрия (Доверие / Стресс / Готовность), интерактивная карта **ZOPA** и повестка **AGENDA**.
+- 📥 **Аналитический PDF-дебрифинг**:
+  - Моментальная выгрузка итогового отчета о поединке, защите BATNA, разборе манипуляций и финальном ранге ($S/A/B$).
+- 📱 **Полный Immersive Sticky Mode на Android**:
+  - Чистый полноэкранный Edge-to-Edge интерфейс с автоматическим скрытием системных кнопок и статус-бара.
+- 🔑 **Панель конфигуратора и AI-бэкенда**:
+  - Адаптивная сетка боевых пресетов ОЭЗ, шкала жесткости оппонентов и встроенная интеграция ключей **Google Gemini** и **OpenRouter**.
+
+---
+
+## 🏛️ Архитектура единого репозитория (100% Kotlin Multiplatform)
 
 ```
 .
-├── .github/
-│   └── workflows/
-│       └── release.yml                 # Пайплайн сборки релизов (APK + MSI + JAR + Wasm)
-├── gradle/
 ├── shared/                             # Единое ядро бизнес-логики и UI
-│   └── src/
-│       ├── commonMain/                 # Общий UI (Compose), модели, Ktor клиент, экраны
-│       ├── androidMain/                # Android-специфичные реализации (expect/actual)
-│       ├── desktopMain/                # Desktop-реализации (JME 3D Robot view)
-│       └── wasmJsMain/                 # Web Wasm реализации (Canvas 60 FPS Robot view)
-├── app/                                # Android Application (SDK 26–34)
-├── desktop/                            # Desktop Application (JVM: Windows MSI / UberJar)
-├── web/                                # Web Application (Compose Wasm / Browser bundle)
-├── build.gradle.kts
-├── settings.gradle.kts
-├── gradle.properties
-├── Dockerfile                          # Multi-stage Gradle + Nginx для раздачи Web Wasm
-└── docker-compose.yml                  # Запуск веб-версии и локального LLM-контура
+│   ├── commonMain/                     # 100% общий Compose UI, экраны (Home, Arena, Admin)
+│   ├── androidMain/                    # Android Immersive & Canvas implementations
+│   ├── desktopMain/                    # Desktop JMonkeyEngine 3D implementations
+│   └── wasmJsMain/                     # Web Wasm Google model-viewer 3D host
+├── app/                                # Android-приложение (Immersive Sticky Mode, SDK 26-34)
+├── desktop/                            # Desktop-приложение (Windows MSI установщик / UberJar)
+├── web/                                # WebAssembly браузерная версия (Wasm GC, 60 FPS)
+├── .github/workflows/release.yml       # Автоматическая сборка всех релизов (APK + MSI + Wasm)
+├── Dockerfile                          # Multi-stage сборка Nginx + Wasm
+└── docker-compose.yml                  # Мгновенное развертывание веб-версии
 ```
 
 ---
 
-## 📱 Платформы и возможности
+## 🚀 Быстрый запуск и сборка
 
-### 1. Единый UI и бизнес-логика (`:shared`)
-- **HomeScreen**: Выбор сценариев, запуск переговоров, переход в админ-панель.
-- **ArenaScreen**: Интерактивный чат переговоров с анализом напряжения (Tension), динамическими подсказками и карточками метрик (ZOPA, BATNA).
-- **AdminScreen**: Конфигуратор сценариев резидентов ОЭЗ, уровня жесткости и параметров сделок.
-- **Б.А.Р.С. Наставник**: Интерактивный робот с динамическими реакциями (3D JMonkeyEngine на Desktop, высокопроизводительный Canvas на Web/Android).
-- **Машина времени & Разбор полетов**: Откат ходов и детальный AI-дебрифинг сделки.
+### 🌐 1. WebAssembly (Браузерная версия):
+```bash
+./gradlew :web:wasmJsBrowserDevelopmentRun          # Запуск локального dev-сервера с hot-reload
+./gradlew :web:wasmJsBrowserDistribution             # Продакшн-бандл Wasm + JS
+```
 
----
-
-## 🛠️ Сборка проекта и дистрибутивов
-
-### 🤖 Android:
+### 📱 2. Android APK:
 ```bash
 ./gradlew :app:assembleDebug
 ./gradlew :app:assembleRelease
 ```
-Сгенерированный APK: `app/build/outputs/apk/debug/app-debug.apk`.
+*Сгенерированный APK:* `app/build/outputs/apk/debug/app-debug.apk`.
 
-### 🪟 Windows Desktop (MSI / JAR):
+### 🪟 3. Windows Desktop (MSI / JAR):
 ```bash
-./gradlew :desktop:packageDistributionForCurrentOS   # MSI установщик
-./gradlew :desktop:packageUberJarForCurrentOS        # Universal JAR
+./gradlew :desktop:packageDistributionForCurrentOS   # Нативный MSI установщик
+./gradlew :desktop:packageUberJarForCurrentOS        # Универсальный исполняемый JAR
 ```
-Сгенерированные файлы: `desktop/build/compose/binaries/main/msi/*.msi` и `desktop/build/compose/jars/*.jar`.
 
-### 🌐 Web Wasm (Compose Multiplatform Browser):
-```bash
-./gradlew :web:wasmJsBrowserDevelopmentRun          # Запуск dev-сервера с hot-reload
-./gradlew :web:wasmJsBrowserDistribution             # Продакшн бандл Wasm + JS + HTML
-```
-Сгенерированный бандл: `web/build/dist/wasmJs/productionExecutable/`.
-
-### 🐳 Docker (Web Wasm + Nginx):
+### 🐳 4. Docker (Развертывание веб-версии):
 ```bash
 docker compose up -d --build
 ```
-Доступно на `http://localhost:3000`.
+Доступно в браузере по адресу: `http://localhost:3000`.
 
 ---
 
-## 🚀 CI/CD & Релизы
-
-При пуше в `main` пайплайн GitHub Actions автоматически:
-1. Создает патч-тег версии.
-2. Собирает **Android APK**.
-3. Собирает **Windows MSI** и **UberJar**.
-4. Собирает **Web Wasm Distribution** (`arena-web-wasm.zip`).
-5. Публикует релиз со всеми артефактами в **GitHub Releases**.
+## 🏆 Разработано командой «NO PHP - NO PROBLEMS - 2026» для ОЭЗ «Алабуга»
+> *Чистый нативный стек, передовые стандарты Compose Multiplatform и бескомпромиссная надежность.*

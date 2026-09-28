@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,9 +18,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -75,6 +77,23 @@ fun HomeScreen(
         }
     }
 
+    // Анимация клика для кнопок
+    val enterInteractionSource = remember { MutableInteractionSource() }
+    val isEnterPressed by enterInteractionSource.collectIsPressedAsState()
+    val enterScale by animateFloatAsState(
+        targetValue = if (isEnterPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "enterScale"
+    )
+
+    val adminInteractionSource = remember { MutableInteractionSource() }
+    val isAdminPressed by adminInteractionSource.collectIsPressedAsState()
+    val adminScale by animateFloatAsState(
+        targetValue = if (isAdminPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "adminScale"
+    )
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -86,7 +105,7 @@ fun HomeScreen(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // 1. ФОН: Инженерная сетка + гигантский полупрозрачный силуэт логотипа «Алабуга / 033» + частицы
+        // 1. ФОН: Инженерная сетка + полупрозрачный белый силуэт логотипа Алабуги (шестиугольная стрела/шеврон + ромб)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val step = 28.dp.toPx()
             val w = size.width
@@ -114,34 +133,33 @@ fun HomeScreen(
                 y += step
             }
 
-            // Гигантский фоновый герб ОЭЗ «Алабуга» по центру (alpha = 0.035f)
+            // ТОЧНЫЙ СИЛУЭТ ЛОГОТИПА АЛАБУГИ (как на фото 2: шеврон-крыша из блоков + ромб внизу)
             val cx = w / 2f
             val cy = h / 2f
-            val logoRadius = (w.coerceAtMost(h) * 0.42f).coerceIn(120f, 320f)
-            
-            // Центральный ромб
-            val rhombPath = Path().apply {
-                moveTo(cx, cy - logoRadius * 0.4f)
-                lineTo(cx + logoRadius * 0.35f, cy)
-                lineTo(cx, cy + logoRadius * 0.4f)
-                lineTo(cx - logoRadius * 0.35f, cy)
+            val s = (w.coerceAtMost(h) * 0.48f).coerceIn(160f, 380f)
+            val whiteAlpha = 0.045f
+
+            // Верхний шеврон (крыло влево и вправо)
+            val chevronPath = Path().apply {
+                moveTo(cx, cy - s * 0.45f)
+                lineTo(cx + s * 0.42f, cy - s * 0.03f)
+                lineTo(cx + s * 0.28f, cy + s * 0.11f)
+                lineTo(cx, cy - s * 0.17f)
+                lineTo(cx - s * 0.28f, cy + s * 0.11f)
+                lineTo(cx - s * 0.42f, cy - s * 0.03f)
                 close()
             }
-            drawPath(rhombPath, Color(0xFF00FFCC).copy(alpha = 0.025f))
+            drawPath(chevronPath, Color.White.copy(alpha = whiteAlpha))
 
-            // Внешние концентрические орбиты
-            drawCircle(
-                color = Color(0xFF7B2CBF).copy(alpha = 0.035f),
-                radius = logoRadius * 0.85f,
-                center = Offset(cx, cy),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-            )
-            drawCircle(
-                color = Color(0xFF00F0FF).copy(alpha = 0.025f),
-                radius = logoRadius * 1.15f,
-                center = Offset(cx, cy),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
-            )
+            // Нижний ромб
+            val rhombPath = Path().apply {
+                moveTo(cx, cy + s * 0.08f)
+                lineTo(cx + s * 0.12f, cy + s * 0.20f)
+                lineTo(cx, cy + s * 0.32f)
+                lineTo(cx - s * 0.12f, cy + s * 0.20f)
+                close()
+            }
+            drawPath(rhombPath, Color.White.copy(alpha = whiteAlpha))
 
             // Парящие космические частицы
             particles.forEach { (px, py, pAlpha) ->
@@ -161,7 +179,7 @@ fun HomeScreen(
                 .fillMaxHeight()
                 .widthIn(max = 480.dp)
                 .align(Alignment.Center)
-                .padding(vertical = 36.dp, horizontal = 24.dp),
+                .padding(vertical = 28.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -203,7 +221,7 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
                     text = "АРЕНА ПЕРЕГОВОРОВ",
@@ -217,25 +235,26 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Интерактивный AI-тренажер жестких B2B-сделок",
+                    text = "Интерактивный тренажер переговоров. Учись побеждать в B2B-сделках без уступок!",
                     fontSize = 13.sp,
                     color = Color(0xFF94A3B8),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp
                 )
             }
 
-            // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Крупный 3D-робот Б.А.Р.С. с тенью и светящейся подложкой
+            // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Очень крупный 3D-робот Б.А.Р.С. (380dp)
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 // Радиальное неоновое свечение за роботом
                 Box(
                     modifier = Modifier
-                        .size(340.dp)
+                        .size(380.dp)
                         .background(
                             Brush.radialGradient(
                                 listOf(
@@ -247,18 +266,18 @@ fun HomeScreen(
                         )
                 )
 
-                // 3D-модель робота (высота 340dp)
+                // 3D-модель робота (высота 380dp)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp)
+                        .height(380.dp)
                         .clickable { handleRobotTap() },
                     contentAlignment = Alignment.Center
                 ) {
                     BarsRobotView(
                         animation = robotAnimation,
                         modifier = Modifier.fillMaxSize(),
-                        height = 340.dp,
+                        height = 380.dp,
                         onClick = handleRobotTap
                     )
                 }
@@ -267,13 +286,13 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .offset(y = (-4).dp)
-                        .size(width = 170.dp, height = 22.dp)
+                        .offset(y = (-6).dp)
+                        .size(width = 200.dp, height = 24.dp)
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    Color.Black.copy(alpha = 0.55f),
-                                    Color.Black.copy(alpha = 0.2f),
+                                    Color.Black.copy(alpha = 0.6f),
+                                    Color.Black.copy(alpha = 0.25f),
                                     Color.Transparent
                                 )
                             )
@@ -281,18 +300,20 @@ fun HomeScreen(
                 )
             }
 
-            // НИЖНЯЯ ЧАСТЬ: Премиальные кнопки
+            // НИЖНЯЯ ЧАСТЬ: Премиальные кнопки с анимацией клика
             Column(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. Кнопка «▶ ВОЙТИ В ПЕРЕГОВОРНУЮ» (Благородный фиолетово-индиго градиент #7B2CBF → #480CA8)
+                // 1. Кнопка «▶ ВОЙТИ В ПЕРЕГОВОРНУЮ»
                 Button(
                     onClick = onEnterArena,
+                    interactionSource = enterInteractionSource,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
+                        .scale(enterScale)
                         .shadow(
                             elevation = 14.dp,
                             shape = RoundedCornerShape(16.dp),
@@ -347,12 +368,14 @@ fun HomeScreen(
                     }
                 }
 
-                // 2. Кнопка «⚙ ПАНЕЛЬ АДМИНИСТРАТОРА» (Glassmorphism #161926/40%)
+                // 2. Кнопка «⚙ ПАНЕЛЬ АДМИНИСТРАТОРА»
                 OutlinedButton(
                     onClick = onOpenAdmin,
+                    interactionSource = adminInteractionSource,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(50.dp)
+                        .scale(adminScale),
                     shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -382,10 +405,12 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(2.dp))
 
                 Text(
-                    text = "KOTLIN MULTIPLATFORM • COMPOSE UI & WEBASSEMBLY",
+                    text = "NO PHP - NO PROBLEMS - 2026",
                     fontSize = 10.sp,
                     color = Color(0xFF64748B),
                     fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp,
                     textAlign = TextAlign.Center
                 )
             }
