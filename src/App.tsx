@@ -196,7 +196,7 @@ export default function App() {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setIsLoading(true);
-    setBarsAnimation("talk");
+    setBarsAnimation("thinking");
 
     try {
       let data: any = null;
@@ -356,7 +356,25 @@ export default function App() {
         });
       }
       setBarsFeedback(data.bars_feedback);
-      setBarsAnimation(data.bars_animation || "talk");
+
+      let nextRobotAnim: BarsAnimationState = "talk";
+      if (data.is_deal_closed) {
+        nextRobotAnim = "win";
+      } else if (data.is_deal_failed) {
+        nextRobotAnim = "death";
+      } else if (data.methodology_tag?.category === "ERROR") {
+        nextRobotAnim = "warn";
+      } else if (data.manipulation_type === "bluff" || emotion === "bluff") {
+        nextRobotAnim = "chomp";
+      } else if (emotion === "attack" || (data.metrics && data.metrics.tension >= 65)) {
+        nextRobotAnim = "punch";
+      } else if (data.methodology_tag?.type === "positive") {
+        nextRobotAnim = "wave";
+      } else {
+        nextRobotAnim = data.bars_animation || "talk";
+      }
+
+      setBarsAnimation(nextRobotAnim);
       setIsDealClosed(data.is_deal_closed);
       setIsDealFailed(data.is_deal_failed);
 

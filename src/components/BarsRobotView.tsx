@@ -38,6 +38,54 @@ export const BarsRobotView: React.FC<BarsRobotViewProps> = ({ animation, classNa
           border: "border-emerald-500/50",
           bg: "bg-emerald-950/70",
         };
+      case "wave":
+        return {
+          text: "Б.А.Р.С. ПРИВЕТСТВИЕ",
+          color: "bg-cyan-400",
+          textColor: "text-cyan-200",
+          border: "border-cyan-500/50",
+          bg: "bg-cyan-950/70",
+        };
+      case "punch":
+        return {
+          text: "Б.А.Р.С. ОТРАЖЕНИЕ ДАВЛЕНИЯ",
+          color: "bg-amber-400",
+          textColor: "text-amber-200",
+          border: "border-amber-500/50",
+          bg: "bg-amber-950/70",
+        };
+      case "chomp":
+        return {
+          text: "Б.А.Р.С. ВЫЯВЛЕНИЕ БЛЕФА",
+          color: "bg-yellow-400",
+          textColor: "text-yellow-200",
+          border: "border-yellow-500/50",
+          bg: "bg-yellow-950/70",
+        };
+      case "hit":
+        return {
+          text: "Б.А.Р.С. ПАРИРОВАНИЕ АТАКИ",
+          color: "bg-orange-400",
+          textColor: "text-orange-200",
+          border: "border-orange-500/50",
+          bg: "bg-orange-950/70",
+        };
+      case "death":
+        return {
+          text: "Б.А.Р.С. СРЫВ ПЕРЕГОВОРОВ",
+          color: "bg-red-600",
+          textColor: "text-red-200",
+          border: "border-red-600/60",
+          bg: "bg-red-950/80",
+        };
+      case "thinking":
+        return {
+          text: "Б.А.Р.С. СТРАТЕГИЧЕСКИЙ АНАЛИЗ",
+          color: "bg-purple-400",
+          textColor: "text-purple-200",
+          border: "border-purple-500/50",
+          bg: "bg-purple-950/70",
+        };
       case "idle":
       default:
         return {

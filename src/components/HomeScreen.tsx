@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Play, Settings, Cpu, Sparkles } from "lucide-react";
 import { triggerHaptic } from "../utils/haptics";
 import { resolveRobotAnimation, MIKE_ANIMATIONS } from "../utils/robotAnimations";
@@ -26,6 +26,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const speechIndexRef = useRef<number>(0);
   const timeoutRef = useRef<any>(null);
 
+  // Periodic ambient wave gesture: every ~10 seconds Mike waves hello to the player
+  useEffect(() => {
+    const waveInterval = setInterval(() => {
+      // Don't interrupt user-triggered speech tips
+      if (timeoutRef.current) return;
+
+      const viewer = modelViewerRef.current;
+      if (viewer) {
+        const available = viewer.availableAnimations || [];
+        const waveAnim = resolveRobotAnimation("wave", available);
+        setActiveAnim(waveAnim);
+        viewer.animationName = waveAnim;
+        if (viewer.play) {
+          viewer.play();
+        }
+
+        // Return to idle after waving for 3.2 seconds
+        setTimeout(() => {
+          if (!timeoutRef.current) {
+            const idleAnim = resolveRobotAnimation("idle", available);
+            setActiveAnim(idleAnim);
+            viewer.animationName = idleAnim;
+            if (viewer.play) {
+              viewer.play();
+            }
+          }
+        }, 3200);
+      }
+    }, 10000);
+
+    return () => clearInterval(waveInterval);
+  }, []);
+
   const handleRobotClick = () => {
     triggerHaptic("medium");
     const nextSpeech = LOBBY_SPEECHES[speechIndexRef.current % LOBBY_SPEECHES.length];
@@ -35,8 +68,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const viewer = modelViewerRef.current;
     if (viewer) {
       const available = viewer.availableAnimations || [];
-      const isWave = speechIndexRef.current % 2 === 1;
-      const chosen = resolveRobotAnimation(isWave ? "wave" : "win", available);
+      const gestures = ["wave", "win", "punch", "chomp"];
+      const chosenGesture = gestures[speechIndexRef.current % gestures.length];
+      const chosen = resolveRobotAnimation(chosenGesture, available);
       setActiveAnim(chosen);
       viewer.animationName = chosen;
       if (viewer.play) {
@@ -46,6 +80,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
       setSpeechText(null);
       const viewer = modelViewerRef.current;
       if (viewer) {
@@ -57,7 +92,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           viewer.play();
         }
       }
-    }, 4000);
+    }, 4500);
   };
 
   return (
@@ -140,15 +175,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             alt="Робот-наставник Б.А.Р.С. ОЭЗ Алабуга (3D робот)"
             autoplay
             animation-name={activeAnim}
-            camera-orbit="0deg 82deg 72%"
+            camera-orbit="0deg 80deg 72%"
             camera-target="0m 0.82m 0m"
+            camera-controls
+            touch-action="pan-y"
+            disable-zoom
             interaction-prompt="none"
-            shadow-intensity="1.5"
-            shadow-softness="0.75"
-            exposure="1.2"
+            shadow-intensity="1.8"
+            shadow-softness="0.5"
+            exposure="1.3"
             environment-image="neutral"
             auto-rotate
-            rotation-per-second="10deg"
+            rotation-per-second="8deg"
             style={
               {
                 width: "100%",

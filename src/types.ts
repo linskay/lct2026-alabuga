@@ -1,6 +1,16 @@
 export type ActorRole = "USER" | "OPPONENT" | "BARS";
 
-export type BarsAnimationState = "idle" | "talk" | "warn" | "win";
+export type BarsAnimationState =
+  | "idle"
+  | "talk"
+  | "warn"
+  | "win"
+  | "wave"
+  | "punch"
+  | "chomp"
+  | "hit"
+  | "death"
+  | "thinking";
 
 export type DifficultyLevel = "Новичок ОЭЗ" | "Прожжённый закупщик" | "Гендиректор Алабуги";
 
