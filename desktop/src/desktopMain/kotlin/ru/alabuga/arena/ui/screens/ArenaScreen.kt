@@ -27,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.alabuga.arena.model.*
-import ru.alabuga.arena.ui.components.BarsRobotCanvasView
+import ru.alabuga.arena.ui.components.BarsRobot3DView
 import ru.alabuga.arena.ui.components.DebriefingModal
 import ru.alabuga.arena.ui.components.TimeTravelModal
 import ru.alabuga.arena.ui.components.ZopaMapCard
@@ -387,9 +387,10 @@ fun ArenaScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            BarsRobotCanvasView(
-                                animationState = barsAnimation,
-                                modifier = Modifier.fillMaxWidth().height(165.dp)
+                            BarsRobot3DView(
+                                animation = barsAnimation,
+                                modifier = Modifier.fillMaxWidth(),
+                                height = 165.dp
                             )
 
                             Spacer(modifier = Modifier.height(4.dp))

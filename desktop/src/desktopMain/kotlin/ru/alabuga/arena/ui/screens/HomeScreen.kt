@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ru.alabuga.arena.ui.components.BarsRobotCanvasView
+import ru.alabuga.arena.ui.components.BarsRobot3DView
 
 @Composable
 fun HomeScreen(
@@ -208,11 +208,15 @@ fun HomeScreen(
                         }
                     }
 
-                    BarsRobotCanvasView(
-                        animationState = robotAnimation,
-                        modifier = Modifier.size(240.dp),
-                        onClick = handleRobotClick
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier.size(240.dp).clickable { handleRobotClick() }
+                    ) {
+                        BarsRobot3DView(
+                            animation = robotAnimation,
+                            modifier = Modifier.fillMaxSize(),
+                            height = 240.dp
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
