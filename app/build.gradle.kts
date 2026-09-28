@@ -109,4 +109,7 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
+
+    // 3D SceneView (Filament-based GLB renderer)
+    implementation("io.github.sceneview:sceneview:2.2.1")
 }

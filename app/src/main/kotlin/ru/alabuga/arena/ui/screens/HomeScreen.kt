@@ -26,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ru.alabuga.arena.ui.components.BarsRobotCanvasView
+import ru.alabuga.arena.ui.components.BarsRobot3DView
+import androidx.compose.foundation.clickable
 
 @Composable
 fun HomeScreen(
@@ -195,10 +197,10 @@ fun HomeScreen(
                         }
                     }
 
-                    BarsRobotCanvasView(
-                        animationState = robotAnimation,
-                        modifier = Modifier.fillMaxWidth().height(190.dp),
-                        onClick = handleRobotClick
+                    BarsRobot3DView(
+                        animation = robotAnimation,
+                        modifier = Modifier.fillMaxWidth().clickable { handleRobotClick() },
+                        height = 190.dp
                     )
                 }
             }

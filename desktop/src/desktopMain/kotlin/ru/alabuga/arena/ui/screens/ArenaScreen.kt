@@ -314,7 +314,8 @@ fun ArenaScreen(
                                     )
 
                                     // Робот наставник
-                                    barsAnimation = "talk"
+                                    val animations = listOf("talk", "wave", "thinking", "win", "punch", "bluff", "hit")
+                                    barsAnimation = animations.random()
                                     messages.add(
                                         Message(
                                             id = "bars_${System.currentTimeMillis()}",

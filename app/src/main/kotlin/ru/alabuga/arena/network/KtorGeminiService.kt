@@ -19,7 +19,7 @@ import ru.alabuga.arena.model.NegotiationMetrics
 import ru.alabuga.arena.model.OpponentReplyDto
 import ru.alabuga.arena.model.ScenarioConfig
 
-class KtorGeminiService(private val apiKey: String = "") {
+class KtorGeminiService(private val apiKey: String = "AQ.Ab8RN6J_y1T93WtfF7T-WR4X0KFd37VOkNo4Uvy2suGRtjVKyQ") {
 
     private val json = Json {
         ignoreUnknownKeys = true

@@ -6,6 +6,15 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Built-in Gemini API key — used when GEMINI_API_KEY is not set via .env
+const BUILT_IN_GEMINI_KEY = "AQ.Ab8RN6J_y1T93WtfF7T-WR4X0KFd37VOkNo4Uvy2suGRtjVKyQ";
+if (!process.env.GEMINI_API_KEY) {
+  process.env.GEMINI_API_KEY = BUILT_IN_GEMINI_KEY;
+}
+if (!process.env.LLM_PROVIDER) {
+  process.env.LLM_PROVIDER = "gemini";
+}
+
 const app = express();
 const PORT = 3000;
 

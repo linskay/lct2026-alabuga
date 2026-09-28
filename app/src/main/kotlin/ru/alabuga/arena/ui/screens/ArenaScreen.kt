@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.alabuga.arena.ui.components.BarsRobotCanvasView
+import ru.alabuga.arena.ui.components.BarsRobot3DView
 import ru.alabuga.arena.model.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -143,9 +144,14 @@ fun ArenaScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    BarsRobotCanvasView(
-                        animationState = barsAnimation,
-                        modifier = Modifier.fillMaxWidth().height(160.dp)
+//                    BarsRobotCanvasView(
+//                        animationState = barsAnimation,
+//                        modifier = Modifier.fillMaxWidth().height(160.dp)
+//                    )
+                    BarsRobot3DView(
+                        animation = barsAnimation,
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 160.dp
                     )
 
                     Spacer(modifier = Modifier.height(2.dp))
