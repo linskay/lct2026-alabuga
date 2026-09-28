@@ -53,7 +53,7 @@ fun BarsRobot3DView(
         "idle"     -> "SK_ZMikeAnim_ZMIKE_Idle"
         "talk"     -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
         "warn"     -> "SK_ZMikeAnim_ZMIKE_IdleAggro"
-        "win"      -> "SK_ZMikeAnim_ZMIKE_Jump"
+        "win"      -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
         "wave"     -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
         "punch"    -> "SK_ZMikeAnim_ZMIKE_PunchR"
         "hit"      -> "SK_ZMikeAnim_ZMIKE_HitRegisterFront"

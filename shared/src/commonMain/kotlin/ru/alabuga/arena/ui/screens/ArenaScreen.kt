@@ -19,6 +19,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,11 +44,13 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ru.alabuga.arena.model.*
+import ru.alabuga.arena.network.KtorGeminiService
 import ru.alabuga.arena.ui.components.BarsRobotView
 import ru.alabuga.arena.ui.components.DebriefingModal
 import ru.alabuga.arena.ui.components.TimeTravelModal
@@ -87,6 +90,12 @@ fun ArenaScreen(
     }
 
     var latestBarsAdvice by remember { mutableStateOf(config.initialBarsAdvice) }
+    var robotAnimation by remember { mutableStateOf("idle") }
+    var isGeneratingReply by remember { mutableStateOf(false) }
+
+    val geminiService = remember { KtorGeminiService() }
+    val coroutineScope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
 
     val messages = remember {
         mutableStateListOf(
@@ -101,6 +110,19 @@ fun ArenaScreen(
                 contextHints = config.initialDynamicHints
             )
         )
+    }
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    LaunchedEffect(robotAnimation) {
+        if (robotAnimation != "idle") {
+            delay(4000L)
+            robotAnimation = "idle"
+        }
     }
 
     // Динамический цвет атмосферы (0%: фиолетовый -> 50%: пурпур -> 100%: алый)
@@ -141,7 +163,7 @@ fun ArenaScreen(
     val isExactTemplate = remember(trimmed, lastInsertedTemplate) {
         lastInsertedTemplate.isNotEmpty() && trimmed == lastInsertedTemplate.trim()
     }
-    val canSend = trimmed.isNotEmpty() && !hasPlaceholders && !isExactTemplate
+    val canSend = trimmed.isNotEmpty() && !hasPlaceholders && !isExactTemplate && !isGeneratingReply
 
     val sendInteractionSource = remember { MutableInteractionSource() }
     val isSendPressed by sendInteractionSource.collectIsPressedAsState()
@@ -360,7 +382,7 @@ fun ArenaScreen(
                         // 3D Робот Б.А.Р.С.
                         if (!showDebriefing && !showTimeTravel) {
                             BarsRobotView(
-                                animation = if (metrics.tension >= 60) "warn" else if (metrics.dealReadiness >= 65) "win" else "talk",
+                                animation = robotAnimation,
                                 modifier = Modifier.fillMaxSize(),
                                 height = 240.dp
                             )
@@ -387,10 +409,11 @@ fun ArenaScreen(
                         )
                     ) {
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             items(messages) { message ->
                                 val isOpponent = message.actor == MessageActor.OPPONENT
@@ -400,53 +423,57 @@ fun ArenaScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .widthIn(max = 520.dp)
+                                            .widthIn(max = 540.dp)
                                             .clip(
-                                                RoundedCornerShape(
-                                                    topStart = 18.dp,
-                                                    topEnd = 18.dp,
-                                                    bottomStart = if (isOpponent) 4.dp else 18.dp,
-                                                    bottomEnd = if (isOpponent) 18.dp else 4.dp
-                                                )
+                                                if (isOpponent) RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+                                                else RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
                                             )
                                             .background(
-                                                if (isOpponent) Brush.linearGradient(
-                                                    listOf(Color(0xFF131728).copy(alpha = 0.75f), Color(0xFF131728).copy(alpha = 0.75f))
-                                                )
-                                                else Brush.linearGradient(
-                                                    listOf(Color(0xFF7B2CBF).copy(alpha = 0.50f), Color(0xFF480CA8).copy(alpha = 0.40f))
-                                                )
+                                                if (isOpponent) Brush.linearGradient(listOf(Color(0xFF131520).copy(alpha = 0.85f), Color(0xFF101322).copy(alpha = 0.85f)))
+                                                else Brush.linearGradient(listOf(Color(0xFF32145A).copy(alpha = 0.85f), Color(0xFF1E0E38).copy(alpha = 0.85f)))
                                             )
                                             .border(
                                                 1.dp,
-                                                if (isOpponent) Color(0xFF2E3856) else Color(0xFF9D4EDD).copy(alpha = 0.4f),
-                                                RoundedCornerShape(
-                                                    topStart = 18.dp,
-                                                    topEnd = 18.dp,
-                                                    bottomStart = if (isOpponent) 4.dp else 18.dp,
-                                                    bottomEnd = if (isOpponent) 18.dp else 4.dp
-                                                )
+                                                if (isOpponent) Color(0xFF2E3856) else Color(0xFF9D4EDD).copy(alpha = 0.45f),
+                                                if (isOpponent) RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+                                                else RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
                                             )
                                             .padding(14.dp)
                                     ) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalAlignment = if (isOpponent) Alignment.Start else Alignment.End,
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                horizontalArrangement = if (isOpponent) Arrangement.SpaceBetween else Arrangement.End,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(
-                                                    text = if (isOpponent) config.opponentName else "ВЫ (ОЭЗ «АЛАБУГА»)",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isOpponent) Color(0xFF00FFCC) else Color(0xFFD8B4FE),
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-                                                if (isOpponent && message.emotionEmoji != null) {
+                                                if (isOpponent) {
                                                     Text(
-                                                        text = "${message.emotionEmoji} ${message.emotionLabel ?: ""}",
+                                                        text = config.opponentName,
                                                         fontSize = 11.sp,
-                                                        color = Color(0xFF94A3B8)
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF00FFCC),
+                                                        fontFamily = FontFamily.Monospace,
+                                                        textAlign = TextAlign.Start
+                                                    )
+                                                    if (message.emotionEmoji != null) {
+                                                        Text(
+                                                            text = "${message.emotionEmoji} ${message.emotionLabel ?: ""}",
+                                                            fontSize = 11.sp,
+                                                            color = Color(0xFF94A3B8)
+                                                        )
+                                                    }
+                                                } else {
+                                                    Text(
+                                                        text = "ВЫ (ОЭЗ «АЛАБУГА»)",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFD8B4FE),
+                                                        fontFamily = FontFamily.Monospace,
+                                                        textAlign = TextAlign.End
                                                     )
                                                 }
                                             }
@@ -455,8 +482,43 @@ fun ArenaScreen(
                                                 text = message.text,
                                                 fontSize = 15.sp,
                                                 color = Color(0xFFF1F5F9),
-                                                lineHeight = 22.sp
+                                                lineHeight = 22.sp,
+                                                textAlign = if (isOpponent) TextAlign.Start else TextAlign.End
                                             )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (isGeneratingReply) {
+                                item {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Start
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                                .background(Color(0xFF131520).copy(alpha = 0.85f))
+                                                .border(1.dp, Color(0xFF2E3856), RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(14.dp),
+                                                    color = Color(0xFF00FFCC),
+                                                    strokeWidth = 2.dp
+                                                )
+                                                Text(
+                                                    text = "${config.opponentName} формулирует ответ...",
+                                                    fontSize = 13.sp,
+                                                    color = Color(0xFF94A3B8),
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -469,7 +531,6 @@ fun ArenaScreen(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) {
                         val hintsScrollState = rememberScrollState()
-                        val coroutineScope = rememberCoroutineScope()
 
                         val rawHints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints
                         val hints = if (!rawHints.isNullOrEmpty()) rawHints else listOf(
@@ -609,55 +670,78 @@ fun ArenaScreen(
 
                                 IconButton(
                                     onClick = {
-                                        if (canSend) {
+                                        if (canSend && !isGeneratingReply) {
                                             val userText = trimmed
                                             inputText = ""
                                             lastInsertedTemplate = ""
 
                                             currentStep++
-                                            val newTrust = (metrics.trust + 5).coerceAtMost(100)
-                                            val newTension = (metrics.tension - 4).coerceAtLeast(10)
-                                            val newReadiness = (metrics.dealReadiness + 8).coerceAtMost(100)
-                                            metrics = NegotiationMetrics(newTrust, newTension, newReadiness)
 
-                                            messages.add(
-                                                Message(
-                                                    id = "user_${currentStep}_${Random.nextInt(100000)}",
-                                                    actor = MessageActor.USER,
-                                                    text = userText,
-                                                    stepIndex = currentStep,
-                                                    snapshotMetrics = metrics
-                                                )
+                                            val userMsg = Message(
+                                                id = "user_${currentStep}_${Random.nextInt(100000)}",
+                                                actor = MessageActor.USER,
+                                                text = userText,
+                                                stepIndex = currentStep,
+                                                snapshotMetrics = metrics
                                             )
+                                            messages.add(userMsg)
 
-                                            latestBarsAdvice = "Отличная контратака! Оппонент начинает двигаться по ставке. Удерживай планку и защищай BATNA."
-
-                                            val oppOffer = (zopaState.currentOffer + 30).coerceAtMost(460)
-                                            val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
-                                            zopaState = zopaState.copy(
-                                                buyerMax = oppOffer,
-                                                currentOffer = oppOffer,
-                                                isOverlap = isOverlapNow,
-                                                overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
-                                                overlapMax = if (isOverlapNow) oppOffer else null,
-                                                changeReason = if (isOverlapNow) "Коридор сделки открыт! Стороны сошлись в цене от 460 ₽/м²." else "Оппонент повысил предложение до $oppOffer ₽/м² взамен на встречные условия."
-                                            )
-
-                                            messages.add(
-                                                Message(
-                                                    id = "opp_${currentStep}_${Random.nextInt(100000)}",
-                                                    actor = MessageActor.OPPONENT,
-                                                    text = "Ваши доводы имеют смысл. Если вы подтверждаете мощности в срок, мы готовы скорректировать предложение до $oppOffer ₽/м².",
-                                                    stepIndex = currentStep,
-                                                    snapshotMetrics = metrics,
-                                                    emotionEmoji = "🤝",
-                                                    emotionLabel = "Сближение позиций",
-                                                    contextHints = listOf(
-                                                        "Мы фиксируем ставку $oppOffer ₽/м² при встречном условии [гарантия]...",
-                                                        "Давайте зафиксируем график поэтапного ввода мощностей..."
+                                            isGeneratingReply = true
+                                            coroutineScope.launch {
+                                                try {
+                                                    val replyDto = geminiService.sendMessage(
+                                                        history = messages.toList(),
+                                                        userMessage = userText,
+                                                        config = config,
+                                                        currentMetrics = metrics
                                                     )
-                                                )
-                                            )
+
+                                                    val updatedTrust = (metrics.trust + replyDto.metricsDelta.trust).coerceIn(0, 100)
+                                                    val updatedTension = (metrics.tension + replyDto.metricsDelta.tension).coerceIn(0, 100)
+                                                    val updatedReadiness = (metrics.dealReadiness + replyDto.metricsDelta.dealReadiness).coerceIn(0, 100)
+                                                    val newMetrics = NegotiationMetrics(updatedTrust, updatedTension, updatedReadiness)
+                                                    metrics = newMetrics
+
+                                                    latestBarsAdvice = replyDto.barsFeedback
+                                                    robotAnimation = replyDto.barsAnimation
+
+                                                    val (emoEmoji, emoLabel) = when {
+                                                        replyDto.barsAnimation == "warn" -> "😠" to "Недовольство / Напряжение"
+                                                        replyDto.barsAnimation == "win" -> "🤝" to "Сближение позиций"
+                                                        replyDto.metricsDelta.tension > 10 -> "⚡" to "Обострение"
+                                                        replyDto.metricsDelta.dealReadiness > 5 -> "💡" to "Интерес"
+                                                        else -> "💼" to "Деловой анализ"
+                                                    }
+
+                                                    val oppOffer = (zopaState.currentOffer + (replyDto.metricsDelta.dealReadiness * 2).coerceAtLeast(10)).coerceAtMost(520)
+                                                    val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
+                                                    zopaState = zopaState.copy(
+                                                        buyerMax = oppOffer,
+                                                        currentOffer = oppOffer,
+                                                        isOverlap = isOverlapNow,
+                                                        overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
+                                                        overlapMax = if (isOverlapNow) oppOffer else null,
+                                                        changeReason = if (isOverlapNow) "Коридор сделки открыт! Стороны сошлись в цене от ${config.batna.minPricePerSqm} ₽/м²." else "Оппонент скорректировал позицию до $oppOffer ₽/м² на основе встречных аргументов."
+                                                    )
+
+                                                    messages.add(
+                                                        Message(
+                                                            id = "opp_${currentStep}_${Random.nextInt(100000)}",
+                                                            actor = MessageActor.OPPONENT,
+                                                            text = replyDto.opponentReply,
+                                                            stepIndex = currentStep,
+                                                            snapshotMetrics = newMetrics,
+                                                            emotionEmoji = emoEmoji,
+                                                            emotionLabel = emoLabel,
+                                                            contextHints = replyDto.dynamicHints
+                                                        )
+                                                    )
+                                                } catch (_: Throwable) {
+                                                    // Fallback handled inside KtorGeminiService
+                                                } finally {
+                                                    isGeneratingReply = false
+                                                }
+                                            }
                                         }
                                     },
                                     interactionSource = sendInteractionSource,
