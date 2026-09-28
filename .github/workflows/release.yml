@@ -139,8 +139,12 @@ jobs:
           cache: 'gradle'
 
       - name: Build MSI + UberJar
-        # packageDistributionForCurrentOS безопасен: Exe убран из targetFormats в build.gradle.kts
-        run: .\gradlew.bat :desktop:packageDistributionForCurrentOS :desktop:packageUberJarForCurrentOS --no-daemon --stacktrace
+        shell: pwsh
+        run: |
+          Write-Host "Building UberJar..."
+          .\gradlew.bat :desktop:packageUberJarForCurrentOS --no-daemon --stacktrace
+          Write-Host "Building MSI Distribution..."
+          .\gradlew.bat :desktop:packageDistributionForCurrentOS --no-daemon --stacktrace
 
       - name: Show jpackage logs on failure
         if: failure()

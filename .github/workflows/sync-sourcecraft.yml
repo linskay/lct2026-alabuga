@@ -1,0 +1,55 @@
+name: 🔄 Sync & Deliver to SourceCraft
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_run:
+    workflows: ["Build & Publish Release (APK + MSI + JAR)"]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-sourcecraft:
+    name: 🚀 Mirror to SourceCraft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Mirror to SourceCraft Repository
+        env:
+          SOURCECRAFT_TOKEN: ${{ secrets.SOURCECRAFT_TOKEN }}
+          SOURCECRAFT_USER: ${{ secrets.SOURCECRAFT_USER || 'linskay' }}
+        run: |
+          if [ -z "$SOURCECRAFT_TOKEN" ]; then
+            echo "::error ::Секрет SOURCECRAFT_TOKEN не настроен в GitHub Secrets!"
+            echo "Чтобы синхронизация с SourceCraft заработала:"
+            echo "1. Зайдите на https://sourcecraft.dev -> Настройки профиля -> Access Tokens и создайте токен с правами write:repository."
+            echo "2. Добавьте его в репозиторий GitHub: Settings -> Secrets and variables -> Actions -> New repository secret с именем SOURCECRAFT_TOKEN."
+            exit 1
+          fi
+
+          echo "Configuring SourceCraft remote..."
+          REMOTE_URL="https://${SOURCECRAFT_USER}:${SOURCECRAFT_TOKEN}@sourcecraft.dev/lct-hackaton-2026/case-19-negotiation-simulator-team-12.git"
+          
+          git config user.name "GitHub Sync Bot"
+          git config user.email "bot@alabuga-arena.ru"
+          
+          git remote add sourcecraft "$REMOTE_URL" 2>/dev/null || git remote set-url sourcecraft "$REMOTE_URL"
+          
+          echo "Pushing main branch to SourceCraft..."
+          git push sourcecraft main --force
+          
+          echo "Pushing all tags to SourceCraft..."
+          git push sourcecraft --tags --force || true
+          
+          echo "✅ Репозиторий успешно синхронизирован с SourceCraft!"

@@ -34,17 +34,15 @@ compose.desktop {
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "AlabugaArena"
             packageVersion = "1.0.0"
-            description = "Арена Переговоров ОЭЗ «Алабуга»"
-            copyright = "© 2026 ОЭЗ «Алабуга»"
-            vendor = "ОЭЗ «Алабуга»"
-
-            appResourcesRootDir.set(project.layout.projectDirectory.dir("resources"))
+            description = "Alabuga Arena Negotiation Simulator"
+            copyright = "Copyright (c) 2026 Alabuga SEZ"
+            vendor = "Alabuga SEZ"
 
             windows {
                 menu = true
                 shortcut = true
                 dirChooser = true
-                menuGroup = "Алабуга"
+                menuGroup = "Alabuga"
                 upgradeUuid = "d7c805eb-642d-45db-9c3f-c3093ec86b51"
             }
         }
