@@ -7,7 +7,8 @@
 set -e
 
 SOURCECRAFT_REPO="https://sourcecraft.dev/lct-hackaton-2026/case-19-negotiation-simulator-team-12.git"
-TOKEN="${SOURCECRAFT_TOKEN:-$1}"
+DEFAULT_TOKEN="pv1_SH2v4115o58S2Y4sYxm3ysF94j4tKBub35p191Sl7yhK9uA4zf18R2cm36m2mQYV_1450995143"
+TOKEN="${SOURCECRAFT_TOKEN:-${1:-$DEFAULT_TOKEN}}"
 
 if [ -z "$TOKEN" ]; then
   echo "❌ Ошибка: Не указан токен доступа SourceCraft."
