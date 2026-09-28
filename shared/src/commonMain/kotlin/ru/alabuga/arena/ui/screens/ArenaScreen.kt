@@ -358,11 +358,13 @@ fun ArenaScreen(
                         )
 
                         // 3D Робот Б.А.Р.С.
-                        BarsRobotView(
-                            animation = if (metrics.tension >= 60) "warn" else if (metrics.dealReadiness >= 65) "win" else "talk",
-                            modifier = Modifier.fillMaxSize(),
-                            height = 240.dp
-                        )
+                        if (!showDebriefing && !showTimeTravel) {
+                            BarsRobotView(
+                                animation = if (metrics.tension >= 60) "warn" else if (metrics.dealReadiness >= 65) "win" else "talk",
+                                modifier = Modifier.fillMaxSize(),
+                                height = 240.dp
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
