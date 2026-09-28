@@ -88,11 +88,11 @@ jobs:
         with:
           lfs: true
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
           cache: 'gradle'
 
       - name: Grant execute permission for gradlew
@@ -100,8 +100,7 @@ jobs:
 
       - name: Build Android APK
         run: |
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace \
-            || ./gradlew :app:assembleRelease --no-daemon --stacktrace
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Show APK output tree
         if: always()
@@ -111,9 +110,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: arena-android-apk
-          # Gradle кладёт APK в app/build/outputs/apk/<variant>/*.apk
-          path: app/build/outputs/apk/**/*.apk
-          if-no-files-found: warn
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
   # ────────────────────────────────────────────────────────────────────
   # JOB 3: Windows Desktop (MSI + UberJar)
@@ -178,7 +176,7 @@ jobs:
         with:
           name: arena-windows-desktop
           path: bin-dist/*
-          if-no-files-found: warn
+          if-no-files-found: error
 
   # ────────────────────────────────────────────────────────────────────
   # JOB 4: Web Wasm Distribution
@@ -218,7 +216,7 @@ jobs:
         with:
           name: arena-web-wasm
           path: bin-dist-web/*
-          if-no-files-found: warn
+          if-no-files-found: error
 
   # ────────────────────────────────────────────────────────────────────
   # JOB 5: GitHub Release
@@ -233,24 +231,21 @@ jobs:
 
       - name: Download Android Artifact
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: arena-android-apk
-          path: release-binaries/
+          path: release-binaries-android/
 
       - name: Download Windows Artifact
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: arena-windows-desktop
-          path: release-binaries/
+          path: release-binaries-windows/
 
       - name: Download Web Artifact
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: arena-web-wasm
-          path: release-binaries/
+          path: release-binaries-web/
 
       - name: Normalize & Version Artifact Filenames
         run: |
@@ -258,25 +253,25 @@ jobs:
           mkdir -p final-release/
           
           # 1. Android APK -> AlabugaArena-<TAG>-android.apk
-          find release-binaries/ -type f -name "*.apk" | while read -r f; do
+          find release-binaries-android/ -type f -name "*.apk" | head -1 | while read -r f; do
             echo "Packaging APK: $f -> final-release/AlabugaArena-${TAG}-android.apk"
             cp "$f" "final-release/AlabugaArena-${TAG}-android.apk"
           done
           
           # 2. Windows MSI -> AlabugaArena-<TAG>-windows.msi
-          find release-binaries/ -type f -name "*.msi" | while read -r f; do
+          find release-binaries-windows/ -type f -name "*.msi" | head -1 | while read -r f; do
             echo "Packaging MSI: $f -> final-release/AlabugaArena-${TAG}-windows.msi"
             cp "$f" "final-release/AlabugaArena-${TAG}-windows.msi"
           done
           
           # 3. Universal JAR -> AlabugaArena-<TAG>-desktop.jar
-          find release-binaries/ -type f -name "*.jar" | while read -r f; do
+          find release-binaries-windows/ -type f -name "*.jar" | head -1 | while read -r f; do
             echo "Packaging JAR: $f -> final-release/AlabugaArena-${TAG}-desktop.jar"
             cp "$f" "final-release/AlabugaArena-${TAG}-desktop.jar"
           done
           
           # 4. Web Wasm ZIP -> AlabugaArena-<TAG>-web-wasm.zip
-          find release-binaries/ -type f -name "*.zip" | while read -r f; do
+          find release-binaries-web/ -type f -name "*.zip" | head -1 | while read -r f; do
             echo "Packaging ZIP: $f -> final-release/AlabugaArena-${TAG}-web-wasm.zip"
             cp "$f" "final-release/AlabugaArena-${TAG}-web-wasm.zip"
           done
