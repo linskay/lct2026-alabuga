@@ -1,14 +1,13 @@
 package ru.alabuga.arena.ui.screens
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -17,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -46,17 +46,6 @@ fun HomeScreen(
         )
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.75f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowAlpha"
-    )
-
     val handleRobotClick = {
         val nextIndex = speechIndex + 1
         speechIndex = nextIndex
@@ -70,213 +59,216 @@ fun HomeScreen(
             .background(Color(0xFF07080D)),
         contentAlignment = Alignment.Center
     ) {
-        // Фоновое неоновое свечение по центру
+        // 1. ИНЖЕНЕРНАЯ КЛЕТЧАТАЯ МИКРОСЕТКА + РАЗМЫТИЕ КРАЕВ И РАДИАЛЬНЫЙ НЕОН
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val step = 28.dp.toPx()
+            val w = size.width
+            val h = size.height
+
+            // Вертикальные линии сетки
+            var x = 0f
+            while (x < w) {
+                drawLine(
+                    color = Color(0xFF00F0FF).copy(alpha = 0.035f),
+                    start = Offset(x, 0f),
+                    end = Offset(x, h),
+                    strokeWidth = 1f
+                )
+                x += step
+            }
+
+            // Горизонтальные линии сетки
+            var y = 0f
+            while (y < h) {
+                drawLine(
+                    color = Color(0xFF00F0FF).copy(alpha = 0.035f),
+                    start = Offset(0f, y),
+                    end = Offset(w, y),
+                    strokeWidth = 1f
+                )
+                y += step
+            }
+        }
+
+        // Мягкое радиальное свечение по центру (размытие к краям)
         Box(
             modifier = Modifier
-                .size(600.dp)
+                .size(540.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFF7B2CBF).copy(alpha = 0.18f),
-                            Color(0xFF00F0FF).copy(alpha = 0.05f),
+                            Color(0xFF7B2CBF).copy(alpha = 0.28f),
+                            Color(0xFF00F0FF).copy(alpha = 0.06f),
                             Color.Transparent
                         )
                     )
                 )
         )
 
+        // 2. ЦЕНТРИРОВАННЫЙ КОНТЕЙНЕР (Не растягивается на широких экранах)
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .widthIn(max = 640.dp)
-                .padding(horizontal = 24.dp, vertical = 20.dp)
-                .verticalScroll(rememberScrollState()),
+                .widthIn(max = 440.dp)
+                .padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 1. ВЕРХНЯЯ ЧАСТЬ: Логотип и Заголовок
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = Color(0xFF121524),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.6f)),
-                shadowElevation = 8.dp
+            // ВЕРХНЯЯ ЧАСТЬ: Заголовок и Полигон #033
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color(0xFF121524).copy(alpha = 0.95f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.6f)),
+                    shadowElevation = 8.dp
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF00F0FF))
-                    )
-                    Text(
-                        text = "ОЭЗ «АЛАБУГА»",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF00F0FF),
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.5.sp
-                    )
-                    Text(text = "•", color = Color.Gray, fontSize = 10.sp)
-                    Text(
-                        text = "033 КОРПУС",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color(0xFFD8B4FE),
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF00F0FF))
+                        )
+                        Text(
+                            text = "ОЭЗ «АЛАБУГА»",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF00F0FF),
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(text = "|", color = Color(0xFF64748B), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        Text(
+                            text = "ПОЛИГОН #033",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFD8B4FE),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "АРЕНА ПЕРЕГОВОРОВ",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    letterSpacing = 1.5.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "Интерактивный AI-тренажер жестких B2B-сделок",
+                    fontSize = 12.sp,
+                    color = Color(0xFF94A3B8),
+                    textAlign = TextAlign.Center
+                )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Text(
-                text = "АРЕНА ПЕРЕГОВОРОВ",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-                letterSpacing = 2.sp,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Интерактивный AI-полигон и тренажер жестких коммерческих сделок",
-                fontSize = 13.sp,
-                color = Color(0xFF94A3B8),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // 2. ЦЕНТРАЛЬНАЯ КАРТОЧКА: Робот Б.А.Р.С. + Совет + Подиум
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Color(0xFF0D0F1C).copy(alpha = 0.9f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.35f)),
-                shadowElevation = 12.dp,
+            // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Увеличенный 3D-робот Б.А.Р.С. (без лишних рамок)
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { handleRobotClick() }
+                    .weight(1f)
+                    .padding(vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Речевой баллон тактического совета при клике
-                    if (speechText != null) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = Color(0xFF16192E),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F0FF).copy(alpha = 0.6f)),
-                            shadowElevation = 8.dp,
-                            modifier = Modifier.padding(bottom = 10.dp).fillMaxWidth()
+                // Голографический речевой баллон наставника Б.А.Р.С. при клике
+                if (speechText != null) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFF090A14).copy(alpha = 0.95f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F0FF).copy(alpha = 0.7f)),
+                        shadowElevation = 12.dp,
+                        modifier = Modifier
+                            .padding(bottom = 8.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "СОВЕТ НАСТАВНИКА Б.А.Р.С.",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF00F0FF),
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "«${speechText}»",
-                                    fontSize = 12.sp,
-                                    color = Color.White,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
+                            Text(
+                                text = "СОВЕТ НАСТАВНИКА Б.А.Р.С.",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00F0FF),
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 0.5.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "«${speechText}»",
+                                fontSize = 12.sp,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
+                }
 
-                    // Анимированный 60 FPS робот-наставник
+                // Интерактивный кликабельный контейнер робота
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(290.dp)
+                        .clickable { handleRobotClick() },
+                    contentAlignment = Alignment.Center
+                ) {
                     BarsRobotView(
                         animation = robotAnimation,
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        height = 200.dp
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Нажмите на робота, чтобы получить тактический совет",
-                        fontSize = 11.sp,
-                        color = Color(0xFF64748B),
-                        fontFamily = FontFamily.Monospace,
-                        textAlign = TextAlign.Center
+                        modifier = Modifier.fillMaxSize(),
+                        height = 290.dp
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-            // 3. ТАКТИЧЕСКИЕ ЧИПСЫ-БЕЙДЖИ
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+                // Компактный бейдж статуса под роботом
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF121524),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F0FF).copy(alpha = 0.25f)),
-                    modifier = Modifier.weight(1f)
+                    shape = RoundedCornerShape(50),
+                    color = Color(0xFF0A0C16).copy(alpha = 0.85f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.4f)),
+                    modifier = Modifier.clickable { handleRobotClick() }
                 ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
                     ) {
-                        Text("🛡️ BATNA-ЩИТ", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F0FF), fontFamily = FontFamily.Monospace)
-                        Text("от 460 ₽/м²", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF121524),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.35f)),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("🤖 AI АНАЛИЗ", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD8B4FE), fontFamily = FontFamily.Monospace)
-                        Text("Real-time ZOPA", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF121524),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.25f)),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("⏳ МАШИНА ВРЕМЕНИ", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981), fontFamily = FontFamily.Monospace)
-                        Text("Откат ходов", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF00F0FF))
+                        )
+                        Text(
+                            text = "Б.А.Р.С. ONLINE • НАЖМИТЕ ДЛЯ СОВЕТА",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFCBD5E1),
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 4. КНОПКИ ДЕЙСТВИЯ
+            // НИЖНЯЯ ЧАСТЬ: Две крупные удобные кнопки и Футер
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -297,7 +289,8 @@ fun HomeScreen(
                                 Brush.horizontalGradient(
                                     colors = listOf(
                                         Color(0xFF7B2CBF),
-                                        Color(0xFF480CA8)
+                                        Color(0xFF9D4EDD),
+                                        Color(0xFF00F0FF)
                                     )
                                 )
                             ),
@@ -305,26 +298,26 @@ fun HomeScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = Color(0xFF07080D),
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
                                 text = "ВОЙТИ В ПЕРЕГОВОРНУЮ",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF07080D),
                                 letterSpacing = 1.sp
                             )
                         }
                     }
                 }
 
-                // 2. Второстепенная кнопка (⚙ ПАНЕЛЬ АДМИНИСТРАТОРА / КОНФИГУРАТОР)
+                // 2. Второстепенная кнопка (⚙ ПАНЕЛЬ АДМИНИСТРАТОРА)
                 OutlinedButton(
                     onClick = onOpenAdmin,
                     modifier = Modifier
@@ -333,7 +326,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(16.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xFF161926).copy(alpha = 0.7f),
+                        containerColor = Color(0xFF121524).copy(alpha = 0.7f),
                         contentColor = Color(0xFFCBD5E1)
                     )
                 ) {
@@ -344,23 +337,23 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = null,
-                            tint = Color(0xFFC084FC),
+                            tint = Color(0xFF00F0FF),
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "КОНФИГУРАТОР СЦЕНАРИЕВ & BATNA",
+                            text = "ПАНЕЛЬ АДМИНИСТРАТОРА",
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
                             color = Color(0xFFCBD5E1)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
                 Text(
-                    text = "No PHP — No Problems • ОЭЗ «Алабуга» 2026",
-                    fontSize = 11.sp,
+                    text = "KOTLIN MULTIPLATFORM • COMPOSE UI & WEBASSEMBLY",
+                    fontSize = 10.sp,
                     color = Color(0xFF64748B),
                     fontFamily = FontFamily.Monospace,
                     textAlign = TextAlign.Center
@@ -369,4 +362,5 @@ fun HomeScreen(
         }
     }
 }
+
 

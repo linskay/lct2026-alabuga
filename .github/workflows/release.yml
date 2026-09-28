@@ -210,7 +210,7 @@ jobs:
         run: |
           mkdir -p bin-dist-web
           cd web/build/dist/wasmJs/productionExecutable
-          zip -r ../../../../bin-dist-web/arena-web-wasm.zip .
+          zip -r "$GITHUB_WORKSPACE/bin-dist-web/arena-web-wasm.zip" .
           cd -
 
       - name: Upload Web artifact
