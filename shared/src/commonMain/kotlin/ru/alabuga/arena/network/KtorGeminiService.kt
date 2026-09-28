@@ -3,7 +3,6 @@ package ru.alabuga.arena.network
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -19,6 +18,29 @@ import ru.alabuga.arena.model.NegotiationMetrics
 import ru.alabuga.arena.model.OpponentReplyDto
 import ru.alabuga.arena.model.ScenarioConfig
 
+/**
+ * ## KtorGeminiService
+ *
+ * REST-клиент интеграции с нейросетевыми сервисами Google Gemini и LLM-бэкендом тренажера переговоров.
+ *
+ * ### Назначение:
+ * Выполняет генерацию реплик оппонента, расчёт дельты психологических метрик (Trust / Tension / Deal Readiness),
+ * формирование оперативного совета тактического наставника Б.А.Р.С. и подсказок для игрока.
+ *
+ * ### Спецификация API (OpenAPI / Spring-like Contract):
+ * - **Protocol:** HTTPS
+ * - **Endpoint:** `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`
+ * - **Query Params:** `key={apiKey}`
+ * - **Headers:** `Content-Type: application/json`
+ * - **Response Codes:**
+ *   - `200 OK` — Успешная генерация структурированного JSON-ответа оппонента и наставника Б.А.Р.С.
+ *   - `400 Bad Request` — Некорректный синтаксис промпта или системной инструкции.
+ *   - `401 Unauthorized` — Отсутствует или недействителен ключ Google AI Studio API.
+ *   - `429 Too Many Requests` — Превышена квота запросов (активируется встроенный Smart Fallback).
+ *   - `500 Internal Error / Offline` — Ошибка сети или недоступность серверов (бесшовный переход на детерминированный движок).
+ *
+ * @param apiKey Ключ доступа к Google Gemini API (Google AI Studio).
+ */
 class KtorGeminiService(private val apiKey: String = "AQ.Ab8RN6J_y1T93WtfF7T-WR4X0KFd37VOkNo4Uvy2suGRtjVKyQ") {
 
     private val json = Json {
@@ -33,6 +55,27 @@ class KtorGeminiService(private val apiKey: String = "AQ.Ab8RN6J_y1T93WtfF7T-WR4
         }
     }
 
+    /**
+     * Отправляет текущее состояние диалога в нейросетевой движок и возвращает структурированный ответ.
+     *
+     * ### Поведение метода:
+     * 1. Формирует системную директиву с психотипом оппонента, уровнем жесткости и границами BATNA ОЭЗ «Алабуга».
+     * 2. Передает последние 10 реплик диалога с текущими метриками.
+     * 3. При сбое сети, невалидном ключе или таймауте выполняет автоматический откат на встроенный
+     *    детерминированный тактический движок (Deterministic Tactical Fallback).
+     *
+     * @param history Список предыдущих сообщений диалога с метаданными акторов.
+     * @param userMessage Новая аргументационная реплика, отправленная игроком.
+     * @param config Конфигурация сценария (имя, психотип, жесткость, красные линии BATNA, повестка).
+     * @param currentMetrics Текущие показатели доверия, стресса и готовности к сделке.
+     *
+     * @return [OpponentReplyDto] Структурированный объект ответа, содержащий:
+     *         - `opponent_reply` — встречная речь оппонента;
+     *         - `bars_feedback` — тактический анализ наставника Б.А.Р.С.;
+     *         - `bars_animation` — триггер 3D-анимации робота (`idle`, `talk`, `warn`, `win`);
+     *         - `metrics_delta` — дельта метрик trust, tension, deal_readiness;
+     *         - `dynamic_hints` — 3 контекстные заготовки аргументов для следующего раунда.
+     */
     suspend fun sendMessage(
         history: List<Message>,
         userMessage: String,
@@ -56,11 +99,11 @@ class KtorGeminiService(private val apiKey: String = "AQ.Ab8RN6J_y1T93WtfF7T-WR4
             - Они должны быть строго по теме текущего собеседника (${config.opponentName}) и текущей проблемы!
             - Заготовки должны быть не законченными фразами, а каркасами с многоточием или [укажите...], чтобы игрок сам доформулировал условия.
 
-            Пример для кейса удержания сотрудника (Артем):
+            Пример для кейса инвестора:
             "dynamic_hints": [
-              "Артем, проект масштабирования важнее рутины. Мы готовы передать тебе лидство над [укажите проект]...",
-              "Деньги важны, но в финтехе ты будешь винтиком. Давай согласуем пересмотр грейда при условии...",
-              "Давай разгрузим тебя от ночных дежурств: наймем двух дежурных инженеров, если ты..."
+              "Мы фиксируем ставку 480 ₽/м² при условии 100% предоплаты за [укажите период]...",
+              "Налоговые преференции ОЭЗ (0% на имущество) полностью компенсируют [условие]...",
+              "Срок ввода 110 кВ фиксируется в соглашении взамен на обязательства по CAPEX..."
             ]
 
             Выведи ответ строго в формате JSON:
@@ -98,30 +141,73 @@ class KtorGeminiService(private val apiKey: String = "AQ.Ab8RN6J_y1T93WtfF7T-WR4
             }.body()
 
             val textContent = response.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
-            val cleaned = textContent.replace("```json", "").replace("```", "").trim()
-            json.decodeFromString<OpponentReplyDto>(cleaned)
-        } catch (e: Exception) {
-            val oppFirstName = config.opponentName.split(" ").firstOrNull() ?: "Коллега"
-            val fallbackHints = config.initialDynamicHints.ifEmpty {
-                listOf(
-                    "$oppFirstName, мы готовы пойти навстречу при условии [укажите требование]...",
-                    "Позиция ОЭЗ основана на регламенте. Давайте согласуем компромисс по [вопрос]...",
-                    "Предлагаем зафиксировать условия взамен на встречные инвестиции в [сфера]..."
+            val cleanJson = textContent.replace("```json", "").replace("```", "").trim()
+
+            json.decodeFromString<OpponentReplyDto>(cleanJson)
+        } catch (_: Throwable) {
+            // Smart Deterministic Fallback
+            createSmartFallback(userMessage, config)
+        }
+    }
+
+    /**
+     * Локальный детерминированный движок тактической генерации (Fallback Engine).
+     * Срабатывает при отсутствии интернет-соединения, исчерпании лимитов API или сбоях LLM.
+     */
+    private fun createSmartFallback(
+        userMessage: String,
+        config: ScenarioConfig
+    ): OpponentReplyDto {
+        val lower = userMessage.lowercase()
+
+        return when {
+            lower.contains("460") || lower.contains("capex") || lower.contains("гарант") -> {
+                OpponentReplyDto(
+                    opponentReply = "Ваша позиция аргументирована. Если вы фиксируете мощности 110 кВ в договоре, мы согласны рассмотреть ставку ближе к 460 ₽/м².",
+                    barsFeedback = "Отличный тактический ход! Оппонент пошел на сближение позиций, признав встречные гарантии.",
+                    barsAnimation = "win",
+                    metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 8, tension = -6, dealReadiness = 12),
+                    dynamicHints = listOf(
+                        "Фиксируем ставку 460 ₽/м² и график ввода мощностей...",
+                        "Готовы подписать протокол о намерениях с условием CAPEX 1.2 млрд ₽...",
+                        "Согласуем льготный период 4 месяца при встречной гарантии..."
+                    ),
+                    isDealClosed = false
                 )
             }
-            OpponentReplyDto(
-                opponentReply = "Ваша позиция понятна. Однако нам необходимы четкие гарантии и фиксация сроков по объектам «Синергии».",
-                barsFeedback = "Оппонент прощупывает почву. Удерживайте красные линии и требуйте встречных шагов!",
-                barsAnimation = "talk",
-                metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 4, tension = -2, dealReadiness = 5),
-                dynamicHints = fallbackHints,
-                isDealClosed = false,
-                isDealFailed = false
-            )
+            lower.contains("скидк") || lower.contains("уступ") || lower.contains("соглас") -> {
+                OpponentReplyDto(
+                    opponentReply = "Мы видим вашу готовность идти навстречу. Давайте тогда зафиксируем ставку 380 ₽/м² и 6 месяцев каникул.",
+                    barsFeedback = "Внимание: не сдавай позиции без встречных требований! Требуй жестких обязательств по инвестициям.",
+                    barsAnimation = "warn",
+                    metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 4, tension = 5, dealReadiness = 6),
+                    dynamicHints = listOf(
+                        "Ставка 380 ₽/м² ниже BATNA ОЭЗ. Наш минимум — 460 ₽/м²...",
+                        "Мы можем рассмотреть скидку только при объеме аренды от 15 000 м²...",
+                        "Снижение ставки возможно только взамен на сокращение каникул до 2 месяцев..."
+                    )
+                )
+            }
+            else -> {
+                OpponentReplyDto(
+                    opponentReply = "Мы выслушали вас, но наши инвестиционные комитеты требуют большей определенности по срокам и затратам.",
+                    barsFeedback = "Напомни оппоненту о налоговых преференциях 0% и дефиците сетей 110 кВ на других площадках региона.",
+                    barsAnimation = "talk",
+                    metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 3, tension = 2, dealReadiness = 4),
+                    dynamicHints = listOf(
+                        "Налоговый пакет ОЭЗ (0% на имущество) полностью компенсирует арендную ставку...",
+                        "Свободные мощности 110 кВ в нашем кластере обеспечат ваш запуск без задержек...",
+                        "Предлагаем разбить ввод мощностей на два этапа..."
+                    )
+                )
+            }
         }
     }
 }
 
+/**
+ * Вспомогательные транспортные DTO для десериализации ответа Google Gemini REST API.
+ */
 @Serializable
 private data class GeminiResponse(
     val candidates: List<GeminiCandidate> = emptyList()
@@ -139,5 +225,5 @@ private data class GeminiContent(
 
 @Serializable
 private data class GeminiPart(
-    val text: String? = null
+    val text: String = ""
 )

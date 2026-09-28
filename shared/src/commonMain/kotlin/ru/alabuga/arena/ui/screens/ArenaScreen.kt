@@ -6,6 +6,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +14,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,20 +23,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -66,14 +70,16 @@ fun ArenaScreen(
     var zopaState by remember {
         mutableStateOf(
             ZopaState(
-                buyerMin = 300,
-                buyerMax = 420,
                 sellerMin = config.batna.minPricePerSqm,
-                sellerMax = 500,
+                sellerMax = 520,
+                buyerMin = 300,
+                buyerMax = 380,
+                currentOffer = 350,
                 isOverlap = false,
-                currentOffer = 300,
+                overlapMin = null,
+                overlapMax = null,
                 status = "narrowing",
-                changeReason = "Оппонент удерживает заниженную планку (300 ₽/м²), коридор сделки пока закрыт."
+                changeReason = "Оппонент удерживает заниженную планку (350 ₽/м²), коридор сделки пока закрыт."
             )
         )
     }
@@ -95,17 +101,35 @@ fun ArenaScreen(
         )
     }
 
-    // Dynamic background color based on tension (0: deep violet #7B2CBF -> 100: scarlet red #EF4444)
+    // Динамический цвет атмосферы (0%: фиолетовый -> 50%: пурпур -> 100%: алый)
     val atmosphereColor by animateColorAsState(
         targetValue = when {
-            metrics.tension >= 70 -> Color(0xFFEF4444)
-            metrics.tension >= 45 -> Color(0xFFDC2626)
+            metrics.tension >= 75 -> Color(0xFFFF1E56)
+            metrics.tension >= 50 -> Color(0xFFEF4444)
             metrics.tension >= 25 -> Color(0xFF9333EA)
             else -> Color(0xFF7B2CBF)
         },
         animationSpec = tween(600),
         label = "atmosphereColor"
     )
+
+    // Анимация фоновых космических частиц
+    val infiniteTransition = rememberInfiniteTransition(label = "arenaFx")
+    val particlePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(18000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "particles"
+    )
+
+    val particles = remember {
+        List(24) {
+            Triple(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 0.15f + 0.05f)
+        }
+    }
 
     // Validation
     val trimmed = inputText.trim()
@@ -141,13 +165,13 @@ fun ArenaScreen(
                         Column {
                             Text(
                                 text = config.opponentName,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
                             Text(
                                 text = "${config.opponentCompany} • ${config.opponentRole}",
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 color = Color(0xFF94A3B8)
                             )
                         }
@@ -155,7 +179,7 @@ fun ArenaScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Назад", tint = Color(0xFF00F0FF))
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color(0xFF00F0FF))
                     }
                 },
                 actions = {
@@ -169,7 +193,7 @@ fun ArenaScreen(
                         Icon(imageVector = Icons.Default.EmojiEvents, contentDescription = "Дебрифинг", tint = Color(0xFFD8B4FE))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0D18))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0C16).copy(alpha = 0.85f))
             )
         },
         containerColor = Color(0xFF06070B)
@@ -177,143 +201,267 @@ fun ArenaScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(paddingValues)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color(0xFF140D2B), Color(0xFF06070B)),
+                        radius = 2400f
+                    )
+                ),
             contentAlignment = Alignment.Center
         ) {
-            // Центрированный рабочий контейнер с жестким ограничением ширины max = 1180.dp
+            // ФОН: Инженерная сетка + частицы
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val step = 32.dp.toPx()
+                val w = size.width
+                val h = size.height
+
+                // Сетка
+                var x = 0f
+                while (x < w) {
+                    drawLine(
+                        color = Color(0xFF00F0FF).copy(alpha = 0.025f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, h),
+                        strokeWidth = 1f
+                    )
+                    x += step
+                }
+                var y = 0f
+                while (y < h) {
+                    drawLine(
+                        color = Color(0xFF00F0FF).copy(alpha = 0.025f),
+                        start = Offset(0f, y),
+                        end = Offset(w, y),
+                        strokeWidth = 1f
+                    )
+                    y += step
+                }
+
+                // Частицы
+                particles.forEach { (px, py, pAlpha) ->
+                    val currentY = (py - particlePhase + 1f) % 1f * h
+                    val currentX = px * w
+                    drawCircle(
+                        color = Color(0xFF9D4EDD).copy(alpha = pAlpha),
+                        radius = 2.5.dp.toPx(),
+                        center = Offset(currentX, currentY)
+                    )
+                }
+            }
+
+            // Центрированный рабочий контейнер с ограничением ширины max = 1180.dp
             Row(
                 modifier = modifier
                     .fillMaxHeight()
                     .widthIn(max = 1180.dp)
-                    .padding(horizontal = 24.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // ЛЕВАЯ ЧАСТЬ (65%): Окно оппонента с роботом-аватаром и стресс-индикатором + Чат диалогов + Ввод
+                // ЛЕВАЯ ЧАСТЬ (65%): Окно 3D-аватара + Чат сообщений + Ввод
                 Column(
                     modifier = Modifier
                         .weight(0.65f)
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // 1. Окно прямого эфира оппонента (СВЕТ ВНУТРИ ПРЯМОУГОЛЬНИКА ОТРАЖАЕТ НАПРЯЖЕНИЕ 0% фиолетовый -> 100% алый)
+                    // 1. Окно прямого эфира оппонента (Cyber-Glass: объемный свет + парящий стеклянный HUD)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(0.38f)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF0A0C14))
-                            .border(BorderStroke(1.dp, atmosphereColor.copy(alpha = 0.4f)), RoundedCornerShape(20.dp)),
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(Color(0xFF0B0D18).copy(alpha = 0.50f))
+                            .border(
+                                BorderStroke(
+                                    1.dp,
+                                    Brush.linearGradient(
+                                        listOf(
+                                            atmosphereColor.copy(alpha = 0.35f),
+                                            Color(0xFF00FFCC).copy(alpha = 0.15f)
+                                        )
+                                    )
+                                ),
+                                RoundedCornerShape(22.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Объемное свечение в самом прямоугольнике (свет от фиолетового до алого)
+                        // Верхний отблеск стекла
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .align(Alignment.TopCenter)
+                                .background(Color.White.copy(alpha = 0.08f))
+                        )
+
+                        // Объемный свет внутри прямоугольника (от фиолетового до алого)
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
                                     Brush.radialGradient(
                                         colors = listOf(
-                                            atmosphereColor.copy(alpha = (0.28f + (metrics.tension / 100f) * 0.32f)),
-                                            atmosphereColor.copy(alpha = 0.12f),
-                                            Color(0xFF080910).copy(alpha = 0.95f)
+                                            atmosphereColor.copy(alpha = (0.24f + (metrics.tension / 100f) * 0.32f)),
+                                            Color(0xFF160E2A).copy(alpha = 0.20f),
+                                            Color.Transparent
                                         ),
                                         radius = 600f
                                     )
                                 )
                         )
 
-                        // Дополнительный градиентный свет снизу и сверху
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            atmosphereColor.copy(alpha = 0.18f),
-                                            Color.Transparent,
-                                            atmosphereColor.copy(alpha = 0.35f)
-                                        )
-                                    )
-                                )
-                        )
-
-                        // 3D Робот Б.А.Р.С. прямо в кейсе
+                        // 3D Робот Б.А.Р.С.
                         BarsRobotView(
                             animation = if (metrics.tension >= 60) "warn" else if (metrics.dealReadiness >= 65) "win" else "talk",
                             modifier = Modifier.fillMaxSize(),
                             height = 240.dp
                         )
 
-                        // Неоновый значок статуса напряженности в верхнем углу
+                        // Парящая стеклянная HUD-панель [НАПРЯЖЕНИЕ / СТРЕСС] с неоновым градиентным баром
                         Surface(
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(12.dp),
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color(0xFF0A0C16).copy(alpha = 0.88f),
-                            border = BorderStroke(1.dp, atmosphereColor.copy(alpha = 0.6f))
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFF090B14).copy(alpha = 0.85f),
+                            border = BorderStroke(
+                                1.dp,
+                                Brush.linearGradient(
+                                    listOf(
+                                        atmosphereColor.copy(alpha = 0.45f),
+                                        Color(0xFF00FFCC).copy(alpha = 0.20f)
+                                    )
+                                )
+                            )
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(atmosphereColor)
-                                )
                                 Text(
-                                    text = "НАПРЯЖЕНИЕ: ${metrics.tension}%",
+                                    text = "НАПРЯЖЕНИЕ [ ${metrics.tension}% ]",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = atmosphereColor,
-                                    fontFamily = FontFamily.Monospace
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 0.6.sp
                                 )
+
+                                // Неоновый прогресс-бар стресса
+                                Box(
+                                    modifier = Modifier
+                                        .width(140.dp)
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(Color(0xFF161928))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth((metrics.tension / 100f).coerceIn(0.05f, 1f))
+                                            .clip(RoundedCornerShape(50))
+                                            .background(
+                                                Brush.horizontalGradient(
+                                                    listOf(Color(0xFF7B2CBF), Color(0xFFE11D48), Color(0xFFFF1E56))
+                                                )
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // 2. Чат сообщений (крупные контрастные шрифты 16sp / 24sp)
-                    LazyColumn(
+                    // 2. Чат сообщений (Стеклянная подложка Cyber-Glass)
+                    Surface(
                         modifier = Modifier
                             .weight(0.42f)
                             .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF0D101B).copy(alpha = 0.55f),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                listOf(
+                                    Color(0xFF7B2CBF).copy(alpha = 0.30f),
+                                    Color(0xFF00FFCC).copy(alpha = 0.15f)
+                                )
+                            )
+                        )
                     ) {
-                        items(messages) { msg ->
-                            val isUser = msg.actor == MessageActor.USER
-
-                            AnimatedVisibility(
-                                visible = true,
-                                enter = fadeIn(animationSpec = tween(400)) + slideInVertically(initialOffsetY = { 20 })
-                            ) {
-                                Box(
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(messages) { message ->
+                                val isOpponent = message.actor == MessageActor.OPPONENT
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
+                                    horizontalArrangement = if (isOpponent) Arrangement.Start else Arrangement.End
                                 ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(20.dp),
-                                        color = if (isUser) Color(0xFF1B233D) else Color(0xFF0F1016).copy(alpha = 0.85f),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = if (isUser) 0.15f else 0.08f)),
-                                        modifier = Modifier.widthIn(max = 620.dp)
-                                    ) {
-                                        Column(modifier = Modifier.padding(16.dp)) {
-                                            Text(
-                                                text = if (isUser) "Вы (ОЭЗ «Алабуга»)" else config.opponentName,
-                                                fontSize = 17.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isUser) Color(0xFF00F0FF) else Color(0xFFFF9E80),
-                                                fontFamily = FontFamily.Monospace
+                                    Box(
+                                        modifier = Modifier
+                                            .widthIn(max = 520.dp)
+                                            .clip(
+                                                RoundedCornerShape(
+                                                    topStart = 18.dp,
+                                                    topEnd = 18.dp,
+                                                    bottomStart = if (isOpponent) 4.dp else 18.dp,
+                                                    bottomEnd = if (isOpponent) 18.dp else 4.dp
+                                                )
                                             )
-                                            Spacer(modifier = Modifier.height(6.dp))
+                                            .background(
+                                                if (isOpponent) Brush.linearGradient(
+                                                    listOf(Color(0xFF131728).copy(alpha = 0.75f), Color(0xFF131728).copy(alpha = 0.75f))
+                                                )
+                                                else Brush.linearGradient(
+                                                    listOf(Color(0xFF7B2CBF).copy(alpha = 0.50f), Color(0xFF480CA8).copy(alpha = 0.40f))
+                                                )
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isOpponent) Color(0xFF2E3856) else Color(0xFF9D4EDD).copy(alpha = 0.4f),
+                                                RoundedCornerShape(
+                                                    topStart = 18.dp,
+                                                    topEnd = 18.dp,
+                                                    bottomStart = if (isOpponent) 4.dp else 18.dp,
+                                                    bottomEnd = if (isOpponent) 18.dp else 4.dp
+                                                )
+                                            )
+                                            .padding(14.dp)
+                                    ) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = if (isOpponent) config.opponentName else "ВЫ (ОЭЗ «АЛАБУГА»)",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isOpponent) Color(0xFF00FFCC) else Color(0xFFD8B4FE),
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                                if (isOpponent && message.emotionEmoji != null) {
+                                                    Text(
+                                                        text = "${message.emotionEmoji} ${message.emotionLabel ?: ""}",
+                                                        fontSize = 11.sp,
+                                                        color = Color(0xFF94A3B8)
+                                                    )
+                                                }
+                                            }
+
                                             Text(
-                                                text = msg.text,
-                                                fontSize = 16.sp,
+                                                text = message.text,
+                                                fontSize = 15.sp,
                                                 color = Color(0xFFF1F5F9),
-                                                lineHeight = 24.sp
+                                                lineHeight = 22.sp
                                             )
                                         }
                                     }
@@ -322,14 +470,13 @@ fun ArenaScreen(
                         }
                     }
 
-                    // 3. Подсказки и крупное окно ввода (стиль Google AI Studio, поддержка скролла колесиком и перетаскивания)
+                    // 3. Переговорные чипсы-подсказки (Парящие капсулы Cyber-Glass с микро-анимацией наведения)
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) {
                         val hintsScrollState = rememberScrollState()
                         val coroutineScope = rememberCoroutineScope()
 
-                        // Лаконичные чипсы с подсказками (скролл колесиком / перетаскивание мышью)
                         val rawHints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints
                         val hints = if (!rawHints.isNullOrEmpty()) rawHints else listOf(
                             "Мы фиксируем ставку 480 ₽/м² при условии предоплаты за 1 квартал.",
@@ -356,30 +503,53 @@ fun ArenaScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 hints.forEach { hint ->
+                                    val chipInteractionSource = remember { MutableInteractionSource() }
+                                    val isChipHovered by chipInteractionSource.collectIsHoveredAsState()
+                                    val isChipPressed by chipInteractionSource.collectIsPressedAsState()
+
+                                    val chipOffsetY by animateDpAsState(
+                                        targetValue = if (isChipHovered) (-2).dp else 0.dp,
+                                        label = "chipOffsetY"
+                                    )
+                                    val chipScale by animateFloatAsState(
+                                        targetValue = if (isChipPressed) 0.96f else if (isChipHovered) 1.03f else 1f,
+                                        label = "chipScale"
+                                    )
+
                                     Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = Color(0xFF131728),
-                                        border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.5f)),
-                                        modifier = Modifier.clickable {
-                                            inputText = hint
-                                            lastInsertedTemplate = hint
-                                        }
+                                        shape = RoundedCornerShape(50),
+                                        color = if (isChipHovered) Color(0xFF1E2640).copy(alpha = 0.85f) else Color(0xFF0F172A).copy(alpha = 0.65f),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isChipHovered) Brush.linearGradient(listOf(Color(0xFF00FFCC), Color(0xFF9D4EDD)))
+                                            else Brush.linearGradient(listOf(Color(0xFF00FFCC).copy(alpha = 0.35f), Color(0xFF7B2CBF).copy(alpha = 0.30f)))
+                                        ),
+                                        modifier = Modifier
+                                            .offset(y = chipOffsetY)
+                                            .scale(chipScale)
+                                            .clickable(
+                                                interactionSource = chipInteractionSource,
+                                                indication = null
+                                            ) {
+                                                inputText = hint
+                                                lastInsertedTemplate = hint
+                                            }
                                     ) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Lightbulb,
                                                 contentDescription = null,
-                                                tint = Color(0xFF00FFCC),
+                                                tint = if (isChipHovered) Color(0xFF00FFCC) else Color(0xFF00FFCC).copy(alpha = 0.7f),
                                                 modifier = Modifier.size(13.dp)
                                             )
                                             Text(
                                                 text = hint,
                                                 fontSize = 12.sp,
-                                                color = Color(0xFFE2E8F0),
+                                                color = if (isChipHovered) Color.White else Color(0xFFE2E8F0),
                                                 maxLines = 1
                                             )
                                         }
@@ -398,11 +568,15 @@ fun ArenaScreen(
                             )
                         }
 
-                        // Крупное окно ввода (стиль Google AI Studio, высота и шрифт 16sp)
+                        // 4. Крупное окно ввода (стиль Google AI Studio, Cyber-Glass)
                         Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            color = Color(0xFF0F121F),
-                            border = BorderStroke(1.dp, if (canSend) Color(0xFF00F0FF).copy(alpha = 0.6f) else Color(0xFF282F48)),
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xFF0D101B).copy(alpha = 0.75f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (canSend) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.7f), Color(0xFF7B2CBF).copy(alpha = 0.5f)))
+                                else Brush.linearGradient(listOf(Color(0xFF282F48).copy(alpha = 0.6f), Color(0xFF1E2235).copy(alpha = 0.4f)))
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -489,11 +663,11 @@ fun ArenaScreen(
                                     modifier = Modifier
                                         .size(46.dp)
                                         .scale(sendScale)
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(14.dp))
                                         .background(if (canSend) Color(0xFF00F0FF) else Color(0xFF1E2640))
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Send,
+                                        imageVector = Icons.AutoMirrored.Filled.Send,
                                         contentDescription = "Отправить",
                                         tint = if (canSend) Color(0xFF07080D) else Color.Gray
                                     )
@@ -510,14 +684,30 @@ fun ArenaScreen(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // 1. Карточка «Б.А.Р.С. СОВЕТ»
+                    // 1. Карточка «Б.А.Р.С. СОВЕТ» (Визуальный центр сайдбара с фиолетовым неоновым градиентом)
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF1B112C).copy(alpha = 0.85f),
-                        border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.5f))
+                        color = Color(0xFF140E2A).copy(alpha = 0.65f),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                listOf(
+                                    Color(0xFF9D4EDD).copy(alpha = 0.45f),
+                                    Color(0xFF00FFCC).copy(alpha = 0.30f)
+                                )
+                            )
+                        )
                     ) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Верхний отблеск стекла
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(Color.White.copy(alpha = 0.08f))
+                            )
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -529,7 +719,7 @@ fun ArenaScreen(
                                         .background(Color(0xFF00FFCC))
                                 )
                                 Text(
-                                    text = "Б.А.Р.С. • ТАКТИЧЕСКИЙ СОВЕТ",
+                                    text = "🤖 Б.А.Р.С. • ТАКТИЧЕСКИЙ СОВЕТ",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF00FFCC),
@@ -546,12 +736,20 @@ fun ArenaScreen(
                         }
                     }
 
-                    // 2. Метрики переговоров
+                    // 2. Метрики переговоров (Cyber-Glass)
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        color = Color(0xFF0F1016).copy(alpha = 0.85f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF0D101B).copy(alpha = 0.55f),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                listOf(
+                                    Color(0xFF7B2CBF).copy(alpha = 0.30f),
+                                    Color(0xFF00FFCC).copy(alpha = 0.15f)
+                                )
+                            )
+                        )
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -578,9 +776,17 @@ fun ArenaScreen(
                     // 4. Повестка переговоров (Agenda topics)
                     Surface(
                         modifier = Modifier.fillMaxWidth().weight(1f),
-                        shape = RoundedCornerShape(18.dp),
-                        color = Color(0xFF0F1016).copy(alpha = 0.85f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF0D101B).copy(alpha = 0.55f),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                listOf(
+                                    Color(0xFF7B2CBF).copy(alpha = 0.30f),
+                                    Color(0xFF00FFCC).copy(alpha = 0.15f)
+                                )
+                            )
+                        )
                     ) {
                         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
@@ -596,7 +802,8 @@ fun ArenaScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF161A2B), RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF141829).copy(alpha = 0.65f), RoundedCornerShape(12.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
                                         .padding(horizontal = 10.dp, vertical = 8.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -607,13 +814,22 @@ fun ArenaScreen(
                                     }
                                     Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
+                                            .clip(RoundedCornerShape(50))
                                             .background(
                                                 when (topic.status) {
-                                                    "agreed" -> Color(0xFF10B981).copy(alpha = 0.2f)
-                                                    "disputed" -> Color(0xFFFF3366).copy(alpha = 0.2f)
-                                                    else -> Color(0xFFFBBF24).copy(alpha = 0.2f)
+                                                    "agreed" -> Color(0xFF10B981).copy(alpha = 0.18f)
+                                                    "disputed" -> Color(0xFFFF3366).copy(alpha = 0.18f)
+                                                    else -> Color(0xFFFBBF24).copy(alpha = 0.18f)
                                                 }
+                                            )
+                                            .border(
+                                                1.dp,
+                                                when (topic.status) {
+                                                    "agreed" -> Color(0xFF10B981).copy(alpha = 0.45f)
+                                                    "disputed" -> Color(0xFFFF3366).copy(alpha = 0.45f)
+                                                    else -> Color(0xFFFBBF24).copy(alpha = 0.45f)
+                                                },
+                                                RoundedCornerShape(50)
                                             )
                                             .padding(horizontal = 8.dp, vertical = 3.dp)
                                     ) {

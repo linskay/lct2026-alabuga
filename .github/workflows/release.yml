@@ -252,22 +252,55 @@ jobs:
           name: arena-web-wasm
           path: release-binaries/
 
+      - name: Normalize & Version Artifact Filenames
+        run: |
+          TAG="${{ needs.tag-release.outputs.new_tag }}"
+          mkdir -p final-release/
+          
+          # 1. Android APK -> AlabugaArena-<TAG>-android.apk
+          find release-binaries/ -type f -name "*.apk" | while read -r f; do
+            echo "Packaging APK: $f -> final-release/AlabugaArena-${TAG}-android.apk"
+            cp "$f" "final-release/AlabugaArena-${TAG}-android.apk"
+          done
+          
+          # 2. Windows MSI -> AlabugaArena-<TAG>-windows.msi
+          find release-binaries/ -type f -name "*.msi" | while read -r f; do
+            echo "Packaging MSI: $f -> final-release/AlabugaArena-${TAG}-windows.msi"
+            cp "$f" "final-release/AlabugaArena-${TAG}-windows.msi"
+          done
+          
+          # 3. Universal JAR -> AlabugaArena-<TAG>-desktop.jar
+          find release-binaries/ -type f -name "*.jar" | while read -r f; do
+            echo "Packaging JAR: $f -> final-release/AlabugaArena-${TAG}-desktop.jar"
+            cp "$f" "final-release/AlabugaArena-${TAG}-desktop.jar"
+          done
+          
+          # 4. Web Wasm ZIP -> AlabugaArena-<TAG>-web-wasm.zip
+          find release-binaries/ -type f -name "*.zip" | while read -r f; do
+            echo "Packaging ZIP: $f -> final-release/AlabugaArena-${TAG}-web-wasm.zip"
+            cp "$f" "final-release/AlabugaArena-${TAG}-web-wasm.zip"
+          done
+          
+          echo "Final Release Assets to upload:"
+          ls -la final-release/
+
       - name: Prepare Clean Release Notes
         run: |
           cat << 'EOF' > release_body.md
           ### 🚀 Арена Переговоров ОЭЗ «Алабуга» (${{ needs.tag-release.outputs.new_tag }})
 
-          **Кроссплатформенный симулятор жестких B2B-переговоров (Kotlin Multiplatform + Compose):**
-          - 🤖 Интерактивный робот-наставник **Б.А.Р.С.** с динамическими реакциями и тактическим анализом
-          - 📊 Оценка зон согласия ZOPA, BATNA и эмоционального тонуса встречи
-          - 🎯 Сценарии резидентов особой экономической зоны «Алабуга»
-          - ⏳ Механика ретроспективного отката («Машина времени»)
+          **Кроссплатформенный интерактивный тренажер эффективных B2B-переговоров по лучшим мировым практикам (Гарвардская модель, BATNA, ZOPA и взаимовыгодные сделки Win-Win без уступок):**
+          - 🤖 Интерактивный 3D робот-наставник **Б.А.Р.С.** с динамическими реакциями и тактическим анализом
+          - 📊 Анализ коридора согласия ZOPA, защита красных линий BATNA и мониторинг психоэмоционального фона
+          - 🎯 Реалистичные переговорные кейсы с резидентами и инвесторами ОЭЗ «Алабуга»
+          - ⏳ Механика ретроспективного анализа и отката решений («Машина времени»)
+          - 📥 Генерация стилизованного аналитического PDF-отчета дебрифинга с персональными рекомендациями
 
           #### 📦 Готовые пакеты установки и дистрибутивы:
-          - **Android APK** (`.apk`) — мобильная версия для Android
-          - **Windows Installer** (`.msi`) — установщик для рабочего стола Windows
-          - **Universal JAR** (`.jar`) — запуск через Java Runtime
-          - **Web Wasm** (`.zip`) — статический бандл Compose Multiplatform Wasm для веб-сервера / Nginx
+          - **Android APK** (`AlabugaArena-${{ needs.tag-release.outputs.new_tag }}-android.apk`) — мобильная версия для Android
+          - **Windows Installer** (`AlabugaArena-${{ needs.tag-release.outputs.new_tag }}-windows.msi`) — установщик для рабочего стола Windows (на русском языке)
+          - **Universal JAR** (`AlabugaArena-${{ needs.tag-release.outputs.new_tag }}-desktop.jar`) — запуск через Java Runtime
+          - **Web Wasm** (`AlabugaArena-${{ needs.tag-release.outputs.new_tag }}-web-wasm.zip`) — статический бандл Compose Multiplatform Wasm
 
           *(Сборка выпущена автоматически релизным пайплайном ОЭЗ «Алабуга»)*
           EOF
@@ -281,6 +314,6 @@ jobs:
           prerelease: false
           generate_release_notes: false
           body_path: release_body.md
-          files: release-binaries/*
+          files: final-release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

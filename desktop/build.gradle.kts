@@ -37,20 +37,19 @@ compose.desktop {
     application {
         mainClass = "ru.alabuga.arena.desktop.MainKt"
         nativeDistributions {
-            // EXE через WiX исключён — нестабилен на CI с кастомными .wxl.
             // MSI собирается нативно через jpackage и работает надёжно.
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "AlabugaArena"
             packageVersion = "1.0.0"
-            description = "Alabuga Arena Negotiation Simulator"
-            copyright = "Copyright (c) 2026 Alabuga SEZ"
-            vendor = "Alabuga SEZ"
+            description = "Интерактивный тренажер переговоров ОЭЗ «Алабуга»"
+            copyright = "Copyright (c) 2026 ОЭЗ «Алабуга»"
+            vendor = "ОЭЗ «Алабуга»"
 
             windows {
                 menu = true
                 shortcut = true
                 dirChooser = true
-                menuGroup = "Alabuga"
+                menuGroup = "ОЭЗ «Алабуга»"
                 upgradeUuid = "d7c805eb-642d-45db-9c3f-c3093ec86b51"
             }
         }

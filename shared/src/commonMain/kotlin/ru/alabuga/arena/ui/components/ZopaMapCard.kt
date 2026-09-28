@@ -1,5 +1,6 @@
 package ru.alabuga.arena.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -45,12 +46,31 @@ fun ZopaMapCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF131726))
-            .border(1.dp, Color(0xFF282F48), RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xFF0D101B).copy(alpha = 0.55f))
+            .border(
+                BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        listOf(
+                            Color(0xFF7B2CBF).copy(alpha = 0.35f),
+                            Color(0xFF00FFCC).copy(alpha = 0.20f)
+                        )
+                    )
+                ),
+                RoundedCornerShape(20.dp)
+            )
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Top sheen
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(Color.White.copy(alpha = 0.06f))
+        )
+
         // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -78,15 +98,15 @@ fun ZopaMapCard(
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(50))
                     .background(
-                        if (zopa.isOverlap) Color(0xFF10B981).copy(alpha = 0.2f)
-                        else Color(0xFF7B2CBF).copy(alpha = 0.2f)
+                        if (zopa.isOverlap) Color(0xFF10B981).copy(alpha = 0.18f)
+                        else Color(0xFF7B2CBF).copy(alpha = 0.18f)
                     )
                     .border(
                         1.dp,
-                        if (zopa.isOverlap) Color(0xFF10B981) else Color(0xFF9D4EDD),
-                        RoundedCornerShape(20.dp)
+                        if (zopa.isOverlap) Color(0xFF10B981).copy(alpha = 0.45f) else Color(0xFF9D4EDD).copy(alpha = 0.45f),
+                        RoundedCornerShape(50)
                     )
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
@@ -100,60 +120,74 @@ fun ZopaMapCard(
             }
         }
 
-        // Шкала 1: ОЭЗ Алабуга (BATNA)
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Границы ОЭЗ (BATNA):", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                Text("${zopa.sellerMin} – ${zopa.sellerMax} ₽/м²", fontSize = 11.sp, color = Color(0xFF00F0FF), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF0A0C16))
-            ) {
+        // ZOPA visualization tracks
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Buyer track
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("ПОКУПАТЕЛЬ (ИНВЕСТОР)", fontSize = 9.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
+                    Text("${zopa.buyerMin} - ${zopa.buyerMax} ₽/м²", fontSize = 10.sp, color = Color(0xFFCBD5E1), fontFamily = FontFamily.Monospace)
+                }
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(fraction = sellerWidth)
-                        .padding(start = 0.dp) // Simplified
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFF00B4D8), Color(0xFF00F0FF))))
-                )
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFF16192B))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(buyerWidth)
+                            .offset(x = (buyerLeft * 260).dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFF3B82F6), Color(0xFF00F0FF))
+                                )
+                            )
+                    )
+                }
+            }
+
+            // Seller (Alabuga) track
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("ОЭЗ «АЛАБУГА» (BATNA)", fontSize = 9.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
+                    Text("${zopa.sellerMin} - ${zopa.sellerMax} ₽/м²", fontSize = 10.sp, color = Color(0xFFCBD5E1), fontFamily = FontFamily.Monospace)
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFF16192B))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(sellerWidth)
+                            .offset(x = (sellerLeft * 260).dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFF7B2CBF), Color(0xFF10B981))
+                                )
+                            )
+                    )
+                }
             }
         }
 
-        // Шкала 2: Оппонент
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Готовность инвестора:", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                Text("${zopa.buyerMin} – ${zopa.buyerMax} ₽/м²", fontSize = 11.sp, color = Color(0xFFD8B4FE), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF0A0C16))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(fraction = buyerWidth)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFF7B2CBF), Color(0xFFD8B4FE))))
-                )
-            }
-        }
-
-        // Динамический комментарий
         Text(
             text = zopa.changeReason,
             fontSize = 11.sp,
