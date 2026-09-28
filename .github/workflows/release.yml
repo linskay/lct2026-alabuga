@@ -158,14 +158,18 @@ jobs:
             $env:PATH = "$wixPath;$env:PATH"
             $env:WIX = "C:\Program Files (x86)\WiX Toolset v3.11"
           }
-          Write-Host "Building UberJar..."
+          Write-Host "Building standalone UberJar..."
           .\gradlew.bat :desktop:packageUberJarForCurrentOS --no-daemon --stacktrace
-          
-          Write-Host "Building MSI Distribution..."
-          try {
-            .\gradlew.bat :desktop:packageDistributionForCurrentOS --no-daemon --stacktrace
-          } catch {
-            Write-Warning "MSI package creation failed, continuing with standalone UberJar: $_"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "UberJar build failed!"
+            exit 1
+          }
+
+          Write-Host "Building native MSI Distribution..."
+          .\gradlew.bat :desktop:packageDistributionForCurrentOS --no-daemon
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "MSI packaging exited with code $LASTEXITCODE. UberJar will serve as the primary Windows distribution artifact."
+            $global:LASTEXITCODE = 0
           }
 
       - name: Show jpackage logs on failure

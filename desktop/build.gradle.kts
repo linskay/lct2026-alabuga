@@ -37,19 +37,18 @@ compose.desktop {
     application {
         mainClass = "ru.alabuga.arena.desktop.MainKt"
         nativeDistributions {
-            // MSI собирается нативно через jpackage и работает надёжно.
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "AlabugaArena"
             packageVersion = "1.0.0"
-            description = "Интерактивный тренажер переговоров ОЭЗ «Алабуга»"
-            copyright = "Copyright (c) 2026 ОЭЗ «Алабуга»"
-            vendor = "ОЭЗ «Алабуга»"
+            description = "Alabuga B2B Negotiation Arena Simulator"
+            copyright = "Copyright (c) 2026 SEZ Alabuga"
+            vendor = "SEZ Alabuga"
 
             windows {
                 menu = true
                 shortcut = true
                 dirChooser = true
-                menuGroup = "ОЭЗ «Алабуга»"
+                menuGroup = "Alabuga Arena"
                 upgradeUuid = "d7c805eb-642d-45db-9c3f-c3093ec86b51"
                 iconFile.set(project.file("src/desktopMain/resources/icon.ico"))
             }
