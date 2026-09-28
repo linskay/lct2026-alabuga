@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import ru.alabuga.arena.model.AgendaTopic
+import ru.alabuga.arena.model.AppSettings
 import ru.alabuga.arena.model.BatnaRules
 import ru.alabuga.arena.model.ScenarioConfig
 import ru.alabuga.arena.model.ScenarioPresets
@@ -54,11 +55,11 @@ fun AdminScreen(
     var minPrice by remember { mutableStateOf(currentConfig.batna.minPricePerSqm.toString()) }
     var maxGrace by remember { mutableStateOf(currentConfig.batna.maxGracePeriodMonths.toString()) }
 
-    var geminiKey by remember { mutableStateOf("") }
-    var openRouterKey by remember { mutableStateOf("") }
+    var geminiKey by remember { mutableStateOf(AppSettings.geminiApiKey) }
+    var openRouterKey by remember { mutableStateOf(AppSettings.openRouterApiKey) }
     var showGeminiKey by remember { mutableStateOf(false) }
     var showOpenRouterKey by remember { mutableStateOf(false) }
-    var apiKeysSaved by remember { mutableStateOf(false) }
+    var apiKeysSaved by remember { mutableStateOf(AppSettings.geminiApiKey.isNotBlank() || AppSettings.openRouterApiKey.isNotBlank()) }
 
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -389,7 +390,11 @@ fun AdminScreen(
                         }
 
                         Button(
-                            onClick = { apiKeysSaved = true },
+                            onClick = {
+                                AppSettings.geminiApiKey = geminiKey.trim()
+                                AppSettings.openRouterApiKey = openRouterKey.trim()
+                                apiKeysSaved = true
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (apiKeysSaved) Color(0xFF10B981) else Color(0xFF7B2CBF)
                             ),
@@ -406,6 +411,8 @@ fun AdminScreen(
                 // 5. Кнопка запуска симуляции
                 Button(
                     onClick = {
+                        AppSettings.geminiApiKey = geminiKey.trim()
+                        AppSettings.openRouterApiKey = openRouterKey.trim()
                         val updated = config.copy(
                             toughnessLevel = toughness.toInt(),
                             batna = config.batna.copy(

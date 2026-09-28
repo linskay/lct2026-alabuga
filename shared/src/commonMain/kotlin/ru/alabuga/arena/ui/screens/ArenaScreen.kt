@@ -732,7 +732,14 @@ fun ArenaScreen(
                                                         else -> "💼" to "Деловой анализ"
                                                     }
 
-                                                    val oppOffer = (zopaState.currentOffer + (replyDto.metricsDelta.dealReadiness * 2).coerceAtLeast(10)).coerceAtMost(520)
+                                                    val deltaOffer = if (replyDto.metricsDelta.dealReadiness > 0) {
+                                                        (replyDto.metricsDelta.dealReadiness * 2).coerceIn(5, 40)
+                                                    } else if (replyDto.metricsDelta.dealReadiness < 0) {
+                                                        (-10).coerceAtLeast(-30)
+                                                    } else {
+                                                        0
+                                                    }
+                                                    val oppOffer = (zopaState.currentOffer + deltaOffer).coerceIn(300, 520)
                                                     val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
                                                     zopaState = zopaState.copy(
                                                         buyerMax = oppOffer,
@@ -740,7 +747,15 @@ fun ArenaScreen(
                                                         isOverlap = isOverlapNow,
                                                         overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
                                                         overlapMax = if (isOverlapNow) oppOffer else null,
-                                                        changeReason = if (isOverlapNow) "Коридор сделки открыт! Стороны сошлись в цене от ${config.batna.minPricePerSqm} ₽/м²." else "Оппонент скорректировал позицию до $oppOffer ₽/м² на основе встречных аргументов."
+                                                        changeReason = if (isOverlapNow) {
+                                                            "Коридор сделки открыт! Стороны сошлись в цене от ${config.batna.minPricePerSqm} ₽/м²."
+                                                        } else if (deltaOffer > 0) {
+                                                            "Оппонент скорректировал позицию до $oppOffer ₽/м² на основе встречных аргументов."
+                                                        } else if (deltaOffer < 0) {
+                                                            "Оппонент ужесточил позицию ($oppOffer ₽/м²) из-за слабого обоснования цены."
+                                                        } else {
+                                                            zopaState.changeReason
+                                                        }
                                                     )
 
                                                     messages.add(

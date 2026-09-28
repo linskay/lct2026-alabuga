@@ -3,45 +3,23 @@ package ru.alabuga.arena.network
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import ru.alabuga.arena.model.Message
-import ru.alabuga.arena.model.MessageActor
-import ru.alabuga.arena.model.NegotiationMetrics
-import ru.alabuga.arena.model.OpponentReplyDto
-import ru.alabuga.arena.model.ScenarioConfig
+import kotlinx.serialization.json.*
+import ru.alabuga.arena.model.*
+import kotlin.random.Random
 
 /**
  * ## KtorGeminiService
  *
- * REST-клиент интеграции с нейросетевыми сервисами Google Gemini и LLM-бэкендом тренажера переговоров.
- *
- * ### Назначение:
- * Выполняет генерацию реплик оппонента, расчёт дельты психологических метрик (Trust / Tension / Deal Readiness),
- * формирование оперативного совета тактического наставника Б.А.Р.С. и подсказок для игрока.
- *
- * ### Спецификация API (OpenAPI / Spring-like Contract):
- * - **Protocol:** HTTPS
- * - **Endpoint:** `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`
- * - **Query Params:** `key={apiKey}`
- * - **Headers:** `Content-Type: application/json`
- * - **Response Codes:**
- *   - `200 OK` — Успешная генерация структурированного JSON-ответа оппонента и наставника Б.А.Р.С.
- *   - `400 Bad Request` — Некорректный синтаксис промпта или системной инструкции.
- *   - `401 Unauthorized` — Отсутствует или недействителен ключ Google AI Studio API.
- *   - `429 Too Many Requests` — Превышена квота запросов (активируется встроенный Smart Fallback).
- *   - `500 Internal Error / Offline` — Ошибка сети или недоступность серверов (бесшовный переход на детерминированный движок).
- *
- * @param apiKey Ключ доступа к Google Gemini API (Google AI Studio).
+ * REST-клиент интеграции с Google Gemini 2.5 Flash, OpenRouter API и локальным тактическим движком.
  */
-class KtorGeminiService(private val apiKey: String = "AQ.Ab8RN6J_y1T93WtfF7T-WR4X0KFd37VOkNo4Uvy2suGRtjVKyQ") {
+class KtorGeminiService(private val defaultApiKey: String = "") {
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -55,27 +33,6 @@ class KtorGeminiService(private val apiKey: String = "AQ.Ab8RN6J_y1T93WtfF7T-WR4
         }
     }
 
-    /**
-     * Отправляет текущее состояние диалога в нейросетевой движок и возвращает структурированный ответ.
-     *
-     * ### Поведение метода:
-     * 1. Формирует системную директиву с психотипом оппонента, уровнем жесткости и границами BATNA ОЭЗ «Алабуга».
-     * 2. Передает последние 10 реплик диалога с текущими метриками.
-     * 3. При сбое сети, невалидном ключе или таймауте выполняет автоматический откат на встроенный
-     *    детерминированный тактический движок (Deterministic Tactical Fallback).
-     *
-     * @param history Список предыдущих сообщений диалога с метаданными акторов.
-     * @param userMessage Новая аргументационная реплика, отправленная игроком.
-     * @param config Конфигурация сценария (имя, психотип, жесткость, красные линии BATNA, повестка).
-     * @param currentMetrics Текущие показатели доверия, стресса и готовности к сделке.
-     *
-     * @return [OpponentReplyDto] Структурированный объект ответа, содержащий:
-     *         - `opponent_reply` — встречная речь оппонента;
-     *         - `bars_feedback` — тактический анализ наставника Б.А.Р.С.;
-     *         - `bars_animation` — триггер 3D-анимации робота (`idle`, `talk`, `warn`, `win`);
-     *         - `metrics_delta` — дельта метрик trust, tension, deal_readiness;
-     *         - `dynamic_hints` — 3 контекстные заготовки аргументов для следующего раунда.
-     */
     suspend fun sendMessage(
         history: List<Message>,
         userMessage: String,
@@ -143,180 +100,223 @@ class KtorGeminiService(private val apiKey: String = "AQ.Ab8RN6J_y1T93WtfF7T-WR4
             "$senderLabel: ${it.text}"
         }
 
-        val fullPrompt = "$historyText\nИгрок (ОЭЗ): $userMessage\n\nТекущие метрики: Trust=${currentMetrics.trust}, Tension=${currentMetrics.tension}, Readiness=${currentMetrics.dealReadiness}"
+        val fullPrompt = "$historyText\nИгрок (ОЭЗ): $userMessage\n\nТекущие метрики: Trust=${currentMetrics.trust}%, Tension=${currentMetrics.tension}%, Readiness=${currentMetrics.dealReadiness}%"
 
-        return try {
-            if (apiKey.isBlank()) throw IllegalStateException("API key is not set, using smart fallback")
+        val geminiKey = AppSettings.geminiApiKey.ifBlank { defaultApiKey }.trim()
+        val openRouterKey = AppSettings.openRouterApiKey.trim()
 
-            val response: GeminiResponse = client.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey") {
-                contentType(ContentType.Application.Json)
-                setBody(
-                    buildJsonObject {
-                        put("systemInstruction", buildJsonObject {
-                            put("parts", json.parseToJsonElement("""[{"text": ${Json.encodeToString(systemPrompt)}}]"""))
-                        })
-                        put("contents", json.parseToJsonElement("""[{"role": "user", "parts": [{"text": ${Json.encodeToString(fullPrompt)}}]}]"""))
-                    }
-                )
-            }.body()
+        // 1. Попытка запроса через Google Gemini (если есть ключ)
+        if (geminiKey.isNotBlank() && geminiKey.startsWith("AIzaSy")) {
+            try {
+                val response: GeminiResponse = client.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$geminiKey") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        buildJsonObject {
+                            put("systemInstruction", buildJsonObject {
+                                put("parts", json.parseToJsonElement("""[{"text": ${Json.encodeToString(systemPrompt)}}]"""))
+                            })
+                            put("contents", json.parseToJsonElement("""[{"role": "user", "parts": [{"text": ${Json.encodeToString(fullPrompt)}}]}]"""))
+                        }
+                    )
+                }.body()
 
-            val textContent = response.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
-            val cleanJson = textContent.replace("```json", "").replace("```", "").trim()
-
-            json.decodeFromString<OpponentReplyDto>(cleanJson)
-        } catch (_: Throwable) {
-            // Smart Deterministic Fallback
-            createSmartFallback(userMessage, config)
+                val textContent = response.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
+                val cleanJson = textContent.replace("```json", "").replace("```", "").trim()
+                if (cleanJson.isNotBlank()) {
+                    return json.decodeFromString<OpponentReplyDto>(cleanJson)
+                }
+            } catch (e: Throwable) {
+                println("Gemini API call failed: ${e.message}")
+            }
         }
+
+        // 2. Попытка запроса через OpenRouter (если есть ключ)
+        if (openRouterKey.isNotBlank()) {
+            try {
+                val openRouterResp: OpenRouterChatResponse = client.post("https://openrouter.ai/api/v1/chat/completions") {
+                    contentType(ContentType.Application.Json)
+                    header("Authorization", "Bearer $openRouterKey")
+                    setBody(
+                        buildJsonObject {
+                            put("model", "google/gemini-2.5-flash")
+                            put("messages", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("role", "system")
+                                    put("content", systemPrompt)
+                                })
+                                add(buildJsonObject {
+                                    put("role", "user")
+                                    put("content", fullPrompt)
+                                })
+                            })
+                        }
+                    )
+                }.body()
+
+                val textContent = openRouterResp.choices.firstOrNull()?.message?.content ?: ""
+                val cleanJson = textContent.replace("```json", "").replace("```", "").trim()
+                if (cleanJson.isNotBlank()) {
+                    return json.decodeFromString<OpponentReplyDto>(cleanJson)
+                }
+            } catch (e: Throwable) {
+                println("OpenRouter API call failed: ${e.message}")
+            }
+        }
+
+        // 3. Динамический интеллектуальный локальный движок (Smart Context Fallback)
+        return createDynamicContextFallback(userMessage, config, currentMetrics, history)
     }
 
     /**
-     * Локальный детерминированный движок тактической генерации (Fallback Engine).
-     * Срабатывает при отсутствии интернет-соединения, исчерпании лимитов API или сбоях LLM.
+     * Высокоинтеллектуальный динамический движок тактической генерации диалога.
+     * Анализирует ценовые предложения, условия, уступки, вопросы и риски.
      */
-    private fun createSmartFallback(
+    private fun createDynamicContextFallback(
         userMessage: String,
-        config: ScenarioConfig
+        config: ScenarioConfig,
+        currentMetrics: NegotiationMetrics,
+        history: List<Message>
     ): OpponentReplyDto {
         val lower = userMessage.lowercase().trim()
         val words = lower.split(Regex("\\s+")).filter { it.isNotBlank() }
 
-        // 1. Проверка на базарный торг без аргументов
-        val isBazaarTorg = lower.matches(Regex("^[+\\-~]?\\s*\\d+(?:[.,]\\d+)?\\s*(?:[рp₽]|руб(?:лей|ля)?)?\\.?$")) ||
-                (words.size < 4 && (lower.contains("скинь") || lower.contains("дешев") || lower.contains("руб") || lower.contains("давай за")))
+        // Извлечение цифр (ставки аренды / CAPEX)
+        val extractedNumbers = Regex("\\b\\d{2,6}\\b").findAll(lower).mapNotNull { it.value.toIntOrNull() }.toList()
+        val proposedPrice = extractedNumbers.firstOrNull { it in 200..800 }
 
-        if (isBazaarTorg) {
-            return OpponentReplyDto(
-                opponentReply = "Я не на базаре, коллеги. Обоснуйте, за счет чего мы должны снизить цену? Какую гарантию или объем вы даете взамен?",
-                barsFeedback = "Оппонент отверг базарный торг! В B2B-переговорах любая уступка по цене разменивается на встречные обязательства (сроки, CAPEX, объем инвестиций).",
-                barsAnimation = "warn",
-                metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = -10, tension = 15, dealReadiness = -5),
-                dynamicHints = listOf(
-                    "Мы готовы пойти навстречу по ставке до 460 ₽/м², если вы возьмете на себя пусконаладку оборудования...",
-                    "Поймите, ставка 480 ₽/м² обусловлена тем, что мы берем на себя все сети. У других резидентов условия жестче...",
-                    "Давайте зафиксируем ставку 460 ₽/м², но увеличим срок каникул до 4 месяцев, чтобы компенсировать ваши риски по CAPEX...",
-                    "У нас есть запрос от другого инвестора на эти площади, но мы хотим работать с вами. Давайте сойдемся на 460 ₽/м²..."
-                ),
-                isDealClosed = false
-            )
-        }
+        // Анализ тем
+        val mentionsPower = lower.contains("110 кв") || lower.contains("110кв") || lower.contains("квт") || lower.contains("мвт") || lower.contains("мощнос") || lower.contains("энерг")
+        val mentionsCapex = lower.contains("capex") || lower.contains("инвест") || lower.contains("млрд") || lower.contains("млн") || lower.contains("вложени")
+        val mentionsTax = lower.contains("налог") || lower.contains("льгот") || lower.contains("преференц") || lower.contains("0%")
+        val mentionsGrace = lower.contains("каникул") || lower.contains("пусконалад") || lower.contains("месяц") || lower.contains("срок")
+        val mentionsGuarantees = lower.contains("гарант") || lower.contains("штраф") || lower.contains("договор") || lower.contains("ответственност")
+        val isQuestion = lower.contains("?") || lower.startsWith("как") || lower.startsWith("когда") || lower.startsWith("сколько") || lower.startsWith("какие")
 
-        // 2. Проверка на базарный торг (голая цифра) или короткую фразу без условий
+        // 1. Проверка на базарный торг (голая цифра) или слишком короткий ввод
         val isBareNumber = lower.matches(Regex("^[+\\-~]?\\s*\\d+(?:[.,]\\d+)?\\s*(?:[рp₽]|руб(?:лей|ля|ль)?(?:\\s*\\/\\s*м[²2]?)?)?\\.?$"))
-        val fallbackWords = lower.split(Regex("\\s+")).filter { it.isNotBlank() }
-        val isTooShortWithoutB2B = fallbackWords.size < 4 && !lower.contains("если") && !lower.contains("взамен") && !lower.contains("при условии") && !lower.contains("гарант") && !lower.contains("готовы")
+        val isShortWithoutB2B = words.size < 4 && !lower.contains("если") && !lower.contains("взамен") && !lower.contains("при условии") && !lower.contains("гарант")
 
-        if (isBareNumber || isTooShortWithoutB2B) {
+        if (isBareNumber || isShortWithoutB2B) {
+            val variants = listOf(
+                "Слушайте, мы в ОЭЗ торгуемся как на рынке или обсуждаем стратегический проект? На чем основана эта цифра? Без встречных обязательств по мощностям и срокам пусконаладки я эту цифру даже обсуждать не буду.",
+                "Коллеги, это несерьезный разговор. Назвать цифру без аргументов и расчета окупаемости — это базарный подход. Сформулируйте встречные условия.",
+                "Вы предлагаете цифру в вакууме. А что по графику инвестиций? Что по подключению 110 кВ? Без встречного пакета мы топчемся на месте."
+            )
             return OpponentReplyDto(
-                opponentReply = "Слушайте, мы в ОЭЗ торгуемся как на рынке или обсуждаем инвестпроект? На чем основана эта цифра? Без встречных обязательств по мощностям и срокам пусконаладки я эту цифру даже обсуждать не буду.",
-                barsFeedback = "Оппонент жестко пресек попытку базарного торга! В B2B-переговорах никогда не называй голую цену без встречного условия («если вы..., то мы...»).",
+                opponentReply = variants[Random.nextInt(variants.size)],
+                barsFeedback = "Оппонент жестко пресек попытку базарного торга! В B2B-переговорах никогда не называй цену без встречного условия («если вы..., то мы...»).",
                 barsAnimation = "warn",
-                metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = -15, tension = 20, dealReadiness = -10),
+                metricsDelta = MetricsDelta(trust = -12, tension = 18, dealReadiness = -8),
                 dynamicHints = listOf(
-                    "Мы готовы зафиксировать ставку [укажите цифру] ₽/м², если вы возьмете на себя обязательство по CAPEX...",
-                    "Поймите, ставка 460 ₽/м² обусловлена подведенными сетями 110 кВ. Предлагаем компромисс...",
-                    "Давайте свяжем ставку аренды со сроком выхода на полную мощность завода..."
+                    "Мы готовы зафиксировать ставку [ставка] ₽/м², если вы возьмете на себя обязательство по CAPEX не менее 1.2 млрд ₽...",
+                    "Поймите, ставка 460 ₽/м² обусловлена готовой инфраструктурой 110 кВ. Предлагаем компромисс по каникулам...",
+                    "Давайте свяжем ставку аренды со сроком ввода производственной линии..."
                 ),
                 isDealClosed = false
             )
         }
 
-        // 3. Проверка на неформальный ввод, фамильярность, сленг и наезды
-        val isInformalOrRude = lower.contains("гусь") || lower.contains("брат") || lower.contains("слышь") ||
-                lower.contains("чё") || lower.contains("че ") || lower.contains("погнали") ||
-                lower.contains("э ") || lower.contains("чувак") || lower.contains("лох") ||
-                lower.contains("фигн") || lower.contains("херн") || lower.contains("забей") ||
-                lower.contains("ты кто") || lower.length < 5
-
-        if (isInformalOrRude) {
+        // 2. Игрок задал вопрос
+        if (isQuestion) {
+            val replyText = when {
+                mentionsPower -> "По мощностям нам требуется гарантированное подключение не менее 8 МВт к началу 3 квартала. Если ОЭЗ готова дать банковскую гарантию готовности сетей, мы готовы обсуждать ставку от 440 ₽/м²."
+                mentionsGrace -> "По нашему графику монтаж оборудования тяжелой штамповки занимает минимум 8 месяцев. 12 месяцев было бы идеально, но на 4 месяца мы согласимся только при ставке 420 ₽/м²."
+                mentionsCapex -> "Наш общий объем инвестиций в первую очередь составляет 1.4 млрд рублей. Из них 600 млн — это станки из дружественных юрисдикций. Мы несем колоссальные валютные риски."
+                else -> "Нас в первую очередь интересует надежность энергосетей, налоговый пакет и фиксированная ставка аренды на 5 лет без скрытых индексаций. Что из этого ОЭЗ готова гарантировать?"
+            }
             return OpponentReplyDto(
-                opponentReply = "Коллега, мы находимся на переговорах стратегического уровня, а не на базаре. Прошу соблюдать деловой этикет и формулировать условия языком цифр и контрактных обязательств, иначе мы прервем диалог.",
-                barsFeedback = "Грубая тактическая ошибка! Фамильярность и неформальный тон обрушивают доверие оппонента и взвинчивают стресс. Возвращайся к строгому деловому языку.",
-                barsAnimation = "warn",
-                metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = -15, tension = 20, dealReadiness = -10),
+                opponentReply = replyText,
+                barsFeedback = "Отличный ход: открытый вопрос вскрыл приоритеты и скрытые риски оппонента. Теперь формируй пакетное предложение!",
+                barsAnimation = "talk",
+                metricsDelta = MetricsDelta(trust = 6, tension = -4, dealReadiness = 6),
                 dynamicHints = listOf(
-                    "Приношу извинения за резкость. Давайте вернемся к расчету окупаемости по ставке...",
-                    "Мы готовы пойти навстречу по ставке до 460 ₽/м², если вы возьмете на себя пусконаладку оборудования...",
-                    "ОЭЗ «Алабуга» гарантирует юридическую чистоту и строгое соблюдение регламентов..."
-                ),
-                isDealClosed = false
+                    "Мы гарантируем 8 МВт мощности по первой категории надежности в обмен на ставку 460 ₽/м²...",
+                    "Предлагаем 4 месяца каникул при условии запуска пусконаладки во 2 квартале...",
+                    "Пакет льгот 0% на имущество и землю компенсирует любые задержки уже в первый год..."
+                )
             )
         }
 
-        return when {
-            lower.contains("460") || lower.contains("capex") || lower.contains("гарант") || lower.contains("110 кв") -> {
-                OpponentReplyDto(
-                    opponentReply = "Ваша позиция аргументирована. Если вы юридически фиксируете график ввода подстанции 110 кВ и банковскую гарантию компенсации простоев, мы согласны рассмотреть ставку 460 ₽/м².",
-                    barsFeedback = "Отличный тактический ход! Оппонент пошел на сближение позиций, признав встречные гарантии.",
+        // 3. Игрок предложил ставку в районе BATNA (460 - 520 ₽/м²)
+        if (proposedPrice != null && proposedPrice >= config.batna.minPricePerSqm) {
+            val hasStrongTerms = mentionsCapex || mentionsPower || mentionsTax || mentionsGuarantees
+            if (hasStrongTerms) {
+                return OpponentReplyDto(
+                    opponentReply = "Валерий внимательно изучил ваши расчеты... Смотрите, $proposedPrice ₽/м² — это выше нашего изначального бюджета, но с учетом гарантии энергомощностей 110 кВ и налоговых преференций мы готовы пойти на этот компромисс. Давайте фиксировать в протоколе.",
+                    barsFeedback = "Блестящая победа! Ты удержал красную линию BATNA ($proposedPrice ₽/м²) и связал условия с инфраструктурой ОЭЗ. Сделка на мази!",
                     barsAnimation = "win",
-                    metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 8, tension = -6, dealReadiness = 12),
+                    metricsDelta = MetricsDelta(trust = 14, tension = -10, dealReadiness = 20),
                     dynamicHints = listOf(
-                        "Фиксируем ставку 460 ₽/м² и график ввода мощностей до [квартал/год]...",
-                        "Готовы подписать протокол о намерениях с условием CAPEX 1.2 млрд ₽...",
-                        "Согласуем льготный период 4 месяца при встречной гарантии инвестиций..."
+                        "Фиксируем ставку $proposedPrice ₽/м² в соглашении о намерениях...",
+                        "Утверждаем 4 месяца арендных каникул с момента передачи площадки...",
+                        "Передаем проект договора в юридический департамент ОЭЗ..."
                     ),
-                    isDealClosed = false
+                    isDealClosed = currentMetrics.dealReadiness >= 60
                 )
-            }
-            lower.contains("налог") || lower.contains("преференци") || lower.contains("0%") || lower.contains("прибыль") -> {
-                OpponentReplyDto(
-                    opponentReply = "Да, налоговые льготы ОЭЗ (0% на имущество и транспорт) снижают нашу фискальную нагрузку на 140 млн ₽ в год. Это весомый аргумент, однако риски задержки пусконаладки всё ещё высоки.",
-                    barsFeedback = "Превосходно! Апелляция к налоговым преференциям усилила ценность предложения ОЭЗ без уступок в базовой ставке.",
+            } else {
+                return OpponentReplyDto(
+                    opponentReply = "Вы предлагаете $proposedPrice ₽/м², но не даете конкретики по срокам ввода сетей. Если вы подтвердите подключение 8 МВт и каникулы 4 месяца — мы согласны на $proposedPrice ₽/м².",
+                    barsFeedback = "Оппонент близок к согласию на нашу ставку! Добавь встречные гарантии по сетям и закрывай раунд.",
                     barsAnimation = "talk",
-                    metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 6, tension = -4, dealReadiness = 10),
+                    metricsDelta = MetricsDelta(trust = 8, tension = -5, dealReadiness = 12),
                     dynamicHints = listOf(
-                        "Налоговая экономия перекрывает ставку 480 ₽/м² уже со второго года работы...",
-                        "Предлагаем закрепить налоговый статус резидента в течение 30 дней...",
-                        "Готовы включить сопровождение подключения инженерных сетей под ключ..."
-                    )
-                )
-            }
-            lower.contains("скидк") || lower.contains("уступ") || lower.contains("соглас") || lower.contains("380") -> {
-                OpponentReplyDto(
-                    opponentReply = "Мы видим вашу готовность идти навстречу. Однако ставка ниже 460 ₽/м² нарушает финансовую модель проекта. Давайте зафиксируем 440 ₽/м² только при предоплате за 6 месяцев.",
-                    barsFeedback = "Внимание: не сдавай позиции без встречных требований! Защищай BATNA и требуй жестких встречных обязательств.",
-                    barsAnimation = "warn",
-                    metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 4, tension = 5, dealReadiness = 6),
-                    dynamicHints = listOf(
-                        "Ставка ниже 460 ₽/м² невозможна по регламенту ОЭЗ. Наш минимум — 460 ₽/м²...",
-                        "Мы можем рассмотреть скидку только при объеме аренды от 15 000 м²...",
-                        "Снижение ставки возможно только взамен на сокращение арендных каникул до 2 месяцев..."
-                    )
-                )
-            }
-            lower.contains("штраф") || lower.contains("риск") || lower.contains("ответственност") -> {
-                OpponentReplyDto(
-                    opponentReply = "Мы готовы внести пункт о взаимных штрафных санкциях: 0.1% за каждый день просрочки ввода сетей взамен на наши обязательства по запуску производства во 2 квартале.",
-                    barsFeedback = "Конструктивное русло! Закрепление взаимной ответственности уравновешивает переговорные силы.",
-                    barsAnimation = "talk",
-                    metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 7, tension = -3, dealReadiness = 9),
-                    dynamicHints = listOf(
-                        "Фиксируем предел ответственности в размере 5% от годовой аренды...",
-                        "Включаем форс-мажорную оговорку по поставкам высоковольтного оборудования...",
-                        "Утверждаем зеркальный штраф за срыв сроков монтажа оборудования резидентом..."
-                    )
-                )
-            }
-            else -> {
-                OpponentReplyDto(
-                    opponentReply = "Мы выслушали вас, но наши финансовые консультанты настаивают на конкретизации условий по энергомощностям и компенсациям CAPEX. Каковы ваши финальные встречные предложения?",
-                    barsFeedback = "Переходи в наступление: назови твердую ставку 460–480 ₽/м² и обоснуй ее налоговыми льготами 0% и гарантией сетей 110 кВ.",
-                    barsAnimation = "talk",
-                    metricsDelta = ru.alabuga.arena.model.MetricsDelta(trust = 3, tension = 2, dealReadiness = 4),
-                    dynamicHints = listOf(
-                        "Налоговый пакет ОЭЗ (0% на имущество) полностью компенсирует арендную ставку...",
-                        "Свободные мощности 110 кВ в нашем кластере обеспечат ваш запуск без задержек...",
-                        "Предлагаем разбить ввод мощностей на два этапа с фиксацией ставки 460 ₽/м²..."
+                        "Гарантируем ввод сетей 110 кВ до 1 сентября и фиксируем $proposedPrice ₽/м²...",
+                        "Предоставляем 4 месяца каникул при встречном графике монтажа оборудования..."
                     )
                 )
             }
         }
+
+        // 4. Игрок затронул налоги или инфраструктуру
+        if (mentionsTax || mentionsPower) {
+            return OpponentReplyDto(
+                opponentReply = "Да, нулевая ставка налога на имущество и транспорт дает нам около 120 млн рублей экономии в год. Это существенный фактор. Но поймите и нас: простой завода из-за сетей обойдется в 5 млн рублей в сутки. Каковы штрафные санкции ОЭЗ при срыве сроков?",
+                barsFeedback = "Ты нащупал ключевой рычаг ценности! Оппонент признал выгоду налогов, но требует гарантий. Предложи пункт о взаимной ответственности.",
+                barsAnimation = "talk",
+                metricsDelta = MetricsDelta(trust = 9, tension = -4, dealReadiness = 10),
+                dynamicHints = listOf(
+                    "Мы готовы внести зеркальный штраф 0.1% за день просрочки при ставке 460 ₽/м²...",
+                    "Налоговая экономия перекрывает ставку аренды уже со 2-го месяца работы...",
+                    "Предлагаем зафиксировать ставку 460 ₽/м² с персональным куратором по техприсоединению..."
+                )
+            )
+        }
+
+        // 5. Игрок предложил уступку по каникулам или компромисс
+        if (mentionsGrace || mentionsCapex) {
+            return OpponentReplyDto(
+                opponentReply = "Хорошо, если каникулы составляют 4 месяца, то мы вынуждены форсировать пусконаладку. Мы согласны рассмотреть встречный шаг по ставке, но не выше 440–460 ₽/м². Что скажете по энерголимитам?",
+                barsFeedback = "Позиции сторон сближаются! Держи планку 460 ₽/м² и подтверждай энергомощности.",
+                barsAnimation = "talk",
+                metricsDelta = MetricsDelta(trust = 7, tension = -3, dealReadiness = 8),
+                dynamicHints = listOf(
+                    "Мы фиксируем 460 ₽/м² и резервируем 8 МВт по первой категории надежности...",
+                    "Давайте подпишем дорожную карту ввода очередей с привязкой к CAPEX..."
+                )
+            )
+        }
+
+        // 6. Общий реалистичный контекстный ответ
+        val defaultReplies = listOf(
+            "Мы услышали ваши тезисы. Наш совет директоров согласен на гибкость, но требует гарантий окупаемости. Давайте конкретизируем: какая базовая ставка и какие обязательства по CAPEX будут в договоре?",
+            "Позиция понятна, но без четких цифр по ставке и срокам каникул мы не сможем защитить этот инвестпроект перед акционерами. Каковы ваши финальные встречные условия?",
+            "Слушайте, мы готовы работать с «Алабугой», площадка действительно сильная. Но нам нужна определенность по ставке (от 460 ₽/м²) и мощностям. Давайте сойдемся на конкретных параметрах."
+        )
+
+        return OpponentReplyDto(
+            opponentReply = defaultReplies[Random.nextInt(defaultReplies.size)],
+            barsFeedback = "Переходи к твердым B2B-аргументам: назови твердую ставку 460 ₽/м², обоснуй ее готовыми сетями 110 кВ и налоговыми преференциями 0%.",
+            barsAnimation = "talk",
+            metricsDelta = MetricsDelta(trust = 4, tension = -2, dealReadiness = 5),
+            dynamicHints = listOf(
+                "Мы готовы зафиксировать 460 ₽/м² при встречном обязательном CAPEX не менее 1.2 млрд ₽...",
+                "Пакет резидента ОЭЗ дает экономию 140 млн ₽ в год, что полностью оправдывает ставку 460 ₽/м²...",
+                "Предлагаем разбить ввод мощностей на 2 этапа и зафиксировать условия..."
+            )
+        )
     }
 }
 
-/**
- * Вспомогательные транспортные DTO для десериализации ответа Google Gemini REST API.
- */
 @Serializable
 private data class GeminiResponse(
     val candidates: List<GeminiCandidate> = emptyList()
@@ -335,4 +335,19 @@ private data class GeminiContent(
 @Serializable
 private data class GeminiPart(
     val text: String = ""
+)
+
+@Serializable
+private data class OpenRouterChatResponse(
+    val choices: List<OpenRouterChoice> = emptyList()
+)
+
+@Serializable
+private data class OpenRouterChoice(
+    val message: OpenRouterMessage? = null
+)
+
+@Serializable
+private data class OpenRouterMessage(
+    val content: String = ""
 )

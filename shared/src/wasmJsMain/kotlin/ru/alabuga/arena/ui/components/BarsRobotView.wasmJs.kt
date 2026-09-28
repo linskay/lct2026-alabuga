@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.Dp
 @JsFun("(visible, x, y, width, height, anim) => { if (typeof window.setBars3D === 'function') { window.setBars3D(visible, x, y, width, height, anim); } }")
 private external fun jsSetBars3D(visible: Boolean, x: Double, y: Double, width: Double, height: Double, anim: String)
 
+@JsFun("() => { if (typeof window.hideBars3D === 'function') { window.hideBars3D(); } else if (typeof window.setBars3D === 'function') { window.setBars3D(false, 0, 0, 0, 0, ''); } }")
+private external fun jsHideBars3D()
+
 @Composable
 actual fun BarsRobotView(
     animation: String,
@@ -36,12 +39,14 @@ actual fun BarsRobotView(
     LaunchedEffect(animation, posX, posY, widthPx, heightPx, isPlaced) {
         if (isPlaced && widthPx > 0 && heightPx > 0) {
             jsSetBars3D(true, posX, posY, widthPx, heightPx, animation)
+        } else {
+            jsHideBars3D()
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            jsSetBars3D(false, 0.0, 0.0, 0.0, 0.0, "")
+            jsHideBars3D()
         }
     }
 
@@ -52,7 +57,6 @@ actual fun BarsRobotView(
             .onGloballyPositioned { coordinates ->
                 val pos = coordinates.positionInWindow()
                 val size = coordinates.size
-                // Density converts Compose internal coordinates to actual CSS pixels
                 posX = (pos.x / density.density).toDouble()
                 posY = (pos.y / density.density).toDouble()
                 widthPx = (size.width / density.density).toDouble()
@@ -61,6 +65,3 @@ actual fun BarsRobotView(
             }
     )
 }
-
-
-
