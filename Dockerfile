@@ -1,47 +1,60 @@
 # =============================================================================
-# Multi-stage Dockerfile: Арена переговоров ОЭЗ «Алабуга»
+# Multi-stage Dockerfile: Арена переговоров ОЭЗ «Алабуга» (Kotlin Multiplatform Wasm)
 # =============================================================================
 
-# 1. Этап сборки (Builder)
-FROM node:22-alpine AS builder
+# 1. Этап сборки (Gradle Builder)
+FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /app
 
-# Установка зависимостей
-COPY package.json ./
-RUN npm install --legacy-peer-deps
+# Установка Node.js для Wasm toolchain
+RUN apk add --no-cache bash nodejs npm
 
-# Копирование исходного кода
-COPY tsconfig.json vite.config.ts index.html metadata.json ./
-COPY server.ts ./
-COPY src/ ./src/
-COPY public/ ./public/
+# Копирование исходного кода и конфигураций
+COPY gradlew gradlew.bat settings.gradle.kts build.gradle.kts gradle.properties ./
+COPY gradle/ ./gradle/
+COPY shared/ ./shared/
+COPY web/ ./web/
+COPY desktop/ ./desktop/
+COPY app/ ./app/
 
-# Сборка статики (Vite) и серверного бандла (esbuild)
-RUN npm run build
+# Сборка Wasm Web Distribution
+RUN chmod +x gradlew && ./gradlew :web:wasmJsBrowserDistribution --no-daemon
 
-# 2. Этап исполнения (Production Runner)
-FROM node:22-alpine AS runner
+# 2. Этап исполнения (Nginx Production Web Server)
+FROM nginx:alpine AS runner
 
-WORKDIR /app
+COPY --from=builder /app/web/build/dist/wasmJs/productionExecutable /usr/share/nginx/html
 
-# Минимальные зависимости для работы продакшена
-ENV NODE_ENV=production
-ENV PORT=3000
+RUN printf '%s\n' \
+'server {' \
+'    listen 3000;' \
+'    server_name localhost;' \
+'' \
+'    location / {' \
+'        root /usr/share/nginx/html;' \
+'        index index.html index.htm;' \
+'        try_files $uri $uri/ /index.html;' \
+'    }' \
+'' \
+'    types {' \
+'        application/wasm wasm;' \
+'        text/html html;' \
+'        application/javascript js;' \
+'        text/css css;' \
+'        image/svg+xml svg;' \
+'        application/json json;' \
+'    }' \
+'' \
+'    location /api/health {' \
+'        return 200 "{\"status\":\"ok\",\"mode\":\"kmp-wasm\"}";' \
+'        add_header Content-Type application/json;' \
+'    }' \
+'}' > /etc/nginx/conf.d/default.conf
 
-COPY package.json ./
-RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
-
-# Копирование собранных файлов из этапа builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
-
-# Порт приложения
 EXPOSE 3000
 
-# Проверка работоспособности контейнера
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
-# Запуск сервера
-CMD ["node", "dist/server.cjs"]
+CMD ["nginx", "-g", "daemon off;"]

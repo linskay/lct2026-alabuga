@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.androidApplication) apply false
+    alias(libs.plugins.androidLibrary) apply false
     alias(libs.plugins.kotlinAndroid) apply false
     alias(libs.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.composeMultiplatform) apply false
@@ -7,9 +8,9 @@ plugins {
     alias(libs.plugins.kotlinSerialization) apply false
 }
 
-tasks.register<Exec>("devServer") {
+tasks.register("devServer") {
     group = "development"
-    description = "Launch AI Studio Web Preview Dev Server"
-    commandLine("npm", "run", "dev")
+    description = "Launch Kotlin Multiplatform Web Wasm Dev Server"
+    dependsOn(":web:wasmJsBrowserDevelopmentRun")
 }
 

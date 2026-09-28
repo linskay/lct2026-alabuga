@@ -181,11 +181,51 @@ jobs:
           if-no-files-found: warn
 
   # ────────────────────────────────────────────────────────────────────
-  # JOB 4: GitHub Release
+  # JOB 4: Web Wasm Distribution
+  # ────────────────────────────────────────────────────────────────────
+  build-web-wasm:
+    name: 🌐 Build Web Wasm Distribution
+    needs: tag-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Web Wasm
+        run: ./gradlew :web:wasmJsBrowserDistribution --no-daemon --stacktrace
+
+      - name: Package Web Distribution
+        run: |
+          mkdir -p bin-dist-web
+          cd web/build/dist/wasmJs/productionExecutable
+          zip -r ../../../../bin-dist-web/arena-web-wasm.zip .
+          cd -
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-web-wasm
+          path: bin-dist-web/*
+          if-no-files-found: warn
+
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 5: GitHub Release
   # ────────────────────────────────────────────────────────────────────
   publish-release:
     name: 🚀 Publish GitHub Release
-    needs: [tag-release, build-android, build-desktop-windows]
+    needs: [tag-release, build-android, build-desktop-windows, build-web-wasm]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -205,21 +245,29 @@ jobs:
           name: arena-windows-desktop
           path: release-binaries/
 
+      - name: Download Web Artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: arena-web-wasm
+          path: release-binaries/
+
       - name: Prepare Clean Release Notes
         run: |
           cat << 'EOF' > release_body.md
           ### 🚀 Арена Переговоров ОЭЗ «Алабуга» (${{ needs.tag-release.outputs.new_tag }})
 
-          **Кроссплатформенный симулятор жестких B2B-переговоров:**
-          - 🤖 Интерактивный 3D-робот-наставник **Б.А.Р.С.** с динамическими реакциями и тактическим анализом
+          **Кроссплатформенный симулятор жестких B2B-переговоров (Kotlin Multiplatform + Compose):**
+          - 🤖 Интерактивный робот-наставник **Б.А.Р.С.** с динамическими реакциями и тактическим анализом
           - 📊 Оценка зон согласия ZOPA, BATNA и эмоционального тонуса встречи
           - 🎯 Сценарии резидентов особой экономической зоны «Алабуга»
           - ⏳ Механика ретроспективного отката («Машина времени»)
 
-          #### 📦 Готовые пакеты установки:
+          #### 📦 Готовые пакеты установки и дистрибутивы:
           - **Android APK** (`.apk`) — мобильная версия для Android
           - **Windows Installer** (`.msi`) — установщик для рабочего стола Windows
           - **Universal JAR** (`.jar`) — запуск через Java Runtime
+          - **Web Wasm** (`.zip`) — статический бандл Compose Multiplatform Wasm для веб-сервера / Nginx
 
           *(Сборка выпущена автоматически релизным пайплайном ОЭЗ «Алабуга»)*
           EOF

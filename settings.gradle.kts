@@ -28,7 +28,9 @@ dependencyResolutionManagement {
     }
 }
 
+include(":shared")
 include(":app")
 include(":desktop")
+include(":web")
 
 
