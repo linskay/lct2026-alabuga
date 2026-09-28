@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ru.alabuga.arena.model.*
 import ru.alabuga.arena.ui.components.BarsRobotView
@@ -148,6 +150,14 @@ fun ArenaScreen(
         label = "sendScale"
     )
 
+    var elapsedSeconds by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000L)
+            elapsedSeconds++
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -183,6 +193,42 @@ fun ArenaScreen(
                     }
                 },
                 actions = {
+                    // Парящий Cyber-Glass таймер переговоров
+                    val timerMinutes = elapsedSeconds / 60
+                    val timerSeconds = elapsedSeconds % 60
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFF0F172A).copy(alpha = 0.85f),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                listOf(Color(0xFF00F0FF).copy(alpha = 0.45f), Color(0xFF7B2CBF).copy(alpha = 0.35f))
+                            )
+                        ),
+                        modifier = Modifier.padding(end = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = "Таймер переговоров",
+                                tint = Color(0xFF00F0FF),
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00F0FF),
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                    }
+
                     IconButton(onClick = { showDebriefing = true }) {
                         Icon(imageVector = Icons.Default.FileDownload, contentDescription = "Скачать PDF результатов", tint = Color(0xFF00FFCC))
                     }
@@ -317,60 +363,6 @@ fun ArenaScreen(
                             modifier = Modifier.fillMaxSize(),
                             height = 240.dp
                         )
-
-                        // Парящая стеклянная HUD-панель [НАПРЯЖЕНИЕ / СТРЕСС] с неоновым градиентным баром
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            shape = RoundedCornerShape(50),
-                            color = Color(0xFF090B14).copy(alpha = 0.85f),
-                            border = BorderStroke(
-                                1.dp,
-                                Brush.linearGradient(
-                                    listOf(
-                                        atmosphereColor.copy(alpha = 0.45f),
-                                        Color(0xFF00FFCC).copy(alpha = 0.20f)
-                                    )
-                                )
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Text(
-                                    text = "НАПРЯЖЕНИЕ [ ${metrics.tension}% ]",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = atmosphereColor,
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 0.6.sp
-                                )
-
-                                // Неоновый прогресс-бар стресса
-                                Box(
-                                    modifier = Modifier
-                                        .width(140.dp)
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(50))
-                                        .background(Color(0xFF161928))
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .fillMaxWidth((metrics.tension / 100f).coerceIn(0.05f, 1f))
-                                            .clip(RoundedCornerShape(50))
-                                            .background(
-                                                Brush.horizontalGradient(
-                                                    listOf(Color(0xFF7B2CBF), Color(0xFFE11D48), Color(0xFFFF1E56))
-                                                )
-                                            )
-                                    )
-                                }
-                            }
-                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -516,17 +508,24 @@ fun ArenaScreen(
                                         label = "chipScale"
                                     )
 
-                                    Surface(
-                                        shape = RoundedCornerShape(50),
-                                        color = if (isChipHovered) Color(0xFF1E2640).copy(alpha = 0.85f) else Color(0xFF0F172A).copy(alpha = 0.65f),
-                                        border = BorderStroke(
-                                            1.dp,
-                                            if (isChipHovered) Brush.linearGradient(listOf(Color(0xFF00FFCC), Color(0xFF9D4EDD)))
-                                            else Brush.linearGradient(listOf(Color(0xFF00FFCC).copy(alpha = 0.35f), Color(0xFF7B2CBF).copy(alpha = 0.30f)))
-                                        ),
+                                    Box(
                                         modifier = Modifier
                                             .offset(y = chipOffsetY)
                                             .scale(chipScale)
+                                            .clip(RoundedCornerShape(18.dp))
+                                            .background(
+                                                if (isChipHovered) Brush.linearGradient(
+                                                    listOf(Color(0xFF1E2B52).copy(alpha = 0.95f), Color(0xFF2C1952).copy(alpha = 0.95f))
+                                                ) else Brush.linearGradient(
+                                                    listOf(Color(0xFF0F172A).copy(alpha = 0.85f), Color(0xFF191233).copy(alpha = 0.80f))
+                                                )
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isChipHovered) Brush.linearGradient(listOf(Color(0xFF00FFCC), Color(0xFFC084FC)))
+                                                else Brush.linearGradient(listOf(Color(0xFF00FFCC).copy(alpha = 0.40f), Color(0xFF7B2CBF).copy(alpha = 0.35f))),
+                                                RoundedCornerShape(18.dp)
+                                            )
                                             .clickable(
                                                 interactionSource = chipInteractionSource,
                                                 indication = null
@@ -534,21 +533,22 @@ fun ArenaScreen(
                                                 inputText = hint
                                                 lastInsertedTemplate = hint
                                             }
+                                            .padding(horizontal = 16.dp, vertical = 11.dp)
                                     ) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Lightbulb,
                                                 contentDescription = null,
-                                                tint = if (isChipHovered) Color(0xFF00FFCC) else Color(0xFF00FFCC).copy(alpha = 0.7f),
-                                                modifier = Modifier.size(13.dp)
+                                                tint = if (isChipHovered) Color(0xFF00FFCC) else Color(0xFF00FFCC).copy(alpha = 0.75f),
+                                                modifier = Modifier.size(15.dp)
                                             )
                                             Text(
                                                 text = hint,
-                                                fontSize = 12.sp,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Medium,
                                                 color = if (isChipHovered) Color.White else Color(0xFFE2E8F0),
                                                 maxLines = 1
                                             )
@@ -736,7 +736,7 @@ fun ArenaScreen(
                         }
                     }
 
-                    // 2. Метрики переговоров (Cyber-Glass)
+                    // 2. Метрики переговоров и Шкала напряженности (Cyber-Glass)
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
@@ -751,21 +751,71 @@ fun ArenaScreen(
                             )
                         )
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("ДОВЕРИЕ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
-                                Text("${metrics.trust}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F0FF), fontFamily = FontFamily.Monospace)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("ДОВЕРИЕ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
+                                    Text("${metrics.trust}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F0FF), fontFamily = FontFamily.Monospace)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("НАПРЯЖЕНИЕ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
+                                    Text("${metrics.tension}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = atmosphereColor, fontFamily = FontFamily.Monospace)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("ГОТОВНОСТЬ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
+                                    Text("${metrics.dealReadiness}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981), fontFamily = FontFamily.Monospace)
+                                }
                             }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("СТРЕСС", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
-                                Text("${metrics.tension}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = atmosphereColor, fontFamily = FontFamily.Monospace)
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("ГОТОВНОСТЬ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
-                                Text("${metrics.dealReadiness}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981), fontFamily = FontFamily.Monospace)
+
+                            // Неоновый индикатор шкалы напряженности (перенесен из карточки робота)
+                            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "УРОВЕНЬ НАПРЯЖЕННОСТИ",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF94A3B8),
+                                        fontFamily = FontFamily.Monospace,
+                                        letterSpacing = 0.6.sp
+                                    )
+                                    Text(
+                                        text = "${metrics.tension}%",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = atmosphereColor,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(Color(0xFF161928))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth((metrics.tension / 100f).coerceIn(0.05f, 1f))
+                                            .clip(RoundedCornerShape(50))
+                                            .background(
+                                                Brush.horizontalGradient(
+                                                    listOf(Color(0xFF7B2CBF), Color(0xFFE11D48), Color(0xFFFF1E56))
+                                                )
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
