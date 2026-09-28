@@ -181,9 +181,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             touch-action="pan-y"
             disable-zoom
             interaction-prompt="none"
-            shadow-intensity="1.8"
-            shadow-softness="0.5"
-            exposure="1.3"
+            shadow-intensity="1.5"
+            shadow-softness="0.7"
+            exposure="1.0"
             environment-image="neutral"
             auto-rotate
             rotation-per-second="8deg"
