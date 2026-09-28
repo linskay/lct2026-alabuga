@@ -9,12 +9,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,10 +35,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import ru.alabuga.arena.model.*
 import ru.alabuga.arena.ui.components.BarsRobotView
 import ru.alabuga.arena.ui.components.DebriefingModal
@@ -190,25 +195,42 @@ fun ArenaScreen(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // 1. Окно прямого эфира оппонента (с интерактивным роботом Б.А.Р.С. и стресс-баром)
+                    // 1. Окно прямого эфира оппонента (СВЕТ ВНУТРИ ПРЯМОУГОЛЬНИКА ОТРАЖАЕТ НАПРЯЖЕНИЕ 0% фиолетовый -> 100% алый)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(0.38f)
                             .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF0F1016).copy(alpha = 0.85f))
-                            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(20.dp)),
+                            .background(Color(0xFF0A0C14))
+                            .border(BorderStroke(1.dp, atmosphereColor.copy(alpha = 0.4f)), RoundedCornerShape(20.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Фон
+                        // Объемное свечение в самом прямоугольнике (свет от фиолетового до алого)
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
                                     Brush.radialGradient(
-                                        listOf(
-                                            atmosphereColor.copy(alpha = 0.15f),
-                                            Color.Transparent
+                                        colors = listOf(
+                                            atmosphereColor.copy(alpha = (0.28f + (metrics.tension / 100f) * 0.32f)),
+                                            atmosphereColor.copy(alpha = 0.12f),
+                                            Color(0xFF080910).copy(alpha = 0.95f)
+                                        ),
+                                        radius = 600f
+                                    )
+                                )
+                        )
+
+                        // Дополнительный градиентный свет снизу и сверху
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            atmosphereColor.copy(alpha = 0.18f),
+                                            Color.Transparent,
+                                            atmosphereColor.copy(alpha = 0.35f)
                                         )
                                     )
                                 )
@@ -221,48 +243,33 @@ fun ArenaScreen(
                             height = 240.dp
                         )
 
-                        // ИНДИКАТОР СТРЕССА: от фиолетового (0%) до ало-красного (100%)
+                        // Неоновый значок статуса напряженности в верхнем углу
                         Surface(
                             modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF0A0C16).copy(alpha = 0.92f),
-                            border = BorderStroke(1.dp, atmosphereColor.copy(alpha = 0.4f))
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xFF0A0C16).copy(alpha = 0.88f),
+                            border = BorderStroke(1.dp, atmosphereColor.copy(alpha = 0.6f))
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(atmosphereColor)
+                                )
                                 Text(
-                                    text = "НАПРЯЖЕНИЕ [ ${metrics.tension}% ]",
+                                    text = "НАПРЯЖЕНИЕ: ${metrics.tension}%",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = atmosphereColor,
                                     fontFamily = FontFamily.Monospace
                                 )
-                                Box(
-                                    modifier = Modifier
-                                        .width(150.dp)
-                                        .height(7.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color(0xFF1E2640))
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .fillMaxWidth((metrics.tension / 100f).coerceIn(0.05f, 1f))
-                                            .background(
-                                                Brush.horizontalGradient(
-                                                    listOf(Color(0xFF7B2CBF), Color(0xFFEF4444))
-                                                )
-                                            )
-                                    )
-                                }
                             }
                         }
                     }
@@ -315,22 +322,44 @@ fun ArenaScreen(
                         }
                     }
 
-                    // 3. Подсказки и крупное окно ввода (стиль Google AI Studio)
+                    // 3. Подсказки и крупное окно ввода (стиль Google AI Studio, поддержка скролла колесиком и перетаскивания)
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) {
-                        // Лаконичные чипсы с подсказками
-                        val hints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints ?: emptyList()
+                        val hintsScrollState = rememberScrollState()
+                        val coroutineScope = rememberCoroutineScope()
+
+                        // Лаконичные чипсы с подсказками (скролл колесиком / перетаскивание мышью)
+                        val rawHints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints
+                        val hints = if (!rawHints.isNullOrEmpty()) rawHints else listOf(
+                            "Мы фиксируем ставку 480 ₽/м² при условии предоплаты за 1 квартал.",
+                            "Налоговые преференции ОЭЗ (0% на имущество) нивелируют разницу в ставке.",
+                            "Срок ввода 110 кВ фиксируется в соглашении с финансовыми гарантиями ОЭЗ.",
+                            "Предоставим 4 месяца каникул взамен на обязательства по CAPEX 1.2 млрд ₽.",
+                            "Альтернативные площадки региона испытывают острый дефицит мощностей 110 кВ."
+                        )
+
                         if (hints.isNotEmpty()) {
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp)
+                                    .horizontalScroll(hintsScrollState)
+                                    .pointerInput(Unit) {
+                                        detectHorizontalDragGestures { change, dragAmount ->
+                                            change.consume()
+                                            coroutineScope.launch {
+                                                hintsScrollState.scrollBy(-dragAmount)
+                                            }
+                                        }
+                                    },
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(hints) { hint ->
+                                hints.forEach { hint ->
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = Color(0xFF131728),
-                                        border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.4f)),
+                                        border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.5f)),
                                         modifier = Modifier.clickable {
                                             inputText = hint
                                             lastInsertedTemplate = hint
@@ -339,7 +368,7 @@ fun ArenaScreen(
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Lightbulb,
