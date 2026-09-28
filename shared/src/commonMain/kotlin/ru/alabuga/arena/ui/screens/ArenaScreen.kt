@@ -1,7 +1,12 @@
 package ru.alabuga.arena.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +26,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -86,7 +93,7 @@ fun ArenaScreen(
         )
     }
 
-    // Dynamic background color based on tension (0-100: purple -> neon red)
+    // Dynamic background color based on tension
     val atmosphereColor by animateColorAsState(
         targetValue = when {
             metrics.tension >= 70 -> Color(0xFFEF4444)
@@ -97,7 +104,18 @@ fun ArenaScreen(
         label = "atmosphereColor"
     )
 
-    // Validation: checks placeholders and exact unmodified template
+    // ВАУ-ЭФФЕКТ: Пульсация свечения наставника
+    val infiniteTransition = rememberInfiniteTransition()
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    // Validation
     val trimmed = inputText.trim()
     val hasPlaceholders = remember(trimmed) {
         trimmed.contains("[") || trimmed.contains("]") || trimmed.contains("...")
@@ -124,13 +142,13 @@ fun ArenaScreen(
                         Column {
                             Text(
                                 text = config.opponentName,
-                                fontSize = 14.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
                             Text(
                                 text = "${config.opponentCompany} • ${config.opponentRole}",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = Color(0xFF94A3B8)
                             )
                         }
@@ -142,11 +160,9 @@ fun ArenaScreen(
                     }
                 },
                 actions = {
-                    // Time travel button
                     IconButton(onClick = { showTimeTravel = true }) {
                         Icon(imageVector = Icons.Default.History, contentDescription = "Машина времени", tint = Color(0xFF00F0FF))
                     }
-                    // Debriefing button
                     IconButton(onClick = { showDebriefing = true }) {
                         Icon(imageVector = Icons.Default.EmojiEvents, contentDescription = "Дебрифинг", tint = Color(0xFFD8B4FE))
                     }
@@ -154,25 +170,107 @@ fun ArenaScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0D18))
             )
         },
-        containerColor = Color(0xFF07080D)
+        containerColor = Color(0xFF06070B)
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentAlignment = Alignment.Center
+        ) {
+            // ТОЧНОЕ ТЗ: Пропорции 65% на 35%
             Row(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    .background(Color(0xFF06070B))
             ) {
-                // ЛЕВАЯ КОЛОНКА (Интерактивный чат + подсказки + ввод)
+                // ЛЕВАЯ ЧАСТЬ (65%): Оппонент, Чат диалогов, Ввод
                 Column(
-                    modifier = Modifier.weight(1.3f).fillMaxHeight(),
+                    modifier = Modifier
+                        .weight(0.65f)
+                        .fillMaxHeight()
+                        .padding(20.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Чат сообщений
+                    // 1. Камера оппонента (крупным планом по центру)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.38f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF0D0E15))
+                            .border(BorderStroke(1.dp, atmosphereColor.copy(alpha = 0.4f)), RoundedCornerShape(20.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Фон с мягким свечением
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.radialGradient(
+                                        listOf(
+                                            atmosphereColor.copy(alpha = 0.15f),
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = Color(0xFF161A2B),
+                                border = BorderStroke(1.dp, Color(0xFF00F0FF).copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFF3366))
+                                    )
+                                    Text(
+                                        text = "${config.opponentName.uppercase()} • LIVE FEED",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFE2E8F0),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = messages.lastOrNull { it.actor == MessageActor.OPPONENT }?.emotionEmoji ?: "👤",
+                                fontSize = 46.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = messages.lastOrNull { it.actor == MessageActor.OPPONENT }?.emotionLabel ?: "Ожидание хода",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFCBD5E1)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 2. Чат диалогов
                     LazyColumn(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(0.44f)
                             .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -180,208 +278,217 @@ fun ArenaScreen(
                             val isUser = msg.actor == MessageActor.USER
                             val isBars = msg.actor == MessageActor.BARS
 
-                            Box(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
+                            AnimatedVisibility(
+                                visible = true,
+                                enter = fadeIn(animationSpec = tween(400)) + slideInVertically(initialOffsetY = { 20 })
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = when {
-                                        isUser -> Color(0xFF1E2640)
-                                        isBars -> Color(0xFF24153B)
-                                        else -> Color(0xFF121524)
-                                    },
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        when {
-                                            isUser -> Color(0xFF00F0FF).copy(alpha = 0.3f)
-                                            isBars -> Color(0xFF7B2CBF).copy(alpha = 0.6f)
-                                            else -> Color.White.copy(alpha = 0.08f)
-                                        }
-                                    ),
-                                    modifier = Modifier.widthIn(max = 520.dp)
+                                Box(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
                                 ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(
-                                            text = when {
-                                                isUser -> "Вы (ОЭЗ «Алабуга»)"
-                                                isBars -> "Б.А.Р.С. (Тактический наставник)"
-                                                else -> config.opponentName
-                                            },
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isUser) Color(0xFF00F0FF) else if (isBars) Color(0xFFD8B4FE) else Color(0xFFFF9E80),
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = msg.text,
-                                            fontSize = 13.sp,
-                                            color = Color(0xFFE2E8F0),
-                                            lineHeight = 18.sp
-                                        )
+                                    Surface(
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = when {
+                                            isUser -> Color(0xFF1E2640)
+                                            isBars -> Color(0xFF24153B)
+                                            else -> Color(0xFF121524)
+                                        },
+                                        border = BorderStroke(
+                                            1.dp,
+                                            when {
+                                                isUser -> Color(0xFF00F0FF).copy(alpha = 0.35f)
+                                                isBars -> Color(0xFF7B2CBF).copy(alpha = 0.6f)
+                                                else -> Color.White.copy(alpha = 0.1f)
+                                            }
+                                        ),
+                                        modifier = Modifier.widthIn(max = 520.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(
+                                                text = when {
+                                                    isUser -> "Вы (ОЭЗ «Алабуга»)"
+                                                    isBars -> "Б.А.Р.С. (Тактический наставник)"
+                                                    else -> config.opponentName
+                                                },
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isUser) Color(0xFF00F0FF) else if (isBars) Color(0xFFD8B4FE) else Color(0xFFFF9E80),
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = msg.text,
+                                                fontSize = 14.sp,
+                                                color = Color(0xFFF1F5F9),
+                                                lineHeight = 20.sp
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Подсказки (аргументы)
-                    val hints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints ?: emptyList()
-                    if (hints.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        LazyRow(
+                    // 3. Подсказки и поле ввода (прибиты к низу)
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) {
+                        val hints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints ?: emptyList()
+                        if (hints.isNotEmpty()) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(hints) { hint ->
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Color(0xFF13182C),
+                                        border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.6f)),
+                                        modifier = Modifier.clickable {
+                                            inputText = hint
+                                            lastInsertedTemplate = hint
+                                        }
+                                    ) {
+                                        Text(
+                                            text = hint,
+                                            fontSize = 12.sp,
+                                            color = Color(0xFFD8B4FE),
+                                            maxLines = 1,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (hasPlaceholders || isExactTemplate) {
+                            Text(
+                                text = "Заполните параметры [в скобках] перед отправкой!",
+                                fontSize = 11.sp,
+                                color = Color(0xFFFBBF24),
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(hints) { hint ->
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color(0xFF13182C),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.5f)),
-                                    modifier = Modifier.clickable {
-                                        inputText = hint
-                                        lastInsertedTemplate = hint
-                                    }
-                                ) {
-                                    Text(
-                                        text = hint,
-                                        fontSize = 11.sp,
-                                        color = Color(0xFFD8B4FE),
-                                        maxLines = 1,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Предупреждение о необходимости изменить шаблон
-                    if (hasPlaceholders || isExactTemplate) {
-                        Text(
-                            text = "Заполните параметры [в скобках] перед отправкой!",
-                            fontSize = 11.sp,
-                            color = Color(0xFFFBBF24),
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-                    }
-
-                    // Поле ввода сообщения
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = inputText,
-                            onValueChange = { inputText = it },
-                            placeholder = { Text("Введите встречный аргумент...", fontSize = 13.sp) },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF00F0FF),
-                                unfocusedBorderColor = Color(0xFF1E2640),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedContainerColor = Color(0xFF0F121F),
-                                unfocusedContainerColor = Color(0xFF0F121F)
+                            OutlinedTextField(
+                                value = inputText,
+                                onValueChange = { inputText = it },
+                                placeholder = { Text("Введите встречный аргумент...", fontSize = 13.sp) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(14.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = Color.White),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(0xFF00F0FF),
+                                    unfocusedBorderColor = Color(0xFF1E2640),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedContainerColor = Color(0xFF0F121F),
+                                    unfocusedContainerColor = Color(0xFF0F121F)
+                                )
                             )
-                        )
 
-                        IconButton(
-                            onClick = {
-                                if (canSend) {
-                                    val userText = trimmed
-                                    inputText = ""
-                                    lastInsertedTemplate = ""
+                            IconButton(
+                                onClick = {
+                                    if (canSend) {
+                                        val userText = trimmed
+                                        inputText = ""
+                                        lastInsertedTemplate = ""
 
-                                    currentStep++
-                                    val newTrust = (metrics.trust + 5).coerceAtMost(100)
-                                    val newTension = (metrics.tension - 4).coerceAtLeast(10)
-                                    val newReadiness = (metrics.dealReadiness + 8).coerceAtMost(100)
-                                    metrics = NegotiationMetrics(newTrust, newTension, newReadiness)
+                                        currentStep++
+                                        val newTrust = (metrics.trust + 5).coerceAtMost(100)
+                                        val newTension = (metrics.tension - 4).coerceAtLeast(10)
+                                        val newReadiness = (metrics.dealReadiness + 8).coerceAtMost(100)
+                                        metrics = NegotiationMetrics(newTrust, newTension, newReadiness)
 
-                                    messages.add(
-                                        Message(
-                                            id = "user_${currentStep}_${Random.nextInt(100000)}",
-                                            actor = MessageActor.USER,
-                                            text = userText,
-                                            stepIndex = currentStep,
-                                            snapshotMetrics = metrics
-                                        )
-                                    )
-
-                                    // Робот наставник
-                                    val animations = listOf("talk", "wave", "thinking", "win", "punch", "bluff", "hit")
-                                    barsAnimation = animations.random()
-                                    messages.add(
-                                        Message(
-                                            id = "bars_${currentStep}_${Random.nextInt(100000)}",
-                                            actor = MessageActor.BARS,
-                                            text = "Хороший аргумент. Оппонент начинает прислушиваться к встречным требованиям. Удерживай планку!",
-                                            stepIndex = currentStep,
-                                            snapshotMetrics = metrics
-                                        )
-                                    )
-
-                                    // Ответ оппонента
-                                    val oppOffer = (zopaState.currentOffer + 30).coerceAtMost(460)
-                                    val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
-                                    zopaState = zopaState.copy(
-                                        buyerMax = oppOffer,
-                                        currentOffer = oppOffer,
-                                        isOverlap = isOverlapNow,
-                                        overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
-                                        overlapMax = if (isOverlapNow) oppOffer else null,
-                                        changeReason = if (isOverlapNow) "Коридор сделки открыт! Стороны сошлись в цене от 460 ₽/м²." else "Оппонент повысил предложение до $oppOffer ₽/м² взамен на встречные условия."
-                                    )
-
-                                    messages.add(
-                                        Message(
-                                            id = "opp_${currentStep}_${Random.nextInt(100000)}",
-                                            actor = MessageActor.OPPONENT,
-                                            text = "Ваши доводы имеют смысл. Если вы подтверждаете мощности в срок, мы готовы скорректировать предложение до $oppOffer ₽/м².",
-                                            stepIndex = currentStep,
-                                            snapshotMetrics = metrics,
-                                            emotionEmoji = "🤝",
-                                            emotionLabel = "Сближение позиций",
-                                            contextHints = listOf(
-                                                "Мы фиксируем ставку $oppOffer ₽/м² при встречном условии [гарантия]...",
-                                                "Давайте зафиксируем график поэтапного ввода мощностей..."
+                                        messages.add(
+                                            Message(
+                                                id = "user_${currentStep}_${Random.nextInt(100000)}",
+                                                actor = MessageActor.USER,
+                                                text = userText,
+                                                stepIndex = currentStep,
+                                                snapshotMetrics = metrics
                                             )
                                         )
-                                    )
-                                }
-                            },
-                            enabled = canSend,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (canSend) Color(0xFF00F0FF) else Color(0xFF1E2640))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Send,
-                                contentDescription = "Отправить",
-                                tint = if (canSend) Color(0xFF07080D) else Color.Gray
-                            )
+
+                                        val animations = listOf("talk", "wave", "thinking", "win", "punch", "bluff", "hit")
+                                        barsAnimation = animations.random()
+                                        messages.add(
+                                            Message(
+                                                id = "bars_${currentStep}_${Random.nextInt(100000)}",
+                                                actor = MessageActor.BARS,
+                                                text = "Хороший аргумент. Оппонент начинает прислушиваться к встречным требованиям. Удерживай планку!",
+                                                stepIndex = currentStep,
+                                                snapshotMetrics = metrics
+                                            )
+                                        )
+
+                                        val oppOffer = (zopaState.currentOffer + 30).coerceAtMost(460)
+                                        val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
+                                        zopaState = zopaState.copy(
+                                            buyerMax = oppOffer,
+                                            currentOffer = oppOffer,
+                                            isOverlap = isOverlapNow,
+                                            overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
+                                            overlapMax = if (isOverlapNow) oppOffer else null,
+                                            changeReason = if (isOverlapNow) "Коридор сделки открыт! Стороны сошлись в цене от 460 ₽/м²." else "Оппонент повысил предложение до $oppOffer ₽/м² взамен на встречные условия."
+                                        )
+
+                                        messages.add(
+                                            Message(
+                                                id = "opp_${currentStep}_${Random.nextInt(100000)}",
+                                                actor = MessageActor.OPPONENT,
+                                                text = "Ваши доводы имеют смысл. Если вы подтверждаете мощности в срок, мы готовы скорректировать предложение до $oppOffer ₽/м².",
+                                                stepIndex = currentStep,
+                                                snapshotMetrics = metrics,
+                                                emotionEmoji = "🤝",
+                                                emotionLabel = "Сближение позиций",
+                                                contextHints = listOf(
+                                                    "Мы фиксируем ставку $oppOffer ₽/м² при встречном условии [гарантия]...",
+                                                    "Давайте зафиксируем график поэтапного ввода мощностей..."
+                                                )
+                                            )
+                                        )
+                                    }
+                                },
+                                enabled = canSend,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (canSend) Color(0xFF00F0FF) else Color(0xFF1E2640))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = "Отправить",
+                                    tint = if (canSend) Color(0xFF07080D) else Color.Gray
+                                )
+                            }
                         }
                     }
                 }
 
-                // ПРАВАЯ КОЛОНКА (Телеметрия + 2D Canvas Б.А.Р.С. + Карта ZOPA)
+                // ПРАВАЯ ЧАСТЬ (35%): Сайдбар с наставником, метриками, ZOPA и повесткой
                 Column(
-                    modifier = Modifier.weight(0.9f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    modifier = Modifier
+                        .weight(0.35f)
+                        .fillMaxHeight()
+                        .background(Color(0xFF0C0D14))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Плашка Б.А.Р.С. и атмосферы
+                    // ВАУ-ЭФФЕКТ: Карточка наставника Б.А.Р.С. с пульсирующим свечением
                     Surface(
-                        modifier = Modifier.fillMaxWidth().height(230.dp),
-                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        shape = RoundedCornerShape(18.dp),
                         color = Color(0xFF090A10),
-                        border = androidx.compose.foundation.BorderStroke(1.5.dp, atmosphereColor.copy(alpha = 0.8f))
+                        border = BorderStroke(1.5.dp, atmosphereColor.copy(alpha = glowAlpha))
                     ) {
                         Column(
                             modifier = Modifier.fillMaxSize().padding(8.dp),
@@ -391,23 +498,23 @@ fun ArenaScreen(
                             BarsRobotView(
                                 animation = barsAnimation,
                                 modifier = Modifier.fillMaxWidth(),
-                                height = 165.dp
+                                height = 140.dp
                             )
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                Text("ДОВЕРИЕ: ${metrics.trust}%", fontSize = 11.sp, color = Color(0xFF00F0FF), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                                Text("СТРЕСС: ${metrics.tension}%", fontSize = 11.sp, color = atmosphereColor, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                                Text("ГОТОВНОСТЬ: ${metrics.dealReadiness}%", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text("ДОВЕРИЕ: ${metrics.trust}%", fontSize = 10.sp, color = Color(0xFF00F0FF), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text("СТРЕСС: ${metrics.tension}%", fontSize = 10.sp, color = atmosphereColor, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text("ГОТОВНОСТЬ: ${metrics.dealReadiness}%", fontSize = 10.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                             }
                         }
                     }
 
-                    // Интерактивная карта ZOPA
+                    // Интерактивная карта ZOPA / BATNA
                     ZopaMapCard(zopa = zopaState)
 
                     // Повестка переговоров (Agenda topics)
@@ -415,9 +522,9 @@ fun ArenaScreen(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         shape = RoundedCornerShape(16.dp),
                         color = Color(0xFF101322),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF282F48))
+                        border = BorderStroke(1.dp, Color(0xFF282F48))
                     ) {
-                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 text = "ПОВЕСТКА ПЕРЕГОВОРОВ (AGENDA)",
                                 fontSize = 11.sp,
@@ -432,13 +539,13 @@ fun ArenaScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(Color(0xFF161A2B), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
                                         Text(topic.title, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                                        Text(topic.detail, fontSize = 10.sp, color = Color(0xFF94A3B8))
+                                        Text(topic.detail, fontSize = 10.sp, color = Color(0xFF94A3B8), maxLines = 1)
                                     }
                                     Box(
                                         modifier = Modifier
@@ -454,14 +561,14 @@ fun ArenaScreen(
                                     ) {
                                         Text(
                                             text = when (topic.status) {
-                                                "agreed" -> "Согласовано"
-                                                "disputed" -> "Спор"
-                                                else -> "В работе"
+                                                "agreed" -> "СОГЛАСОВАНО"
+                                                "disputed" -> "СПОРНО"
+                                                else -> "ОБСУЖДАЕТСЯ"
                                             },
-                                            fontSize = 9.sp,
+                                            fontSize = 8.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = when (topic.status) {
-                                                "agreed" -> Color(0xFF34D399)
+                                                "agreed" -> Color(0xFF10B981)
                                                 "disputed" -> Color(0xFFFF3366)
                                                 else -> Color(0xFFFBBF24)
                                             },
