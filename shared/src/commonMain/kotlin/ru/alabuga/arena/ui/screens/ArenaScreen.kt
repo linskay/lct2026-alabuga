@@ -55,6 +55,7 @@ import ru.alabuga.arena.ui.components.BarsRobotView
 import ru.alabuga.arena.ui.components.DebriefingModal
 import ru.alabuga.arena.ui.components.TimeTravelModal
 import ru.alabuga.arena.ui.components.ZopaMapCard
+import ru.alabuga.arena.telemetry.TelemetryService
 import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,6 +111,10 @@ fun ArenaScreen(
                 contextHints = config.initialDynamicHints
             )
         )
+    }
+
+    LaunchedEffect(config.id) {
+        TelemetryService.recordNegotiationStart(config.id)
     }
 
     LaunchedEffect(messages.size) {
@@ -770,6 +775,17 @@ fun ArenaScreen(
                                                             contextHints = replyDto.dynamicHints
                                                         )
                                                     )
+
+                                                    TelemetryService.recordRound(
+                                                        scenarioId = config.id,
+                                                        roundIndex = currentStep,
+                                                        playerTextLength = userText.length,
+                                                        dealReadiness = updatedReadiness,
+                                                        trust = updatedTrust,
+                                                        stress = updatedTension,
+                                                        currentOffer = oppOffer,
+                                                        censorBlocked = false
+                                                    )
                                                 } catch (_: Throwable) {
                                                     // Fallback handled inside KtorGeminiService
                                                 } finally {
@@ -1071,6 +1087,19 @@ fun ArenaScreen(
                         conditionText = "Получить высший ранг S (6+ раундов без спешки)"
                     )
                 )
+
+                LaunchedEffect(showDebriefing) {
+                    if (showDebriefing) {
+                        TelemetryService.recordOutcome(
+                            scenarioId = config.id,
+                            isSuccess = metrics.dealReadiness >= 65,
+                            finalPrice = zopaState.currentOffer,
+                            roundsTotal = currentStep,
+                            finalTrust = metrics.trust,
+                            finalStress = metrics.tension
+                        )
+                    }
+                }
 
                 DebriefingModal(
                     report = DebriefingReport(

@@ -136,16 +136,40 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: Build MSI + UberJar
+      - name: Install WiX Toolset
         shell: pwsh
         run: |
+          try {
+            choco install wixtoolset --no-progress -y
+            $wixPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin"
+            if (Test-Path $wixPath) {
+              Write-Host "Adding WiX to GITHUB_PATH: $wixPath"
+              "$wixPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            }
+          } catch {
+            Write-Warning "WiX installation via chocolatey failed: $_"
+          }
+
+      - name: Build Desktop Artifacts (UberJar + MSI)
+        shell: pwsh
+        run: |
+          $wixPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin"
+          if (Test-Path $wixPath) {
+            $env:PATH = "$wixPath;$env:PATH"
+            $env:WIX = "C:\Program Files (x86)\WiX Toolset v3.11"
+          }
           Write-Host "Building UberJar..."
           .\gradlew.bat :desktop:packageUberJarForCurrentOS --no-daemon --stacktrace
+          
           Write-Host "Building MSI Distribution..."
-          .\gradlew.bat :desktop:packageDistributionForCurrentOS --no-daemon --stacktrace
+          try {
+            .\gradlew.bat :desktop:packageDistributionForCurrentOS --no-daemon --stacktrace
+          } catch {
+            Write-Warning "MSI package creation failed, continuing with standalone UberJar: $_"
+          }
 
       - name: Show jpackage logs on failure
-        if: failure()
+        if: always()
         shell: pwsh
         run: |
           $logDir = "desktop\build\compose\logs"

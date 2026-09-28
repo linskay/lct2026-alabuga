@@ -1,16 +1,15 @@
-
 # =============================================================================
-# Docker Compose: Арена переговоров ОЭЗ «Алабуга»
+# Docker Compose: Арена переговоров ОЭЗ «Алабуга» & Grafana Мониторинг
 # =============================================================================
 # Быстрый запуск сервиса:
 #   docker compose up -d --build
 #
-# Запуск вместе с локальной нейросетью (Ollama) в закрытом контуре:
-#   docker compose --profile local-llm up -d --build
+# Запуск полного контура с локальной LLM и дашбордом Grafana:
+#   docker compose --profile all up -d --build
 # =============================================================================
 
 services:
-  # Основное веб-приложение симулятора переговоров
+  # Основное веб-приложение симулятора переговоров (Kotlin Wasm-GC)
   arena-app:
     build:
       context: .
@@ -25,13 +24,12 @@ services:
     environment:
       - PORT=3000
       - NODE_ENV=production
-      # Если запущен сервис local-llm, контейнер свяжется с ним по имени сервиса
       - LOCAL_LLM_URL=http://local-llm:11434/v1
     networks:
       - arena-network
 
   # Опциональный контейнер локальной модели (для работы без интернета)
-  # Активируется флагом: --profile local-llm
+  # Активируется флагом: --profile local-llm или --profile all
   local-llm:
     image: ollama/ollama:latest
     container_name: alabuga-local-llm
@@ -46,10 +44,59 @@ services:
       - local-llm
       - all
 
+  # Prometheus: сбор метрик телеметрии переговорных сессий
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: alabuga-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - arena-network
+    profiles:
+      - monitoring
+      - all
+
+  # Grafana: корпоративный аналитический дашборд переговоров
+  grafana:
+    image: grafana/grafana:latest
+    container_name: alabuga-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=alabuga
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/alabuga_arena_dashboard.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - arena-network
+    profiles:
+      - monitoring
+      - all
+
 networks:
   arena-network:
     driver: bridge
 
 volumes:
   ollama-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
     driver: local

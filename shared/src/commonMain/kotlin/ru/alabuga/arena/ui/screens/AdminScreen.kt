@@ -34,6 +34,8 @@ import ru.alabuga.arena.model.AppSettings
 import ru.alabuga.arena.model.BatnaRules
 import ru.alabuga.arena.model.ScenarioConfig
 import ru.alabuga.arena.model.ScenarioPresets
+import ru.alabuga.arena.telemetry.TelemetryService
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,6 +46,7 @@ fun AdminScreen(
     onStartSimulation: (ScenarioConfig) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val coroutineScope = rememberCoroutineScope()
     val scenariosList = remember {
         mutableStateListOf<ScenarioConfig>().apply {
             addAll(ScenarioPresets.list)
@@ -60,6 +63,12 @@ fun AdminScreen(
     var showGeminiKey by remember { mutableStateOf(false) }
     var showOpenRouterKey by remember { mutableStateOf(false) }
     var apiKeysSaved by remember { mutableStateOf(AppSettings.geminiApiKey.isNotBlank() || AppSettings.openRouterApiKey.isNotBlank()) }
+
+    var telemetryEnabled by remember { mutableStateOf(AppSettings.enableTelemetry) }
+    var grafanaUrl by remember { mutableStateOf(AppSettings.grafanaEndpoint) }
+    var grafanaTestStatus by remember { mutableStateOf<String?>(null) }
+    var isTestingGrafana by remember { mutableStateOf(false) }
+    var showPrometheusModal by remember { mutableStateOf(false) }
 
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -408,11 +417,139 @@ fun AdminScreen(
                     }
                 }
 
-                // 5. Кнопка запуска симуляции
+                // 5. РАЗДЕЛ «📊 ТЕЛЕМЕТРИЯ & GRAFANA МОНИТОРИНГ»
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF101322),
+                    border = BorderStroke(1.dp, Color(0xFF00F0FF).copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = Color(0xFF00F0FF))
+                                Text("📊 МОНИТОРИНГ & GRAFANA ТЕЛЕМЕТРИЯ", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Потоковая телеметрия", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Switch(
+                                    checked = telemetryEnabled,
+                                    onCheckedChange = {
+                                        telemetryEnabled = it
+                                        AppSettings.enableTelemetry = it
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color(0xFF00F0FF),
+                                        checkedTrackColor = Color(0xFF1E1B4B)
+                                    )
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "Сбор метрик переговоров в реальном времени: ZOPA комплаенс, уровень стресса/доверия, переговорный ранг, время реакции и вызовы LLM.",
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = grafanaUrl,
+                                onValueChange = {
+                                    grafanaUrl = it
+                                    AppSettings.grafanaEndpoint = it
+                                },
+                                label = { Text("URL Grafana / Prometheus Endpoint") },
+                                placeholder = { Text("http://localhost:3001") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            Button(
+                                onClick = {
+                                    isTestingGrafana = true
+                                    coroutineScope.launch {
+                                        val res = TelemetryService.testGrafanaConnection(grafanaUrl)
+                                        grafanaTestStatus = res.second
+                                        isTestingGrafana = false
+                                    }
+                                },
+                                enabled = !isTestingGrafana,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                                border = BorderStroke(1.dp, Color(0xFF00F0FF)),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                if (isTestingGrafana) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color(0xFF00F0FF), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(imageVector = Icons.Default.Sensors, contentDescription = null, tint = Color(0xFF00F0FF), modifier = Modifier.size(16.dp))
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("ТЕСТ СВЯЗИ", fontSize = 11.sp, color = Color(0xFF00F0FF), fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        grafanaTestStatus?.let { status ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (status.contains("✅")) Color(0xFF064E3B) else Color(0xFF450A0A),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = status,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    fontSize = 11.sp,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = { showPrometheusModal = true }
+                            ) {
+                                Icon(imageVector = Icons.Default.Code, contentDescription = null, tint = Color(0xFF00FFCC), modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Показать Prometheus Metrics (0.0.4)", fontSize = 11.sp, color = Color(0xFF00FFCC))
+                            }
+
+                            Text(
+                                text = "🔗 Открыть дашборд Grafana (3001)",
+                                fontSize = 11.sp,
+                                color = Color(0xFF00F0FF),
+                                modifier = Modifier.clickable {
+                                    uriHandler.openUri(if (grafanaUrl.isNotBlank()) grafanaUrl else "http://localhost:3001")
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // 6. Кнопка запуска симуляции
                 Button(
                     onClick = {
                         AppSettings.geminiApiKey = geminiKey.trim()
                         AppSettings.openRouterApiKey = openRouterKey.trim()
+                        AppSettings.grafanaEndpoint = grafanaUrl.trim()
+                        AppSettings.enableTelemetry = telemetryEnabled
                         val updated = config.copy(
                             toughnessLevel = toughness.toInt(),
                             batna = config.batna.copy(
@@ -449,6 +586,70 @@ fun AdminScreen(
                 showCreateDialog = false
             }
         )
+    }
+
+    // ДИАЛОГ ПРОСМОТРА МЕТРИК PROMETHEUS
+    if (showPrometheusModal) {
+        Dialog(onDismissRequest = { showPrometheusModal = false }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFF0F172A),
+                border = BorderStroke(1.dp, Color(0xFF00FFCC)),
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "PROMETHEUS METRICS EXPORT",
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF00FFCC),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp
+                        )
+                        IconButton(onClick = { showPrometheusModal = false }) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Закрыть", tint = Color.Gray)
+                        }
+                    }
+
+                    val metricsText = remember { TelemetryService.generatePrometheusMetrics() }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF070B14))
+                            .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = metricsText,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            color = Color(0xFF38BDF8),
+                            lineHeight = 14.sp
+                        )
+                    }
+
+                    Button(
+                        onClick = { showPrometheusModal = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                        border = BorderStroke(1.dp, Color(0xFF00FFCC)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("ЗАКРЫТЬ", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -706,3 +907,4 @@ fun CreateScenarioDialog(
         }
     }
 }
+
