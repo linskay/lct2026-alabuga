@@ -59,7 +59,19 @@ export function detectMethodologyTag(userText: string, lastOpponentText?: string
   const text = (userText || "").trim();
   const lower = text.toLowerCase();
 
-  // 1. Ошибки / Конфликтогены / Безоговорочные уступки
+  // 1. Ошибки / Конфликтогены / Безоговорочные уступки / Ловушка Ультиматума
+  if (
+    (lower.includes("или 460 или") || lower.includes("или вы соглашаетесь или") || lower.includes("других вариантов нет") || lower.includes("на этом разговор окончен")) &&
+    !lower.includes("давайте")
+  ) {
+    return {
+      category: "ERROR",
+      tag: "Ошибка: Ловушка «Ультиматума»",
+      description: "Поведенческая экономика (эксперимент «Ультиматум»): жесткий зажим оппонента в угол провоцирует иррациональный эмоциональный срыв сделки.",
+      type: "danger",
+    };
+  }
+
   if (
     lower.startsWith("к сожалению") ||
     lower.startsWith("извините") ||
@@ -88,7 +100,35 @@ export function detectMethodologyTag(userText: string, lastOpponentText?: string
     };
   }
 
-  // 2. Гарвард: Разделение людей и проблемы
+  // 2. Интегративные переговоры: Расширение пирога (ZOPA 100/100 из статьи Habr)
+  if (
+    (lower.includes("почему для вас") || lower.includes("почему именно этот срок") || lower.includes("почему бюджет")) &&
+    (lower.includes("срок") || lower.includes("месяц") || lower.includes("бюджет") || lower.includes("квартал") || lower.includes("важен"))
+  ) {
+    return {
+      category: "HARVARD",
+      tag: "Гарвард: Расширение пирога (ZOPA)",
+      description: "Выявление глубинных мотивов (сроки запуска, кассовый разрыв) превращает позиционный торг в интегративный win-win 100/100.",
+      type: "positive",
+    };
+  }
+
+  if (
+    lower.includes("разделим на фазы") ||
+    lower.includes("разбить на этап") ||
+    lower.includes("первая очередь") ||
+    lower.includes("mvp") ||
+    lower.includes("поэтапн")
+  ) {
+    return {
+      category: "HARVARD",
+      tag: "Интегративный подход: Поэтапная реализация",
+      description: "Разбивка проекта на фазы снимает кассовый стресс оппонента и гарантирует ввод критических мощностей без снижения ставки.",
+      type: "positive",
+    };
+  }
+
+  // 3. Гарвард: Разделение людей и проблемы
   if (
     lower.includes("отложим эмоци") ||
     lower.includes("без эмоци") ||
@@ -102,6 +142,19 @@ export function detectMethodologyTag(userText: string, lastOpponentText?: string
       category: "HARVARD",
       tag: "Гарвард: Разделение людей и проблемы",
       description: "Эмоции отделены от существа спора. Снижение градуса агрессии без потери жесткости в отстаивании интересов.",
+      type: "positive",
+    };
+  }
+
+  // 4. BATNA: Расчет издержек альтернативы (Cost of Inaction)
+  if (
+    (lower.includes("простой") || lower.includes("убытк") || lower.includes("калуг") || lower.includes("14 месяцев") || lower.includes("заморозк")) &&
+    (lower.includes("дороже") || lower.includes("обойдется") || lower.includes("потеря") || lower.includes("срыв контракта"))
+  ) {
+    return {
+      category: "BATNA",
+      tag: "BATNA: Демонстрация цены альтернативы",
+      description: "Оцифровка издержек оппонента в альтернативной локации (простой оборудования, дефицит сетей) сдвигает его точку ухода.",
       type: "positive",
     };
   }
@@ -763,11 +816,11 @@ function generateFallbackResponse(body: any) {
       }
     }
 
-    // Determine context_hints scaffolding based on current negotiation turn
+    // Determine context_hints scaffolding based on current negotiation turn & Habr theory of games
     let contextHints: string[] = [
-      "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
-      "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
-      "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим [опишите компромисс]...",
+      "Валерий, почему для вас так критичен срок ввода к 3 кварталу? Давайте разделим проект на фазы: подключим ключевые 15 МВт в первую очередь по ставке 460 ₽/м²...",
+      "Если оценить альтернативу в Калуге: простой оборудования на 14 месяцев обойдется бизнесу дороже любой экономии на аренде. В Алабуге подстанция 110 кВ уже готова...",
+      "Давайте не загонять диалог в ловушку ультиматумов: мы закрепляем целевое обучение кадров в «Политехе», а вы подтверждаете ставку 460 ₽/м² и график CAPEX...",
     ];
 
     if (manipulationType === "bluff" || opponentReply.includes("Калуг")) {
@@ -1134,9 +1187,9 @@ ${batnaRulesFormatted}
         result.is_deal_failed || false
       );
       result.context_hints = result.dynamic_hints || result.context_hints || [
-        "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
-        "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
-        "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим [опишите компромисс]...",
+        "Валерий, почему для вас так критичен срок ввода к 3 кварталу? Давайте разделим проект на фазы: подключим ключевые 15 МВт в первую очередь по ставке 460 ₽/м²...",
+        "Если оценить альтернативу в Калуге: простой оборудования на 14 месяцев обойдется бизнесу дороже любой экономии на аренде. В Алабуге подстанция 110 кВ уже готова...",
+        "Давайте не загонять диалог в ловушку ультиматумов: мы закрепляем целевое обучение кадров в «Политехе», а вы подтверждаете ставку 460 ₽/м² и график CAPEX...",
       ];
       result.is_deal_closed = Boolean(result.is_deal_closed || calcReadiness >= 100);
       result.is_deal_failed = Boolean(result.is_deal_failed || (calcTension >= 95 && calcTrust <= 20));

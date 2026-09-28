@@ -194,22 +194,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             animation-name={activeAnim}
             camera-orbit="0deg 80deg 72%"
             camera-target="0m 0.82m 0m"
-            camera-controls
-            touch-action="pan-y"
-            disable-zoom
             interaction-prompt="none"
             shadow-intensity="1.5"
             shadow-softness="0.7"
             exposure="1.0"
             environment-image="neutral"
-            auto-rotate
-            rotation-per-second="8deg"
             style={
               {
                 width: "100%",
                 height: "100%",
                 position: "relative",
                 zIndex: 10,
+                pointerEvents: "none",
                 "--poster-color": "transparent",
               } as any
             }
