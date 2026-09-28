@@ -155,15 +155,27 @@ fun ArenaScreen(
         }
     }
 
-    // Validation
+    // Validation & B2B Censor
     val trimmed = inputText.trim()
+    val words = remember(trimmed) { trimmed.split(Regex("\\s+")).filter { it.isNotBlank() } }
     val hasPlaceholders = remember(trimmed) {
         trimmed.contains("[") || trimmed.contains("]") || trimmed.contains("...")
     }
     val isExactTemplate = remember(trimmed, lastInsertedTemplate) {
         lastInsertedTemplate.isNotEmpty() && trimmed == lastInsertedTemplate.trim()
     }
-    val canSend = trimmed.isNotEmpty() && !hasPlaceholders && !isExactTemplate && !isGeneratingReply
+
+    // ИИ-Цензор ввода: запрет на «базарные» цифры и фразы короче 4 слов без аргументов
+    val isBazaarInput = remember(trimmed, words) {
+        if (trimmed.isEmpty()) false
+        else {
+            val isJustNumber = trimmed.matches(Regex("^[+\\-~]?\\s*\\d+(?:[.,]\\d+)?\\s*(?:[рp₽]|руб(?:лей|ля)?)?\\.?$", RegexOption.IGNORE_CASE))
+            val isTooShortWithoutArgs = words.size < 4 && !trimmed.contains("если", ignoreCase = true) && !trimmed.contains("взамен", ignoreCase = true) && !trimmed.contains("при условии", ignoreCase = true)
+            isJustNumber || isTooShortWithoutArgs
+        }
+    }
+
+    val canSend = trimmed.isNotEmpty() && !hasPlaceholders && !isExactTemplate && !isBazaarInput && !isGeneratingReply
 
     val sendInteractionSource = remember { MutableInteractionSource() }
     val isSendPressed by sendInteractionSource.collectIsPressedAsState()
@@ -534,11 +546,10 @@ fun ArenaScreen(
 
                         val rawHints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints
                         val hints = if (!rawHints.isNullOrEmpty()) rawHints else listOf(
-                            "Мы фиксируем ставку 480 ₽/м² при условии предоплаты за 1 квартал.",
-                            "Налоговые преференции ОЭЗ (0% на имущество) нивелируют разницу в ставке.",
-                            "Срок ввода 110 кВ фиксируется в соглашении с финансовыми гарантиями ОЭЗ.",
-                            "Предоставим 4 месяца каникул взамен на обязательства по CAPEX 1.2 млрд ₽.",
-                            "Альтернативные площадки региона испытывают острый дефицит мощностей 110 кВ."
+                            "Мы готовы пойти навстречу по ставке до [укажите цифру] ₽/м², если вы возьмете на себя пусконаладку [обязательство]...",
+                            "Поймите, ставка [укажите цифру] ₽/м² обусловлена тем, что мы берем на себя все сети. У других резидентов [аргумент]...",
+                            "Давайте зафиксируем [укажите цифру] ₽/м², но увеличим срок каникул до [укажите срок] месяцев, чтобы компенсировать [риск]...",
+                            "У нас есть запрос от другого инвестора на эти площади, но мы хотим работать с вами. Давайте сойдемся на [условие]..."
                         )
 
                         if (hints.isNotEmpty()) {
@@ -617,6 +628,53 @@ fun ArenaScreen(
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // Плашка-памятка «Конструктор аргумента ZOPA»
+                        if (trimmed.isNotEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF0F172A).copy(alpha = 0.85f),
+                                border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.40f)),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "💡 Стратегия ZOPA: Предложите уступку (срок/объемы/гарантии), чтобы сдвинуть оппонента по цене. Избегайте пустых торгов.",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF7DD3FC),
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        // ИИ-Цензор: предупреждение о базарных цифрах и коротких репликах без аргументов
+                        if (isBazaarInput) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF451A03).copy(alpha = 0.90f),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.70f)),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "⚠️ B2B-переговоры — это не базар. Назовите уступку или обоснуйте цену. Например: \"Мы готовы согласовать 460 ₽/м², но при условии...\"",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFFFDE68A),
+                                        lineHeight = 16.sp
+                                    )
                                 }
                             }
                         }
@@ -728,7 +786,7 @@ fun ArenaScreen(
                                                         Message(
                                                             id = "opp_${currentStep}_${Random.nextInt(100000)}",
                                                             actor = MessageActor.OPPONENT,
-                                                            text = replyDto.opponentReply,
+                                                            text = replyDto.getResolvedReply(),
                                                             stepIndex = currentStep,
                                                             snapshotMetrics = newMetrics,
                                                             emotionEmoji = emoEmoji,
