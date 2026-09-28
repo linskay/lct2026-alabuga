@@ -13,17 +13,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.Scene
-import io.github.sceneview.animation.ModelAnimator
-import io.github.sceneview.math.Position
-import io.github.sceneview.math.Rotation
 import io.github.sceneview.node.ModelNode
+import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelLoader
-import io.github.sceneview.rememberNode
-import io.github.sceneview.rememberCameraNode
-import io.github.sceneview.rememberEnvironmentLoader
-import io.github.sceneview.node.CameraNode
 
 @Composable
 fun BarsRobot3DView(
@@ -33,34 +28,29 @@ fun BarsRobot3DView(
 ) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
-    val environmentLoader = rememberEnvironmentLoader(engine)
 
     var loadFailed by remember { mutableStateOf(false) }
-    var currentAnimationIndex by remember { mutableStateOf<Int?>(null) }
-    var modelAnimator by remember { mutableStateOf<ModelAnimator?>(null) }
 
-    val modelNode = rememberNode {
+    val modelNode = remember(modelLoader) {
         try {
             val instance = modelLoader.createModelInstance("bars.glb")
             if (instance != null) {
                 ModelNode(
                     modelInstance = instance,
                     scaleToUnits = 1.0f
-                ).apply {
-                    modelAnimator = this.modelInstance?.animator
-                }
+                )
             } else {
                 loadFailed = true
-                ModelNode(engine = engine)
+                null
             }
         } catch (e: Exception) {
             loadFailed = true
-            ModelNode(engine = engine)
+            null
         }
     }
 
     val cameraNode = rememberCameraNode(engine) {
-        position = Position(y = 0.5f, z = 2.5f)
+        position = Float3(0f, 0.5f, 2.5f)
     }
 
     val targetAnimationName = when (animation) {
@@ -77,18 +67,16 @@ fun BarsRobot3DView(
         else -> "SK_ZMikeAnim_ZMIKE_Idle"
     }
 
-    // Effect to apply animation
-    LaunchedEffect(animation, modelAnimator) {
-        modelAnimator?.let { animator ->
-            val count = animator.animationCount
-            for (i in 0 until count) {
-                if (animator.getAnimationName(i) == targetAnimationName) {
-                    currentAnimationIndex = i
-                    break
-                }
-            }
-            if (currentAnimationIndex == null && count > 0) {
-                currentAnimationIndex = 0 // Fallback to first animation
+    LaunchedEffect(animation, modelNode) {
+        modelNode?.let { node ->
+            try {
+                node.playAnimation(targetAnimationName)
+            } catch (_: Exception) {
+                try {
+                    if (node.animationCount > 0) {
+                        node.playAnimation(0)
+                    }
+                } catch (_: Exception) {}
             }
         }
     }
@@ -102,7 +90,7 @@ fun BarsRobot3DView(
         else -> Triple("СКАНЕР АКТИВЕН", "3D НАСТАВНИК ONLINE", Color(0xFF00F0FF))
     }
 
-    if (loadFailed) {
+    if (loadFailed || modelNode == null) {
         BarsRobotCanvasView(
             animationState = animation,
             modifier = modifier
@@ -122,31 +110,27 @@ fun BarsRobot3DView(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            var lastFrameTime by remember { mutableStateOf(0L) }
             Scene(
                 modifier = Modifier.fillMaxSize(),
                 engine = engine,
                 modelLoader = modelLoader,
                 cameraNode = cameraNode,
                 childNodes = listOf(modelNode),
-                environment = environmentLoader.createHDREnvironment(""), // Optional, could load an HDR here if available, or just leave default
-                onFrame = { frameTime ->
-                    // Auto-rotation 10 deg/sec
-                    val deltaSeconds = frameTime.intervalSeconds.toFloat()
-                    modelNode.rotation = Rotation(
-                        y = modelNode.rotation.y + (10f * deltaSeconds)
-                    )
-                    
-                    // Apply animation time
-                    currentAnimationIndex?.let { index ->
-                        modelAnimator?.apply {
-                            applyAnimation(index, frameTime.totalSeconds.toFloat())
-                            updateBoneMatrices()
-                        }
+                onFrame = { frameTimeNs ->
+                    if (lastFrameTime != 0L) {
+                        val deltaSeconds = (frameTimeNs - lastFrameTime) / 1_000_000_000f
+                        modelNode.rotation = Float3(
+                            x = modelNode.rotation.x,
+                            y = modelNode.rotation.y + (10f * deltaSeconds),
+                            z = modelNode.rotation.z
+                        )
                     }
+                    lastFrameTime = frameTimeNs
                 }
             )
         }
-        
+
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(

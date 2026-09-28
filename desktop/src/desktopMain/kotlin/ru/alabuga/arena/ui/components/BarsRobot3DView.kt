@@ -104,8 +104,7 @@ fun BarsRobot3DView(
                         val settings = AppSettings(true).apply {
                             setRenderer(AppSettings.LWJGL_OPENGL33)
                             isFullscreen = false
-                            width = 640
-                            height = 480
+                            setResolution(640, 480)
                             frameRate = 60
                             isVSync = true
                             setSamples(4)
