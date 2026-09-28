@@ -1,25 +1,27 @@
 package ru.alabuga.arena.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.alabuga.arena.model.ScenarioConfig
@@ -37,6 +39,14 @@ fun AdminScreen(
     var toughness by remember { mutableStateOf(currentConfig.toughnessLevel.toFloat()) }
     var minPrice by remember { mutableStateOf(currentConfig.batna.minPricePerSqm.toString()) }
     var maxGrace by remember { mutableStateOf(currentConfig.batna.maxGracePeriodMonths.toString()) }
+
+    var geminiKey by remember { mutableStateOf("") }
+    var openRouterKey by remember { mutableStateOf("") }
+    var showGeminiKey by remember { mutableStateOf(false) }
+    var showOpenRouterKey by remember { mutableStateOf(false) }
+    var apiKeysSaved by remember { mutableStateOf(false) }
+
+    val uriHandler = LocalUriHandler.current
 
     Scaffold(
         topBar = {
@@ -66,15 +76,21 @@ fun AdminScreen(
         },
         containerColor = Color(0xFF07080D)
     ) { paddingValues ->
-        LazyColumn(
+        Box(
             modifier = modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // 1. Выбор сценария
-            item {
+            // Ограничение максимальной ширины на десктопе (maxWidth = 1100.dp) для устранения растянутости
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 1100.dp)
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 1. Выбор сценария: Сетка LazyVerticalGrid (GridCells.Adaptive(260.dp))
                 Text(
                     text = "ГОТОВЫЕ БОЕВЫЕ СЦЕНАРИИ ОЭЗ",
                     fontSize = 12.sp,
@@ -83,31 +99,32 @@ fun AdminScreen(
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(10.dp))
 
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(260.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp)
                 ) {
                     items(ScenarioPresets.list) { preset ->
                         val isSelected = preset.id == config.id
                         Surface(
                             modifier = Modifier
-                                .width(240.dp)
+                                .fillMaxWidth()
                                 .clickable {
                                     config = preset
                                     toughness = preset.toughnessLevel.toFloat()
                                     minPrice = preset.batna.minPricePerSqm.toString()
                                     maxGrace = preset.batna.maxGracePeriodMonths.toString()
                                 },
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(14.dp),
                             color = if (isSelected) Color(0xFF1B233D) else Color(0xFF101322),
-                            border = androidx.compose.foundation.BorderStroke(
+                            border = BorderStroke(
                                 1.5.dp,
                                 if (isSelected) Color(0xFF00F0FF) else Color(0xFF282F48)
                             )
                         ) {
-                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(
                                     text = preset.sphere,
                                     fontSize = 10.sp,
@@ -117,7 +134,7 @@ fun AdminScreen(
                                 )
                                 Text(
                                     text = preset.name,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
@@ -130,23 +147,21 @@ fun AdminScreen(
                         }
                     }
                 }
-            }
 
-            // 2. Настройки жесткости и блефа
-            item {
+                // 2. Компактная интерактивная шкала жесткости
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = Color(0xFF101322),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF282F48)),
+                    border = BorderStroke(1.dp, Color(0xFF282F48)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Уровень жесткости оппонента", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Шкала жесткости оппонента", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             Text("${toughness.toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F0FF), fontFamily = FontFamily.Monospace)
                         }
 
@@ -168,40 +183,108 @@ fun AdminScreen(
                         )
                     }
                 }
-            }
 
-            // 3. Защита BATNA ОЭЗ
-            item {
+                // 3. РАЗДЕЛ «🔑 ИНТЕГРАЦИЯ AI & БЭКЕНДА»
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = Color(0xFF101322),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF282F48)),
+                    border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = Color(0xFF00F0FF))
-                            Text("Красные линии ОЭЗ «Алабуга» (BATNA)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Icon(imageVector = Icons.Default.Key, contentDescription = null, tint = Color(0xFF00FFCC))
+                            Text("🔑 ИНТЕГРАЦИЯ AI & БЭКЕНДА", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
 
-                        config.batna.redLines.forEach { line ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFF00F0FF)))
-                                Text(line, fontSize = 12.sp, color = Color(0xFFE2E8F0))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Google Gemini API Key
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Google Gemini API Key", fontSize = 11.sp, color = Color(0xFFCBD5E1), fontWeight = FontWeight.SemiBold)
+                                OutlinedTextField(
+                                    value = geminiKey,
+                                    onValueChange = { geminiKey = it; apiKeysSaved = false },
+                                    placeholder = { Text("AIzaSy...", fontSize = 11.sp) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    visualTransformation = if (showGeminiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { showGeminiKey = !showGeminiKey }) {
+                                            Icon(
+                                                imageVector = if (showGeminiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = null,
+                                                tint = Color.Gray,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                )
+                                Text(
+                                    text = "🔗 Получить ключ в Google AI Studio",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF00F0FF),
+                                    modifier = Modifier.clickable {
+                                        uriHandler.openUri("https://aistudio.google.com/")
+                                    }
+                                )
                             }
+
+                            // OpenRouter API Key
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("OpenRouter API Key (Резерв)", fontSize = 11.sp, color = Color(0xFFCBD5E1), fontWeight = FontWeight.SemiBold)
+                                OutlinedTextField(
+                                    value = openRouterKey,
+                                    onValueChange = { openRouterKey = it; apiKeysSaved = false },
+                                    placeholder = { Text("sk-or-v1-...", fontSize = 11.sp) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    visualTransformation = if (showOpenRouterKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { showOpenRouterKey = !showOpenRouterKey }) {
+                                            Icon(
+                                                imageVector = if (showOpenRouterKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = null,
+                                                tint = Color.Gray,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                )
+                                Text(
+                                    text = "🔗 Получить ключ на OpenRouter",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFFD8B4FE),
+                                    modifier = Modifier.clickable {
+                                        uriHandler.openUri("https://openrouter.ai/keys")
+                                    }
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { apiKeysSaved = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (apiKeysSaved) Color(0xFF10B981) else Color(0xFF7B2CBF)
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Icon(imageVector = if (apiKeysSaved) Icons.Default.Check else Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (apiKeysSaved) "КЛЮЧИ СОХРАНЕНЫ" else "СОХРАНИТЬ КЛЮЧИ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-            }
 
-            // 4. Кнопка запуска
-            item {
+                // 4. Кнопка запуска симуляции
                 Button(
                     onClick = {
                         val updated = config.copy(
@@ -213,8 +296,8 @@ fun AdminScreen(
                         )
                         onStartSimulation(updated)
                     },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2CBF))
                 ) {
                     Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null)
