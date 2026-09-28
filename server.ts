@@ -385,6 +385,82 @@ function getGenAI(): GoogleGenAI | null {
   return aiClient;
 }
 
+// Helper to extract respectful address from opponent full name or role
+function getOpponentPoliteName(fullName?: string, role?: string): string {
+  if (!fullName || typeof fullName !== "string") {
+    return role ? role.toLowerCase() : "коллега";
+  }
+  const trimmed = fullName.trim();
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2 && (parts[0].length <= 4 || ["Чжан", "Ван", "Ли", "Чжао", "Чэнь", "Ян"].includes(parts[0]))) {
+    return `господин ${parts[0]}`;
+  }
+  return parts[0];
+}
+
+// Dynamic game-theory scaffolding generator based on current scenario context
+function generateServerDynamicCaseHints(
+  context: any,
+  _history: any[],
+  opponentReply: string,
+  manipulationType: string,
+  isDealClosed: boolean
+): string[] {
+  const name = getOpponentPoliteName(context?.opponentName, context?.opponentRole);
+  const alternative = context?.opponentBatna || "альтернативная площадка или подрядчик";
+  const sphere = context?.sphere || "B2B / Инвесторы ОЭЗ";
+  const redLines = context?.batna?.redLines || [];
+  const primaryRedLine = redLines[0] || (context?.batna?.minPricePerSqm ? `ставку не ниже ${context.batna.minPricePerSqm} ₽/м²` : "базовые условия соглашения");
+  const targetKpis = context?.targetKpis || [];
+  const primaryKpi = targetKpis[0] || primaryRedLine;
+  const secondaryKpi = targetKpis[1] || (targetKpis.length > 2 ? targetKpis[2] : "график реализации проекта");
+
+  // 1. Сделка успешно закрыта
+  if (isDealClosed) {
+    return [
+      `${name}, фиксируем согласованные параметры: [перечислите ключевые договоренности] и передаем протокол на подписание.`,
+      `Отлично, все разногласия сняты. Передаем проект соглашения юридической службе с учетом договоренности по [укажите главный пункт]...`,
+      `Благодарю за конструктивный диалог! Закрепляем встречные обязательства: [укажите первые шаги обеих сторон]...`,
+    ];
+  }
+
+  // 2. Отражение блефа / прессинга / ультиматумов
+  if (manipulationType === "bluff" || manipulationType === "authority_press" || manipulationType === "hurry_trap" || opponentReply.includes("Калуг") || opponentReply.includes("Ульяновск") || opponentReply.includes("уходим")) {
+    const shortAlt = alternative.length > 60 ? alternative.slice(0, 57) + "..." : alternative;
+    return [
+      `${name}, сравнение с альтернативой (${shortAlt}) некорректно без учета скрытых рисков: у нас [укажите подтвержденный факт/преимущество ОЭЗ], тогда как там...`,
+      `Мы не принимаем стратегические решения под давлением цейтнота или ультиматумов. Давайте вернемся к цифрам: мы готовы [укажите компромисс], если вы гарантируете [встречное обязательство]...`,
+      `Давайте отложим эмоции и сфокусируемся на экономике: назовите ваши реальные технологические требования к [срокам ввода или объемам], и мы найдем решение...`,
+    ];
+  }
+
+  // 3. Специфика HR
+  if (sphere.includes("HR") || sphere.includes("Наем") || sphere.includes("инженер")) {
+    return [
+      `${name}, почему для вас сейчас в приоритете именно этот оффер? Давайте посмотрим глубже: что важнее — голый оклад или лидерство в новом проекте? Мы готовы предложить [опишите полномочия или проект], взамен на...`,
+      `Если трезво оценить переход в другую компанию: там вы начнете с нуля в чужой операционке. В ОЭЗ вы получаете масштаб и команду [укажите стажеров Политеха/ресурсы], если зафиксируем [укажите KPI]...`,
+      `Давайте не загонять диалог в ультиматум: мы готовы пересмотреть компенсационный пакет и снять рутину [укажите уступку], при условии, что вы берете на себя запуск [укажите проект]...`,
+    ];
+  }
+
+  // 4. Специфика закупок и тендеров
+  if (sphere.includes("Закупк") || sphere.includes("тендер") || sphere.includes("оборудован") || sphere.includes("поставк")) {
+    return [
+      `${name}, почему для вас так критично исключить этот пункт ответственности? Давайте разделим контракт на фазы: запустим пилотную партию с [укажите условие], а гарантии привяжем к [укажите компромисс]...`,
+      `Если оценить риск простоя без жестких гарантий пусконаладки: убытки от заморозки цеха многократно превысят любую экономию на цене. Наше требование защищает обе стороны, если мы [укажите шаг навстречу]...`,
+      `Мы готовы согласовать комфортный график авансирования [укажите уступку], но взамен настаиваем на защите ключевого пункта: [${primaryRedLine}]...`,
+    ];
+  }
+
+  // 5. B2B / Инвесторы ОЭЗ / Общие промышленные сценарии
+  return [
+    `${name}, почему для вас так критичен именно этот дедлайн/бюджет? Давайте разделим проект на фазы: обеспечим ввод первой очереди [укажите первоочередной объем] на наших базовых условиях, а по остальным [опишите компромисс]...`,
+    `Если взвесить альтернативу (${alternative.length > 50 ? alternative.slice(0, 47) + '...' : alternative}): простой оборудования и дефицит мощностей обойдутся бизнесу дороже. Мы гарантируем готовность сетей, если вы подтверждаете [${primaryKpi}]...`,
+    `Давайте не загонять переговоры в ловушку ультиматумов: мы готовы пойти навстречу по [укажите допустимую уступку из ${secondaryKpi}], при условии, что вы соблюдаете [${primaryRedLine}]...`,
+  ];
+}
+
 // Fallback state engine implementing strict stepped resistance, manipulation attacks and trade-offs
 function generateFallbackResponse(body: any) {
   const history = body.history || [];
@@ -816,33 +892,14 @@ function generateFallbackResponse(body: any) {
       }
     }
 
-    // Determine context_hints scaffolding based on current negotiation turn & Habr theory of games
-    let contextHints: string[] = [
-      "Валерий, почему для вас так критичен срок ввода к 3 кварталу? Давайте разделим проект на фазы: подключим ключевые 15 МВт в первую очередь по ставке 460 ₽/м²...",
-      "Если оценить альтернативу в Калуге: простой оборудования на 14 месяцев обойдется бизнесу дороже любой экономии на аренде. В Алабуге подстанция 110 кВ уже готова...",
-      "Давайте не загонять диалог в ловушку ультиматумов: мы закрепляем целевое обучение кадров в «Политехе», а вы подтверждаете ставку 460 ₽/м² и график CAPEX...",
-    ];
-
-    if (manipulationType === "bluff" || opponentReply.includes("Калуг")) {
-      contextHints = [
-        "В Калуге нет свободной подстанции 110 кВ на границе площадки, а у нас [поясните готовность сетей]...",
-        "Мы готовы зафиксировать базовую ставку 460 ₽/м² в обмен на [укажите встречное обязательство инвестора]...",
-        "Сравнение с Калугой некорректно без учета логистики: назовите ваши реальные требования к [срокам или кадрам]...",
-      ];
-    } else if (opponentReply.includes("самолет") || opponentReply.includes("2 часа") || (manipulationType as string) === "hurry" || manipulationType === "hurry_trap") {
-
-      contextHints = [
-        "Спешка перед самолетом — плохой советчик при CAPEX в миллиарды. Давайте прямо сейчас согласуем [ставку или каникулы]...",
-        "Мы не подписываем соглашения под давлением цейтнота, однако можем пойти навстречу по [укажите параметр]...",
-        "Если вы цените свое время, зафиксируем 460 ₽/м² прямо сейчас при условии, что вы [укажите встречное требование]...",
-      ];
-    } else if (isDealClosed) {
-      contextHints = [
-        "Отлично, фиксируем протокол согласования: ставка [укажите ставку] и каникулы [укажите срок]...",
-        "Передаем проект договора на подписание юристам обеих сторон с учетом [укажите обязательства]...",
-        "Благодарю за конструктивный диалог. Закрепляем обязательства по CAPEX [укажите сумму]...",
-      ];
-    }
+    // Determine dynamic context_hints scaffolding based on current scenario & conversation state
+    const contextHints = generateServerDynamicCaseHints(
+      context,
+      history,
+      opponentReply,
+      manipulationType,
+      isDealClosed
+    );
 
     return {
       opponent_reply: opponentReply,
@@ -997,14 +1054,24 @@ ${batnaRulesFormatted}
    - Возвращай metrics_delta (изменение за ход в диапазоне от -15 до +15).
 4. ТАКТИЧЕСКИЙ РАЗБОР Б.А.Р.С. (bars_feedback):
    - Указывай на сильный маневр или ошибку игрока в терминах Гарвардского метода принципиальных переговоров и концепции BATNA.
-5. ДИНАМИЧЕСКИЕ ПОДСКАЗКИ (dynamic_hints):
-   - Модель на лету генерирует ровно 3 тактических каркаса-шаблона под текущий контекст диалога с плейсхолдерами [...] или ... (scaffolding для игрока, чтобы он дополнил своими словами).
+5. ДИНАМИЧЕСКИЕ ПОДСКАЗКИ ДЛЯ ИГРОКА (dynamic_hints):
+   - Обязательно сгенерируй ровно 3 контекстные подсказки-шаблона (scaffolding) для ИГРОКА.
+   - Подсказки ОБЯЗАНЫ быть строго адаптированы под ДАННЫЙ СЦЕНАРИЙ («${context?.title || sphere}»), обращаться к оппоненту (${opponentName}) и опираться на контекст спора (${scenarioDescription}).
+   - Каждая подсказка должна содержать плейсхолдер [...] или ... для дополнения игроком:
+     1. Интегративный вопрос (выяснение скрытой боли/дедлайна оппонента и предложение разбить проект на фазы / MVP).
+     2. BATNA / Издержки альтернативы (оцифровка того, почему уход к «${opponentBatna || 'альтернативе'}» принесет оппоненту большие скрытые издержки).
+     3. Принципиальный встречный размен (готовность пойти навстречу по второстепенному пункту строго взамен на защиту ключевой красной линии: «${redLines[0] || 'базового условия'}»).
 
 Верни ответ СТРОГО в JSON формате со следующими полями:
 {
   "opponent_reply": "Реплика оппонента",
   "bars_feedback": "Тактический совет и разбор Б.А.Р.С.",
   "bars_animation": "idle | talk | warn | win",
+  "dynamic_hints": [
+    "Подсказка 1 с плейсхолдером [...]",
+    "Подсказка 2 с плейсхолдером [...]",
+    "Подсказка 3 с плейсхолдером [...]"
+  ],
   "metrics": {
     "trust": 0..100,
     "tension": 0..100,
@@ -1146,6 +1213,7 @@ ${batnaRulesFormatted}
               "opponent_reply",
               "bars_feedback",
               "bars_animation",
+              "dynamic_hints",
             ],
           },
         },
@@ -1186,11 +1254,16 @@ ${batnaRulesFormatted}
         result.is_deal_closed || false,
         result.is_deal_failed || false
       );
-      result.context_hints = result.dynamic_hints || result.context_hints || [
-        "Валерий, почему для вас так критичен срок ввода к 3 кварталу? Давайте разделим проект на фазы: подключим ключевые 15 МВт в первую очередь по ставке 460 ₽/м²...",
-        "Если оценить альтернативу в Калуге: простой оборудования на 14 месяцев обойдется бизнесу дороже любой экономии на аренде. В Алабуге подстанция 110 кВ уже готова...",
-        "Давайте не загонять диалог в ловушку ультиматумов: мы закрепляем целевое обучение кадров в «Политехе», а вы подтверждаете ставку 460 ₽/м² и график CAPEX...",
-      ];
+      result.context_hints =
+        Array.isArray(result.dynamic_hints) && result.dynamic_hints.length > 0
+          ? result.dynamic_hints
+          : generateServerDynamicCaseHints(
+              context,
+              history,
+              result.opponent_reply || "",
+              result.manipulation_type || "none",
+              result.is_deal_closed || false
+            );
       result.is_deal_closed = Boolean(result.is_deal_closed || calcReadiness >= 100);
       result.is_deal_failed = Boolean(result.is_deal_failed || (calcTension >= 95 && calcTrust <= 20));
 

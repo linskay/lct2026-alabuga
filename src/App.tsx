@@ -19,6 +19,7 @@ import { CaseInfoModal } from "./components/CaseInfoModal";
 import { ScenarioConfiguratorScreen } from "./components/ScenarioConfiguratorScreen";
 import { HomeScreen } from "./components/HomeScreen";
 import { AdminScreen } from "./components/AdminScreen";
+import { generateDynamicCaseHints } from "./utils/dynamicHints";
 
 export enum Screen {
   Home = "Home",
@@ -94,11 +95,7 @@ export default function App() {
     emotion: "attack",
     emotionLabel: "Первый выпад / Давление",
     emotionEmoji: "😠",
-    contextHints: [
-      "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
-      "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем субсидий или мощности]...",
-      "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
-    ],
+    contextHints: generateDynamicCaseHints(PRESET_SCENARIOS[0]),
   };
 
   const [messages, setMessages] = useState<Message[]>([initialBarsWelcome, initialOpponentMessage]);
@@ -318,11 +315,10 @@ export default function App() {
         emotion,
         emotionLabel,
         emotionEmoji,
-        contextHints: data.context_hints || [
-          "Валерий, почему для вас так критичен срок ввода к 3 кварталу? Давайте разделим проект на фазы: подключим ключевые 15 МВт в первую очередь по ставке 460 ₽/м²...",
-          "Если оценить альтернативу в Калуге: простой оборудования на 14 месяцев обойдется бизнесу дороже любой экономии на аренде. В Алабуге подстанция 110 кВ уже готова...",
-          "Давайте не загонять диалог в ловушку ультиматумов: мы закрепляем целевое обучение кадров в «Политехе», а вы подтверждаете ставку 460 ₽/м² и график CAPEX...",
-        ],
+        contextHints:
+          Array.isArray(data.context_hints) && data.context_hints.length > 0
+            ? data.context_hints
+            : generateDynamicCaseHints(config, updatedMessages, emotion, data.is_deal_closed),
       };
 
       const newHistory = [...updatedMessages, opponentMessage];
@@ -446,6 +442,7 @@ export default function App() {
       timestamp: Date.now() + 1,
       stepIndex: 0,
       snapshotMetrics: { ...initialMetrics },
+      contextHints: generateDynamicCaseHints(activeCfg),
     };
 
     setMessages([welcomeBars, resetOpponentMsg]);

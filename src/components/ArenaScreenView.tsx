@@ -14,6 +14,7 @@ import { MethodologyTagBadge } from "./MethodologyTagBadge";
 import { LatencyBadge } from "./LatencyBadge";
 import { OfflineToggle } from "./OfflineToggle";
 import { triggerHaptic } from "../utils/haptics";
+import { generateDynamicCaseHints } from "../utils/dynamicHints";
 import {
   Send,
   RotateCcw,
@@ -213,16 +214,12 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
       .slice(0, 2)
       .toUpperCase() || "ОП";
 
-  // Dynamic context hints: extract from the most recent opponent message
+  // Dynamic context hints: extract from the most recent opponent message or synthesize from scenario
   const latestOpponentMsg = [...messages].reverse().find((m) => m.actor === "OPPONENT");
   const dynamicHints: string[] =
     latestOpponentMsg?.contextHints && latestOpponentMsg.contextHints.length > 0
       ? latestOpponentMsg.contextHints
-      : [
-          "Валерий, спешка в таких инвестициях рискованна. Мы готовы рассмотреть [укажите ставку], если вы гарантируете...",
-          "Условие ОЭЗ — не менее 1.2 млрд CAPEX в обмен на [укажите объем мощностей или льготу]...",
-          "Понимаю жесткий тайминг совета директоров. Давайте зафиксируем 460 ₽/м², но предусмотрим льготу [опишите компромисс]...",
-        ];
+      : generateDynamicCaseHints(config, messages);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#07080e] text-slate-100 select-none">
