@@ -37,7 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.alabuga.arena.model.*
-import ru.alabuga.arena.ui.components.BarsRobotCanvasView
+import ru.alabuga.arena.ui.components.BarsRobotView
 import ru.alabuga.arena.ui.components.DebriefingModal
 import ru.alabuga.arena.ui.components.TimeTravelModal
 import ru.alabuga.arena.ui.components.ZopaMapCard
@@ -214,10 +214,11 @@ fun ArenaScreen(
                                 )
                         )
 
-                        // 3D/Canvas Робот наставник / визуал оппонента прямо в кейсе
-                        BarsRobotCanvasView(
-                            animationState = if (metrics.tension >= 60) "warn" else if (metrics.dealReadiness >= 65) "win" else "talk",
-                            modifier = Modifier.fillMaxSize()
+                        // 3D Робот Б.А.Р.С. прямо в кейсе
+                        BarsRobotView(
+                            animation = if (metrics.tension >= 60) "warn" else if (metrics.dealReadiness >= 65) "win" else "talk",
+                            modifier = Modifier.fillMaxSize(),
+                            height = 240.dp
                         )
 
                         // ИНДИКАТОР СТРЕССА: от фиолетового (0%) до ало-красного (100%)

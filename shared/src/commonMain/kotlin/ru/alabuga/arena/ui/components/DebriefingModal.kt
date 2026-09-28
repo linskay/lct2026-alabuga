@@ -5,9 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -23,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.alabuga.arena.model.DebriefingReport
 import ru.alabuga.arena.model.ScenarioConfig
+import ru.alabuga.arena.util.exportPdfReport
 
 @Composable
 fun DebriefingModal(
@@ -39,6 +37,9 @@ fun DebriefingModal(
         "B" -> Color(0xFFFBBF24)
         else -> Color(0xFFFF3366)
     }
+
+    val weakZonesText = "1. Склонность к преждевременному согласию на каникулы без получения встречных инвестиционных гарантий.<br/>2. Недостаточно жесткая фиксация срока ввода мощностей 110 кВ в первом раунде диалога."
+    val recommendationsText = "• Всегда привязывайте скидку к обязательствам по CAPEX не менее 1.2 млрд ₽.<br/>• Не допускайте превышения льготного периода свыше 4 месяцев (граница BATNA ОЭЗ).<br/>• При повторной попытке оппонента блефовать альтернативными площадками сразу оперируйте дефицитом сетей конкурентов."
 
     Box(
         modifier = Modifier
@@ -192,6 +193,19 @@ fun DebriefingModal(
                     Button(
                         onClick = {
                             pdfDownloaded = true
+                            exportPdfReport(
+                                scenario.name,
+                                scenario.opponentName,
+                                report.finalOutcome,
+                                report.overallRating,
+                                report.totalSteps,
+                                report.batnaScore,
+                                100 - report.stressManagementScore,
+                                if (report.finalOutcome == "WON") 90 else 55,
+                                report.barsExecutiveSummary,
+                                weakZonesText,
+                                recommendationsText
+                            )
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (pdfDownloaded) Color(0xFF10B981) else Color(0xFF00F0FF).copy(alpha = 0.2f),

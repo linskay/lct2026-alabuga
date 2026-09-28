@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -47,23 +49,26 @@ fun AdminScreen(
     var apiKeysSaved by remember { mutableStateOf(false) }
 
     val uriHandler = LocalUriHandler.current
+    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = "КОНФИГУРАТОР ПЕРЕГОВОРОВ & BATNA",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "ОЭЗ «Алабуга» • Настройка психотипов и ограничений",
-                            fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
-                        )
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                        Column {
+                            Text(
+                                text = "КОНФИГУРАТОР ПЕРЕГОВОРОВ & BATNA",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "ОЭЗ «Алабуга» • Настройка психотипов и ограничений",
+                                fontSize = 11.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -82,87 +87,99 @@ fun AdminScreen(
                 .padding(paddingValues),
             contentAlignment = Alignment.TopCenter
         ) {
-            // Ограничение максимальной ширины на десктопе (maxWidth = 1100.dp) для устранения растянутости
+            // Центрированный контейнер с полями по бокам в веб-версии
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .widthIn(max = 1100.dp)
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxHeight()
+                    .widthIn(max = 860.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 // 1. Выбор сценария: Сетка LazyVerticalGrid (GridCells.Adaptive(260.dp))
-                Text(
-                    text = "ГОТОВЫЕ БОЕВЫЕ СЦЕНАРИИ ОЭЗ",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF00F0FF),
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "ГОТОВЫЕ БОЕВЫЕ СЦЕНАРИИ ОЭЗ",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00F0FF),
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
 
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(260.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp)
-                ) {
-                    items(ScenarioPresets.list) { preset ->
-                        val isSelected = preset.id == config.id
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    config = preset
-                                    toughness = preset.toughnessLevel.toFloat()
-                                    minPrice = preset.batna.minPricePerSqm.toString()
-                                    maxGrace = preset.batna.maxGracePeriodMonths.toString()
-                                },
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (isSelected) Color(0xFF1B233D) else Color(0xFF101322),
-                            border = BorderStroke(
-                                1.5.dp,
-                                if (isSelected) Color(0xFF00F0FF) else Color(0xFF282F48)
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    text = preset.sphere,
-                                    fontSize = 10.sp,
-                                    color = Color(0xFFD8B4FE),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = preset.name,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "Оппонент: ${preset.opponentName}",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF94A3B8)
-                                )
+                    // Сетка сценариев (внутри Column)
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ScenarioPresets.list.chunked(2).forEach { rowPresets ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowPresets.forEach { preset ->
+                                    val isSelected = preset.id == config.id
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable {
+                                                config = preset
+                                                toughness = preset.toughnessLevel.toFloat()
+                                                minPrice = preset.batna.minPricePerSqm.toString()
+                                                maxGrace = preset.batna.maxGracePeriodMonths.toString()
+                                            },
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (isSelected) Color(0xFF1B233D) else Color(0xFF101322),
+                                        border = BorderStroke(
+                                            1.5.dp,
+                                            if (isSelected) Color(0xFF00F0FF) else Color(0xFF282F48)
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(
+                                                text = preset.sphere,
+                                                fontSize = 10.sp,
+                                                color = Color(0xFFD8B4FE),
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = preset.name,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                            Text(
+                                                text = "Оппонент: ${preset.opponentName}",
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF94A3B8)
+                                            )
+                                        }
+                                    }
+                                }
+                                if (rowPresets.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
                 }
 
-                // 2. Компактная интерактивная шкала жесткости
+                // 2. Интерактивная шкала жесткости оппонента
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = Color(0xFF101322),
                     border = BorderStroke(1.dp, Color(0xFF282F48)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Шкала жесткости оппонента", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("${toughness.toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F0FF), fontFamily = FontFamily.Monospace)
+                            Text("Шкала жесткости оппонента", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("${toughness.toInt()}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F0FF), fontFamily = FontFamily.Monospace)
                         }
 
                         Slider(
@@ -191,7 +208,7 @@ fun AdminScreen(
                     border = BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -202,7 +219,7 @@ fun AdminScreen(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             // Google Gemini API Key
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -296,14 +313,16 @@ fun AdminScreen(
                         )
                         onStartSimulation(updated)
                     },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2CBF))
                 ) {
                     Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("ЗАПУСТИТЬ СИМУЛЯЦИЮ С ЭТИМИ ПАРАМЕТРАМИ", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("ЗАПУСТИТЬ СИМУЛЯЦИЮ С ЭТИМИ ПАРАМЕТРАМИ", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
