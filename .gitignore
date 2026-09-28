@@ -18,11 +18,21 @@ dist/
 
 # Gradle & Android Build Artifacts
 .gradle/
+.kotlin/
+kotlin-js-store/
 build/
 app/build/
+desktop/build/
+shared/build/
+web/build/
 composeApp/build/
+bin-dist/
+bin-dist-web/
+release-binaries/
 *.apk
 *.aab
+*.msi
+*.exe
 local.properties
 .idea/
 *.iml
@@ -37,3 +47,4 @@ yarn-error.log*
 .env*
 !.env.example
 .DS_Store
+
