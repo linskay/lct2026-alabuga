@@ -759,7 +759,7 @@ export const ArenaScreenView: React.FC<ArenaScreenViewProps> = ({
               </div>
               <div className="flex items-start gap-3">
                 <div className="shrink-0">
-                  <BarsAvatar animation={barsAnimation} size="sm" interactive />
+                  <BarsAvatar animation={barsAnimation} size="md" interactive />
                 </div>
                 <p className="text-xs text-slate-100 leading-relaxed font-sans flex-1">
                   {barsFeedback}

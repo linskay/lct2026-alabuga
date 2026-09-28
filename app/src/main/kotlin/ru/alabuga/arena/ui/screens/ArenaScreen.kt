@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ru.alabuga.arena.ui.components.BarsRobotCanvasView
 import ru.alabuga.arena.model.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +35,7 @@ fun ArenaScreen(
     modifier: Modifier = Modifier
 ) {
     var metrics by remember { mutableStateOf(NegotiationMetrics(trust = 55, tension = 35, dealReadiness = 40)) }
+    var barsAnimation by remember { mutableStateOf("idle") }
     var inputText by remember { mutableStateOf("") }
     var lastInsertedTemplate by remember { mutableStateOf("") }
 
@@ -126,48 +128,34 @@ fun ArenaScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 1. Верхняя плашка с 3D-собеседником и динамическим фоном tension
+            // 1. Верхняя плашка с 3D-аватаром робота Б.А.Р.С. и динамической атмосферой
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(170.dp)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .height(210.dp)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 shape = RoundedCornerShape(20.dp),
                 color = Color(0xFF090A10),
                 border = androidx.compose.foundation.BorderStroke(1.5.dp, atmosphereColor.copy(alpha = 0.8f))
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(atmosphereColor.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(
-                            modifier = Modifier.size(64.dp),
-                            shape = CircleShape,
-                            color = Color(0xFF13182C),
-                            border = androidx.compose.foundation.BorderStroke(2.dp, atmosphereColor)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = config.opponentName.take(2).uppercase(),
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "НАПРЯЖЕНИЕ: ${metrics.tension}% • ДОВЕРИЕ: ${metrics.trust}%",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = atmosphereColor,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
+                    BarsRobotCanvasView(
+                        animationState = barsAnimation,
+                        modifier = Modifier.fillMaxWidth().height(160.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "НАСТАВНИК Б.А.Р.С. • НАПРЯЖЕНИЕ: ${metrics.tension}% • ДОВЕРИЕ: ${metrics.trust}%",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = atmosphereColor,
+                        fontFamily = FontFamily.Monospace
+                    )
                 }
             }
 

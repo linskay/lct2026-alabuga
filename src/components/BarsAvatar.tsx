@@ -131,7 +131,7 @@ export const BarsAvatar: React.FC<BarsAvatarProps> = ({
         {!modelError ? (
           <model-viewer
             ref={modelViewerRef}
-            src="/bars.glb"
+            src="/mike.glb"
             alt="Б.А.Р.С. 3D Робот-наставник (ОЭЗ «Алабуга»)"
             autoplay
             animation-name={activeAnimName}

@@ -86,7 +86,7 @@ export const BarsRobotView: React.FC<BarsRobotViewProps> = ({ animation, classNa
         <model-viewer
           ref={modelViewerRef}
           id="bars-robot-viewer"
-          src="/bars.glb"
+          src="/mike.glb"
           alt="Б.А.Р.С. 3D Ассистент (ОЭЗ Алабуга)"
           autoplay
           animation-name={activeAnim}

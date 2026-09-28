@@ -22,6 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import ru.alabuga.arena.ui.components.BarsRobotCanvasView
 
 @Composable
 fun HomeScreen(
@@ -29,6 +33,25 @@ fun HomeScreen(
     onOpenAdmin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var robotAnimation by remember { mutableStateOf("idle") }
+    var speechText by remember { mutableStateOf<String?>(null) }
+    var speechIndex by remember { mutableStateOf(0) }
+
+    val speeches = remember {
+        listOf(
+            "Приветствую в ОЭЗ «Алабуга»! Готовы проверить стойкость перед жесткими закупщиками?",
+            "Помни правило: защищай ставку 460 ₽/м² и выявляй скрытые дедлайны оппонента!",
+            "Не поддавайся на блеф с Калугой: у них дефицит мощностей 110 кВ!",
+            "Наставник Б.А.Р.С. на связи! Твой главный щит на арене — BATNA и выдержка."
+        )
+    }
+
+    val handleRobotClick = {
+        speechText = speeches[speechIndex % speeches.size]
+        speechIndex++
+        robotAnimation = if (speechIndex % 2 == 1) "talk" else "win"
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
@@ -150,45 +173,33 @@ fun HomeScreen(
                         )
                 )
 
-                // Виртуальный аватар робота Б.А.Р.С.
+                // 3D-аватар робота-наставника Б.А.Р.С. (Mike)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Surface(
-                        modifier = Modifier.size(110.dp),
-                        shape = RoundedCornerShape(28.dp),
-                        color = Color(0xFF13182C),
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF00F0FF)),
-                        shadowElevation = 16.dp
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
+                    if (speechText != null) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color(0xFF0F121F).copy(alpha = 0.95f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F0FF).copy(alpha = 0.7f)),
+                            modifier = Modifier.padding(bottom = 8.dp).fillMaxWidth(0.9f)
+                        ) {
                             Text(
-                                text = "Б.А.Р.С.",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF00F0FF),
-                                fontFamily = FontFamily.Monospace
+                                text = "«${speechText}»",
+                                fontSize = 11.sp,
+                                color = Color.White,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFF0A0C16).copy(alpha = 0.9f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B2CBF).copy(alpha = 0.5f))
-                    ) {
-                        Text(
-                            text = "3D БОРТОВОЙ НАСТАВНИК ONLINE",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFE2E8F0),
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                        )
-                    }
+                    BarsRobotCanvasView(
+                        animationState = robotAnimation,
+                        modifier = Modifier.fillMaxWidth().height(190.dp),
+                        onClick = handleRobotClick
+                    )
                 }
             }
 

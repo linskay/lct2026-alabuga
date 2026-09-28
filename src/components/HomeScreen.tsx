@@ -136,8 +136,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <model-viewer
             id="bars-lobby-avatar"
             ref={modelViewerRef}
-            src="/bars.glb"
-            alt="Робот-наставник Б.А.Р.С. ОЭЗ Алабуга (Radical Robot Mike)"
+            src="/mike.glb"
+            alt="Робот-наставник Б.А.Р.С. ОЭЗ Алабуга (3D робот)"
             autoplay
             animation-name={activeAnim}
             camera-orbit="0deg 82deg 72%"

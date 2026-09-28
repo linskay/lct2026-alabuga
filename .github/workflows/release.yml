@@ -201,6 +201,25 @@ jobs:
           name: arena-windows-desktop
           path: release-binaries/
 
+      - name: Prepare Clean Release Notes
+        run: |
+          cat << 'EOF' > release_body.md
+          ### 🚀 Арена Переговоров ОЭЗ «Алабуга» (${{ needs.tag-release.outputs.new_tag }})
+
+          **Кроссплатформенный симулятор жестких B2B-переговоров:**
+          - 🤖 Интерактивный 3D-робот-наставник **Б.А.Р.С.** с динамическими реакциями и тактическим анализом
+          - 📊 Оценка зон согласия ZOPA, BATNA и эмоционального тонуса встречи
+          - 🎯 Сценарии резидентов особой экономической зоны «Алабуга»
+          - ⏳ Механика ретроспективного отката («Машина времени»)
+
+          #### 📦 Готовые пакеты установки:
+          - **Android APK** (`.apk`) — мобильная версия для Android
+          - **Windows Installer** (`.msi`) — установщик для рабочего стола Windows
+          - **Universal JAR** (`.jar`) — запуск через Java Runtime
+
+          *(Сборка выпущена автоматически релизным пайплайном ОЭЗ «Алабуга»)*
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -208,7 +227,8 @@ jobs:
           name: "Арена Переговоров ОЭЗ «Алабуга» — ${{ needs.tag-release.outputs.new_tag }}"
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
+          body_path: release_body.md
           files: release-binaries/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

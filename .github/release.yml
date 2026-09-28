@@ -1,0 +1,8 @@
+# GitHub Release Notes Configuration
+# Exclude contributors / authors from automatically generated notes
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - '*'
