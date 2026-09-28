@@ -51,6 +51,7 @@ compose.desktop {
                 dirChooser = true
                 menuGroup = "ОЭЗ «Алабуга»"
                 upgradeUuid = "d7c805eb-642d-45db-9c3f-c3093ec86b51"
+                iconFile.set(project.file("src/desktopMain/resources/icon.ico"))
             }
         }
     }
