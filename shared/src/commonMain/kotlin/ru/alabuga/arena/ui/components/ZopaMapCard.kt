@@ -47,17 +47,9 @@ fun ZopaMapCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF0D101B).copy(alpha = 0.55f))
+            .background(Color(0xFF131520))
             .border(
-                BorderStroke(
-                    1.dp,
-                    Brush.linearGradient(
-                        listOf(
-                            Color(0xFF7B2CBF).copy(alpha = 0.35f),
-                            Color(0xFF00FFCC).copy(alpha = 0.20f)
-                        )
-                    )
-                ),
+                BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
                 RoundedCornerShape(20.dp)
             )
             .padding(14.dp),

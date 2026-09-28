@@ -169,8 +169,16 @@ fun ArenaScreen(
     val isBazaarInput = remember(trimmed, words) {
         if (trimmed.isEmpty()) false
         else {
-            val isJustNumber = trimmed.matches(Regex("^[+\\-~]?\\s*\\d+(?:[.,]\\d+)?\\s*(?:[рp₽]|руб(?:лей|ля)?)?\\.?$", RegexOption.IGNORE_CASE))
-            val isTooShortWithoutArgs = words.size < 4 && !trimmed.contains("если", ignoreCase = true) && !trimmed.contains("взамен", ignoreCase = true) && !trimmed.contains("при условии", ignoreCase = true)
+            val isJustNumber = trimmed.matches(Regex("^[+\\-~]?\\s*\\d+(?:[.,]\\d+)?\\s*(?:[рp₽]|руб(?:лей|ля|ль)?(?:\\s*\\/\\s*м[²2]?)?)?\\.?$", RegexOption.IGNORE_CASE))
+            val hasB2BKeywords = trimmed.contains("если", ignoreCase = true) ||
+                    trimmed.contains("взамен", ignoreCase = true) ||
+                    trimmed.contains("при условии", ignoreCase = true) ||
+                    trimmed.contains("гарант", ignoreCase = true) ||
+                    trimmed.contains("готовы", ignoreCase = true) ||
+                    trimmed.contains("предлагаем", ignoreCase = true) ||
+                    trimmed.contains("capex", ignoreCase = true) ||
+                    trimmed.contains("каникул", ignoreCase = true)
+            val isTooShortWithoutArgs = words.size < 4 && !hasB2BKeywords
             isJustNumber || isTooShortWithoutArgs
         }
     }
@@ -345,52 +353,14 @@ fun ArenaScreen(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // 1. Окно прямого эфира оппонента (Cyber-Glass: объемный свет + парящий стеклянный HUD)
+                    // 1. Окно прямого эфира оппонента (3D Робот Б.А.Р.С. в прозрачном общем пространстве)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(0.38f)
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(Color(0xFF0B0D18).copy(alpha = 0.50f))
-                            .border(
-                                BorderStroke(
-                                    1.dp,
-                                    Brush.linearGradient(
-                                        listOf(
-                                            atmosphereColor.copy(alpha = 0.35f),
-                                            Color(0xFF00FFCC).copy(alpha = 0.15f)
-                                        )
-                                    )
-                                ),
-                                RoundedCornerShape(22.dp)
-                            ),
+                            .background(Color.Transparent),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Верхний отблеск стекла
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .align(Alignment.TopCenter)
-                                .background(Color.White.copy(alpha = 0.08f))
-                        )
-
-                        // Объемный свет внутри прямоугольника (от фиолетового до алого)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.radialGradient(
-                                        colors = listOf(
-                                            atmosphereColor.copy(alpha = (0.24f + (metrics.tension / 100f) * 0.32f)),
-                                            Color(0xFF160E2A).copy(alpha = 0.20f),
-                                            Color.Transparent
-                                        ),
-                                        radius = 600f
-                                    )
-                                )
-                        )
-
                         // 3D Робот Б.А.Р.С.
                         if (!showDebriefing && !showTimeTravel) {
                             BarsRobotView(
@@ -409,16 +379,8 @@ fun ArenaScreen(
                             .weight(0.42f)
                             .fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF0D101B).copy(alpha = 0.55f),
-                        border = BorderStroke(
-                            1.dp,
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF7B2CBF).copy(alpha = 0.30f),
-                                    Color(0xFF00FFCC).copy(alpha = 0.15f)
-                                )
-                            )
-                        )
+                        color = Color(0xFF131520).copy(alpha = 0.70f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
                     ) {
                         LazyColumn(
                             state = listState,
@@ -429,9 +391,9 @@ fun ArenaScreen(
                         ) {
                             items(messages) { message ->
                                 val isOpponent = message.actor == MessageActor.OPPONENT
-                                Row(
+                                Box(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = if (isOpponent) Arrangement.Start else Arrangement.End
+                                    contentAlignment = if (isOpponent) Alignment.CenterStart else Alignment.CenterEnd
                                 ) {
                                     Box(
                                         modifier = Modifier
@@ -441,39 +403,38 @@ fun ArenaScreen(
                                                 else RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
                                             )
                                             .background(
-                                                if (isOpponent) Brush.linearGradient(listOf(Color(0xFF131520).copy(alpha = 0.85f), Color(0xFF101322).copy(alpha = 0.85f)))
-                                                else Brush.linearGradient(listOf(Color(0xFF32145A).copy(alpha = 0.85f), Color(0xFF1E0E38).copy(alpha = 0.85f)))
+                                                if (isOpponent) Color(0xFF161926)
+                                                else Color(0xFF32145A)
                                             )
                                             .border(
                                                 1.dp,
-                                                if (isOpponent) Color(0xFF2E3856) else Color(0xFF9D4EDD).copy(alpha = 0.45f),
+                                                Color.White.copy(alpha = 0.05f),
                                                 if (isOpponent) RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
                                                 else RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
                                             )
                                             .padding(14.dp)
                                     ) {
                                         Column(
-                                            modifier = Modifier.fillMaxWidth(),
+                                            modifier = Modifier.wrapContentSize(),
                                             horizontalAlignment = if (isOpponent) Alignment.Start else Alignment.End,
                                             verticalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = if (isOpponent) Arrangement.SpaceBetween else Arrangement.End,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 if (isOpponent) {
                                                     Text(
-                                                        text = config.opponentName,
+                                                        text = config.opponentName.ifBlank { "Валерий Строганов" },
                                                         fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
+                                                        fontWeight = FontWeight.ExtraBold,
                                                         color = Color(0xFF00FFCC),
                                                         fontFamily = FontFamily.Monospace,
                                                         textAlign = TextAlign.Start
                                                     )
-                                                    if (message.emotionEmoji != null) {
+                                                    if (message.emotionEmoji.isNotBlank()) {
                                                         Text(
-                                                            text = "${message.emotionEmoji} ${message.emotionLabel ?: ""}",
+                                                            text = "${message.emotionEmoji} ${message.emotionLabel}",
                                                             fontSize = 11.sp,
                                                             color = Color(0xFF94A3B8)
                                                         )
@@ -482,7 +443,7 @@ fun ArenaScreen(
                                                     Text(
                                                         text = "ВЫ (ОЭЗ «АЛАБУГА»)",
                                                         fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
+                                                        fontWeight = FontWeight.ExtraBold,
                                                         color = Color(0xFFD8B4FE),
                                                         fontFamily = FontFamily.Monospace,
                                                         textAlign = TextAlign.End
@@ -495,7 +456,7 @@ fun ArenaScreen(
                                                 fontSize = 15.sp,
                                                 color = Color(0xFFF1F5F9),
                                                 lineHeight = 22.sp,
-                                                textAlign = if (isOpponent) TextAlign.Start else TextAlign.End
+                                                textAlign = TextAlign.Start
                                             )
                                         }
                                     }
@@ -504,15 +465,15 @@ fun ArenaScreen(
 
                             if (isGeneratingReply) {
                                 item {
-                                    Row(
+                                    Box(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.Start
+                                        contentAlignment = Alignment.CenterStart
                                     ) {
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
-                                                .background(Color(0xFF131520).copy(alpha = 0.85f))
-                                                .border(1.dp, Color(0xFF2E3856), RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                                .background(Color(0xFF161926))
+                                                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
                                                 .padding(horizontal = 16.dp, vertical = 10.dp)
                                         ) {
                                             Row(
@@ -525,7 +486,7 @@ fun ArenaScreen(
                                                     strokeWidth = 2.dp
                                                 )
                                                 Text(
-                                                    text = "${config.opponentName} формулирует ответ...",
+                                                    text = "${config.opponentName.ifBlank { "Валерий Строганов" }} формулирует ответ...",
                                                     fontSize = 13.sp,
                                                     color = Color(0xFF94A3B8),
                                                     fontFamily = FontFamily.Monospace
@@ -828,20 +789,12 @@ fun ArenaScreen(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // 1. Карточка «Б.А.Р.С. СОВЕТ» (Визуальный центр сайдбара с фиолетовым неоновым градиентом)
+                    // 1. Карточка «Б.А.Р.С. СОВЕТ» (Визуальный центр сайдбара Cyber-Glass)
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF140E2A).copy(alpha = 0.65f),
-                        border = BorderStroke(
-                            1.dp,
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF9D4EDD).copy(alpha = 0.45f),
-                                    Color(0xFF00FFCC).copy(alpha = 0.30f)
-                                )
-                            )
-                        )
+                        color = Color(0xFF131520),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
                     ) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             // Верхний отблеск стекла
@@ -849,7 +802,7 @@ fun ArenaScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(1.dp)
-                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .background(Color.White.copy(alpha = 0.04f))
                             )
 
                             Row(
@@ -884,16 +837,8 @@ fun ArenaScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF0D101B).copy(alpha = 0.55f),
-                        border = BorderStroke(
-                            1.dp,
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF7B2CBF).copy(alpha = 0.30f),
-                                    Color(0xFF00FFCC).copy(alpha = 0.15f)
-                                )
-                            )
-                        )
+                        color = Color(0xFF131520),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
                     ) {
                         Column(
                             modifier = Modifier.padding(14.dp),
@@ -971,16 +916,8 @@ fun ArenaScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF0D101B).copy(alpha = 0.55f),
-                        border = BorderStroke(
-                            1.dp,
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF7B2CBF).copy(alpha = 0.30f),
-                                    Color(0xFF00FFCC).copy(alpha = 0.15f)
-                                )
-                            )
-                        )
+                        color = Color(0xFF131520),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
                     ) {
                         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
