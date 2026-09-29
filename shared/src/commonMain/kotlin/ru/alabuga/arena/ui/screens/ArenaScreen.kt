@@ -586,7 +586,8 @@ fun ArenaScreen(
                                         lastInsertedTemplate = hint
                                     },
                                     sendInteractionSource = sendInteractionSource,
-                                    sendScale = sendScale
+                                    sendScale = sendScale,
+                                    atmosphereColor = atmosphereColor
                                 )
                             } else {
                                 ArenaTacticalContent(
@@ -631,7 +632,8 @@ fun ArenaScreen(
                                     lastInsertedTemplate = hint
                                 },
                                 sendInteractionSource = sendInteractionSource,
-                                sendScale = sendScale
+                                sendScale = sendScale,
+                                atmosphereColor = atmosphereColor
                             )
 
                             ArenaTacticalContent(
@@ -992,7 +994,8 @@ private fun ArenaChatContent(
     isBazaarInput: Boolean,
     onHintSelected: (String) -> Unit,
     sendInteractionSource: MutableInteractionSource,
-    sendScale: Float
+    sendScale: Float,
+    atmosphereColor: Color = Color(0xFF7B2CBF)
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -1027,10 +1030,10 @@ private fun ArenaChatContent(
         modifier = modifier,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // 1. Окно прямого эфира оппонента (3D Робот Майк / Б.А.Р.С.)
+        // 1. Окно прямого эфира оппонента (3D Робот Майк / Б.А.Р.С.) с динамической рамкой и фоном стресса
         if (!showDebriefing && !showTimeTravel) {
-            val avatarHeight = if (isMobile) 130.dp else 240.dp
-            Column(
+            val avatarHeight = if (isMobile) 130.dp else 220.dp
+            Surface(
                 modifier = if (isMobile) {
                     Modifier
                         .fillMaxWidth()
@@ -1040,84 +1043,114 @@ private fun ArenaChatContent(
                         .fillMaxWidth()
                         .weight(0.40f)
                 },
-                horizontalAlignment = Alignment.CenterHorizontally
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0xFF0C0F1D).copy(alpha = 0.85f),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        listOf(
+                            Color(0xFF00F0FF).copy(alpha = 0.45f),
+                            atmosphereColor.copy(alpha = 0.65f)
+                        )
+                    )
+                ),
+                shadowElevation = 8.dp
             ) {
-                // ТАКТИЧЕСКИЙ БАББЛ РОБОТА В ПЕРЕГОВОРНОЙ
-                Surface(
-                    onClick = handleArenaRobotTap,
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFF0F172A).copy(alpha = 0.90f),
-                    border = BorderStroke(
-                        1.dp,
-                        Brush.linearGradient(
-                            listOf(Color(0xFF00F0FF).copy(alpha = 0.65f), Color(0xFF7B2CBF).copy(alpha = 0.65f))
-                        )
-                    ),
-                    shadowElevation = 8.dp,
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF00FFCC))
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "🤖 Б.А.Р.С. • НАЖМИТЕ ДЛЯ СОВЕТА",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00F0FF),
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 0.6.sp
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    atmosphereColor.copy(alpha = 0.22f),
+                                    Color.Transparent
+                                )
                             )
-                            Text(
-                                text = arenaRobotPhrases[arenaPhraseIndex % arenaRobotPhrases.size],
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.White,
-                                lineHeight = 15.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // ТАКТИЧЕСКИЙ БАББЛ РОБОТА В ПЕРЕГОВОРНОЙ
+                        Surface(
+                            onClick = handleArenaRobotTap,
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF0F172A).copy(alpha = 0.90f),
+                            border = BorderStroke(
+                                1.dp,
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF00F0FF).copy(alpha = 0.60f), atmosphereColor.copy(alpha = 0.60f))
+                                )
+                            ),
+                            shadowElevation = 4.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF00FFCC))
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "🤖 Б.А.Р.С. • НАЖМИТЕ ДЛЯ СОВЕТА",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00F0FF),
+                                        fontFamily = FontFamily.Monospace,
+                                        letterSpacing = 0.6.sp
+                                    )
+                                    Text(
+                                        text = arenaRobotPhrases[arenaPhraseIndex % arenaRobotPhrases.size],
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color.White,
+                                        lineHeight = 15.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
+                        // 3D Робот Майк
+                        Box(
+                            modifier = if (isMobile) {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(avatarHeight)
+                            } else {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            BarsRobotView(
+                                animation = currentArenaAnim,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { handleArenaRobotTap() },
+                                height = avatarHeight,
+                                onClick = handleArenaRobotTap
                             )
                         }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Box(
-                    modifier = if (isMobile) {
-                        Modifier
-                            .fillMaxWidth()
-                            .height(avatarHeight)
-                            .background(Color.Transparent)
-                    } else {
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .background(Color.Transparent)
-                    },
-                    contentAlignment = Alignment.Center
-                ) {
-                    BarsRobotView(
-                        animation = currentArenaAnim,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { handleArenaRobotTap() },
-                        height = avatarHeight,
-                        onClick = handleArenaRobotTap
-                    )
                 }
             }
         }

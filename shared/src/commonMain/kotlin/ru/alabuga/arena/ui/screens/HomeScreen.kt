@@ -450,18 +450,17 @@ fun HomeScreen(
                     )
                 }
 
-                // ТЕНЬ ПОД НОГАМИ РОБОТА
+                // МЯГКАЯ ТЕНЬ В ОСНОВАНИИ РОБОТА
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .offset(y = (-10).dp)
-                        .size(width = 180.dp, height = 22.dp)
+                        .offset(y = (-6).dp)
+                        .size(width = 130.dp, height = 12.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    Color.Black.copy(alpha = 0.90f),
-                                    Color.Black.copy(alpha = 0.45f),
+                                    Color.Black.copy(alpha = 0.30f),
                                     Color.Transparent
                                 )
                             )
