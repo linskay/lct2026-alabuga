@@ -63,17 +63,17 @@
 </head>
 <body>
     <model-viewer id="bars-3d-model-viewer"
-                  src="bars.glb"
+                  src="mike.glb"
                   alt="3D робот-наставник Б.А.Р.С."
                   tabindex="-1"
                   autoplay
-                  animation-name="Wave"
+                  animation-name="SK_ZMikeAnim_ZMIKE_WaveLoop"
                   camera-controls
                   disable-zoom
                   interaction-prompt="none"
                   touch-action="pan-y"
-                  camera-orbit="0deg 75deg 110%"
-                  camera-target="0m 1.05m 0m"
+                  camera-orbit="0deg 75deg 105%"
+                  camera-target="auto auto auto"
                   shadow-intensity="1.5"
                   shadow-softness="0.75"
                   exposure="1.2"
@@ -82,20 +82,6 @@
     </model-viewer>
 
     <script>
-        const BARS_ANIM_MAP = {
-            'wave': 'Wave',
-            'idle': 'Wave',
-            'talk': 'Wave',
-            'nod': 'Yes',
-            'tilt': 'Sitting',
-            'warn': 'No',
-            'win': 'ThumbsUp',
-            'punch': 'Punch',
-            'jump': 'Jump',
-            'bluff': 'Punch',
-            'death': 'Death'
-        };
-
         const MIKE_ANIM_MAP = {
             'wave': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
             'idle': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
@@ -110,16 +96,9 @@
         };
 
         function resolveAnimation(animName) {
-            const mv = document.getElementById('bars-3d-model-viewer');
-            const available = (mv && mv.availableAnimations) ? mv.availableAnimations : [];
-            const isMike = available.some(function(a) { return a.indexOf('SK_ZMike') !== -1; });
-            if (!animName) return isMike ? 'SK_ZMikeAnim_ZMIKE_WaveLoop' : 'Wave';
+            if (!animName) return 'SK_ZMikeAnim_ZMIKE_WaveLoop';
             const key = animName.toLowerCase();
-            if (isMike) {
-                if (MIKE_ANIM_MAP[key]) return MIKE_ANIM_MAP[key];
-            } else {
-                if (BARS_ANIM_MAP[key]) return BARS_ANIM_MAP[key];
-            }
+            if (MIKE_ANIM_MAP[key]) return MIKE_ANIM_MAP[key];
             return animName;
         }
 
@@ -236,10 +215,7 @@
             });
 
             mvElem.addEventListener('error', function(e) {
-                console.warn("Model loading error, trying fallback:", e);
-                if (mvElem.getAttribute('src') === 'bars.glb') {
-                    mvElem.setAttribute('src', 'mike.glb');
-                }
+                console.warn("Model loading error:", e);
             });
 
             mvElem.addEventListener('click', function(e) {
