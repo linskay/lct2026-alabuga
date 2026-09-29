@@ -1,166 +1,213 @@
 package ru.alabuga.arena.ui.components
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.jme3.animation.*
 import com.jme3.app.SimpleApplication
 import com.jme3.asset.plugins.ClasspathLocator
 import com.jme3.light.AmbientLight
 import com.jme3.light.DirectionalLight
 import com.jme3.math.ColorRGBA
-import com.jme3.math.FastMath
 import com.jme3.math.Quaternion
 import com.jme3.math.Vector3f
 import com.jme3.scene.Spatial
 import com.jme3.system.AppSettings
 import com.jme3.system.JmeCanvasContext
+import java.awt.BorderLayout
 import java.awt.Canvas
 import java.awt.Dimension
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.JPanel
-import java.awt.BorderLayout
 
 /**
- * Полноценный 3D-робот Б.А.Р.С. (Mike) для Compose Desktop.
- * Использует JMonkeyEngine для рендеринга GLB-модели со скелетными анимациями.
- * Встраивается в Compose через SwingPanel → JmeCanvasContext.
- *
- * 10 состояний анимации, авто-вращение, динамическое освещение.
- * При ошибке загрузки — fallback на Canvas2D BarsRobotCanvasView.
+ * Глобальный синглтон-менеджер 3D-движка JMonkeyEngine для десктопной версии.
+ * Позволяет бесшовно перемещать AWT Canvas между экранами (HomeScreen ↔ ArenaScreen)
+ * без уничтожения и повторного создания контекста OpenGL (что предотвращает сбои LWJGL3).
+ */
+object BarsRobot3DManager {
+    @Volatile
+    var app: BarsRobotJmeApp? = null
+        private set
+
+    @Volatile
+    var canvas: Canvas? = null
+        private set
+
+    @Volatile
+    var isFailed: Boolean = false
+        private set
+
+    private var initAttempted = false
+    private var clickCallback: (() -> Unit)? = null
+
+    fun setOnClick(callback: (() -> Unit)?) {
+        clickCallback = callback
+    }
+
+    @Synchronized
+    fun getOrCreateCanvas(): Canvas? {
+        if (isFailed) return null
+        if (canvas != null) return canvas
+        if (initAttempted) return null
+        initAttempted = true
+
+        // Попытка 1: Запуск с современным LWJGL OpenGL 3
+        try {
+            val c = initJme(AppSettings.LWJGL_OPENGL3)
+            if (c != null) return c
+        } catch (e: Throwable) {
+            println("[BarsRobot3D] OpenGL 3 init failed, falling back to OpenGL 2: ${e.message}")
+        }
+
+        // Попытка 2: Fallback на совместимый OpenGL 2
+        try {
+            val c = initJme(AppSettings.LWJGL_OPENGL2)
+            if (c != null) return c
+        } catch (e: Throwable) {
+            println("[BarsRobot3D] OpenGL 2 init failed: ${e.message}")
+        }
+
+        isFailed = true
+        return null
+    }
+
+    private fun initJme(renderer: String): Canvas? {
+        val settings = AppSettings(true).apply {
+            setRenderer(renderer)
+            isFullscreen = false
+            setResolution(640, 480)
+            frameRate = 60
+            isVSync = true
+            setAudioRenderer(null) // Аудио не требуется
+        }
+
+        val jmeApp = BarsRobotJmeApp()
+        jmeApp.setSettings(settings)
+        jmeApp.setPauseOnLostFocus(false)
+        jmeApp.setShowSettings(false)
+        jmeApp.createCanvas()
+
+        val context = jmeApp.context as JmeCanvasContext
+        val c = context.canvas
+        c.preferredSize = Dimension(640, 480)
+        c.minimumSize = Dimension(120, 120)
+
+        // Обработчик клика мыши напрямую по AWT-холсту
+        c.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                clickCallback?.invoke()
+            }
+        })
+
+        jmeApp.startCanvas()
+
+        app = jmeApp
+        canvas = c
+        return c
+    }
+
+    fun requestAnimation(anim: String) {
+        app?.requestAnimation(anim)
+    }
+}
+
+/**
+ * Полноценный 3D-робот Б.А.Р.С. для Compose Desktop.
+ * Рендерит каноничную 3D-модель Б.А.Р.С. (bars.glb) с аутентичными анимациями (Wave, Idle, ThumbsUp, No, Punch и др.).
+ * Встраивается в Compose через SwingPanel с долгоживущим AWT Canvas.
  */
 @Composable
 fun BarsRobot3DView(
     animation: String = "idle",
     modifier: Modifier = Modifier,
-    height: Dp = 300.dp
+    height: Dp = 300.dp,
+    onClick: (() -> Unit)? = null
 ) {
-    var loadFailed by remember { mutableStateOf(false) }
-    val jmeApp = remember { mutableStateOf<BarsRobotJmeApp?>(null) }
+    var loadFailed by remember { mutableStateOf(BarsRobot3DManager.isFailed) }
+    val interactionSource = remember { MutableInteractionSource() }
 
-    // Маппинг состояний переговоров → анимаций модели Mike
-    val targetAnimationName = when (animation) {
-        "idle"     -> "SK_ZMikeAnim_ZMIKE_Idle"
-        "talk"     -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
-        "warn"     -> "SK_ZMikeAnim_ZMIKE_IdleAggro"
-        "win"      -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
-        "wave"     -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
-        "punch"    -> "SK_ZMikeAnim_ZMIKE_PunchR"
-        "hit"      -> "SK_ZMikeAnim_ZMIKE_HitRegisterFront"
-        "death"    -> "SK_ZMikeAnim_ZMIKE_HitRegisterFront_Death"
-        "thinking" -> "SK_ZMikeAnim_ZMIKE_Blinking"
-        "bluff"    -> "SK_ZMikeAnim_ZMIKE_Chomp"
-        else       -> "SK_ZMikeAnim_ZMIKE_Idle"
+    LaunchedEffect(onClick) {
+        BarsRobot3DManager.setOnClick(onClick)
     }
 
-    // Отправляем смену анимации в JME-поток
     LaunchedEffect(animation) {
-        jmeApp.value?.requestAnimation(targetAnimationName)
-    }
-
-    // Статусный текст
-    val (statusText, statusBadge, visorColor) = when (animation) {
-        "talk"     -> Triple("СИНТЕЗ ТАКТИКИ", "Б.А.Р.С. ИНСТРУКТИРУЕТ", Color(0xFF00F0FF))
-        "warn", "punch", "hit", "death" -> Triple("УГРОЗА BATNA!", "АТАКА ПОЗИЦИЙ", Color(0xFFFF3366))
-        "win"      -> Triple("УСЛОВИЯ ПРИНЯТЫ", "СДЕЛКА СОГЛАСОВАНА", Color(0xFF10B981))
-        "thinking", "bluff" -> Triple("АНАЛИЗ ОППОНЕНТА", "РАСЧЕТ ВЕРОЯТНОСТЕЙ", Color(0xFFF59E0B))
-        "wave"     -> Triple("ПРИВЕТСТВИЕ", "КОНТАКТ УСТАНОВЛЕН", Color(0xFF60A5FA))
-        else       -> Triple("СКАНЕР АКТИВЕН", "3D НАСТАВНИК ONLINE", Color(0xFF00F0FF))
+        BarsRobot3DManager.requestAnimation(animation)
     }
 
     if (loadFailed) {
-        // Fallback на Canvas2D
+        // Fallback на Canvas2D в случае отсутствия поддержки аппаратного 3D
         BarsRobotCanvasView(animationState = animation, modifier = modifier)
         return
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1A1A24), Color(0xFF4A1075), Color(0xFF120822))
-                )
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onClick?.invoke() },
+        contentAlignment = Alignment.Center
     ) {
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            SwingPanel(
-                modifier = Modifier.fillMaxSize(),
-                factory = {
-                    val panel = JPanel(BorderLayout())
-                    try {
-                        val settings = AppSettings(true).apply {
-                            setRenderer(AppSettings.LWJGL_OPENGL33)
-                            isFullscreen = false
-                            setResolution(640, 480)
-                            frameRate = 60
-                            isVSync = true
-                            setSamples(4)
-                            isGammaCorrection = true
-                        }
-
-                        val app = BarsRobotJmeApp()
-                        app.setSettings(settings)
-                        app.setPauseOnLostFocus(false)
-                        app.setShowSettings(false)
-                        app.createCanvas()
-
-                        val context = app.context as JmeCanvasContext
-                        val canvas: Canvas = context.canvas
-                        canvas.preferredSize = Dimension(640, 480)
-
-                        panel.add(canvas, BorderLayout.CENTER)
-                        app.startCanvas()
-
-                        jmeApp.value = app
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        loadFailed = true
-                    }
-                    panel
+        SwingPanel(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                val panel = JPanel(BorderLayout()).apply {
+                    isOpaque = true
+                    background = java.awt.Color(11, 14, 27) // #0B0E1B - глубокий киберпанк-фон
                 }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "[$statusText • $statusBadge]",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = visorColor,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 0.5.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
+                val c = BarsRobot3DManager.getOrCreateCanvas()
+                if (c != null) {
+                    val prevParent = c.parent
+                    if (prevParent != null && prevParent != panel) {
+                        (prevParent as? java.awt.Container)?.remove(c)
+                        prevParent.revalidate()
+                        prevParent.repaint()
+                    }
+                    panel.add(c, BorderLayout.CENTER)
+                    panel.revalidate()
+                    panel.repaint()
+                    BarsRobot3DManager.requestAnimation(animation)
+                } else {
+                    loadFailed = true
+                }
+                panel
+            },
+            update = { panel ->
+                val c = BarsRobot3DManager.canvas
+                if (c != null && c.parent != panel) {
+                    val prevParent = c.parent
+                    if (prevParent != null) {
+                        (prevParent as? java.awt.Container)?.remove(c)
+                        prevParent.revalidate()
+                        prevParent.repaint()
+                    }
+                    panel.removeAll()
+                    panel.add(c, BorderLayout.CENTER)
+                    panel.revalidate()
+                    panel.repaint()
+                }
+                BarsRobot3DManager.requestAnimation(animation)
+            }
         )
-    }
-
-    // Cleanup on dispose
-    DisposableEffect(Unit) {
-        onDispose {
-            jmeApp.value?.stop()
-        }
     }
 }
 
 /**
- * JMonkeyEngine 3 приложение для рендеринга GLB-робота Mike.
- * - Загружает bars.glb из classpath-ресурсов
- * - Поддерживает динамическую смену анимаций
- * - Авто-вращение модели (10°/сек)
- * - Кибер-освещение (фиолетовый ambient + направленный белый свет)
+ * JMonkeyEngine 3 приложение для рендеринга каноничной 3D-модели Б.А.Р.С.
+ * - Загружает оригинальную модель Б.А.Р.С. (bars.glb)
+ * - Поддерживает жесты: Wave, Idle, ThumbsUp, No, Punch, Jump, Dance, Yes, Death
+ * - Камера сфокусирована на наставнике (фокус на торс и голову с антенной)
+ * - Киберпанк-освещение ОЭЗ «Алабуга» (неоновый металлик, синий и фиолетовый акценты)
  */
 class BarsRobotJmeApp : SimpleApplication() {
 
@@ -168,9 +215,8 @@ class BarsRobotJmeApp : SimpleApplication() {
     private var animControl: AnimControl? = null
     private var animChannel: AnimChannel? = null
     private var pendingAnimation: String? = null
-    private var autoRotateAngle = 0f
+    private var isBarsModel = true
 
-    /** Запрос смены анимации из Compose-потока (потокобезопасно) */
     @Synchronized
     fun requestAnimation(animName: String) {
         pendingAnimation = animName
@@ -184,81 +230,84 @@ class BarsRobotJmeApp : SimpleApplication() {
     }
 
     override fun simpleInitApp() {
-        // Отключаем стандартный HUD и FlyCamera
+        // Отключаем стандартный HUD и свободную камеру
         setDisplayStatView(false)
         setDisplayFps(false)
         flyCam.isEnabled = false
 
-        // Настраиваем камеру
-        cam.location = Vector3f(0f, 1.0f, 3.0f)
-        cam.lookAt(Vector3f(0f, 0.8f, 0f), Vector3f.UNIT_Y)
+        // Настройка камеры под каноничный ракурс наставника Б.А.Р.С.
+        cam.location = Vector3f(0f, 1.15f, 3.2f)
+        cam.lookAt(Vector3f(0f, 1.05f, 0f), Vector3f.UNIT_Y)
 
-        // Фон — тёмный фиолетовый (Alabuga cyberpunk)
-        viewPort.backgroundColor = ColorRGBA(0.07f, 0.04f, 0.12f, 1.0f)
+        // Глубокий темно-синий/фиолетовый фон (#0B0E1B), идеально сливающийся с интерфейсом
+        viewPort.backgroundColor = ColorRGBA(0.043f, 0.055f, 0.106f, 1.0f)
 
-        // Освещение
+        // Освещение для металлического неонового блеска
         val ambientLight = AmbientLight().apply {
-            color = ColorRGBA(0.48f, 0.17f, 0.75f, 1f).mult(0.6f) // Alabuga purple ambient
+            color = ColorRGBA(0.18f, 0.22f, 0.35f, 1f)
         }
         rootNode.addLight(ambientLight)
 
-        val directionalLight = DirectionalLight().apply {
-            direction = Vector3f(-1f, -1f, -1f).normalizeLocal()
-            color = ColorRGBA.White.mult(1.2f)
+        // Основной белый направленный свет спереди-сверху
+        val mainLight = DirectionalLight().apply {
+            direction = Vector3f(-0.4f, -1.0f, -0.9f).normalizeLocal()
+            color = ColorRGBA.White.mult(1.5f)
         }
-        rootNode.addLight(directionalLight)
+        rootNode.addLight(mainLight)
 
-        val fillLight = DirectionalLight().apply {
-            direction = Vector3f(1f, 0.5f, 1f).normalizeLocal()
-            color = ColorRGBA(0.3f, 0.8f, 1.0f, 1f).mult(0.5f) // Cyan fill
+        // Голубой неоновый свет (Alabuga Cyan)
+        val cyanFillLight = DirectionalLight().apply {
+            direction = Vector3f(0.8f, 0.3f, 0.8f).normalizeLocal()
+            color = ColorRGBA(0.0f, 0.94f, 1.0f, 1.0f).mult(0.9f)
         }
-        rootNode.addLight(fillLight)
+        rootNode.addLight(cyanFillLight)
 
-        // Загрузка GLB-модели из classpath ресурсов
+        // Фиолетовый контурный свет (Alabuga Purple Rim)
+        val purpleRimLight = DirectionalLight().apply {
+            direction = Vector3f(-0.8f, 0.5f, 1.0f).normalizeLocal()
+            color = ColorRGBA(0.48f, 0.17f, 0.75f, 1.0f).mult(0.85f)
+        }
+        rootNode.addLight(purpleRimLight)
+
+        // Загрузка 3D-модели Б.А.Р.С.
         try {
             assetManager.registerLocator("/", ClasspathLocator::class.java)
+
+            // Загружаем в первую очередь аутентичного робота Б.А.Р.С.
             robotModel = try {
-                assetManager.loadModel("mike.glb")
+                assetManager.loadModel("bars.glb")
             } catch (_: Exception) {
                 try {
-                    assetManager.loadModel("bars.glb")
+                    assetManager.loadModel("mike.glb")
                 } catch (_: Exception) {
                     null
                 }
             }
+
             robotModel?.let { model ->
-                // Масштабируем и позиционируем
                 model.setLocalScale(1.0f)
                 model.setLocalTranslation(0f, 0f, 0f)
+                model.localRotation = Quaternion.IDENTITY
                 rootNode.attachChild(model)
 
-                // Ищем AnimControl для скелетных анимаций
-                animControl = model.getControl(AnimControl::class.java)
-                    ?: findAnimControl(model)
+                animControl = model.getControl(AnimControl::class.java) ?: findAnimControl(model)
 
                 animControl?.let { ctrl ->
                     animChannel = ctrl.createChannel()
-                    // Начальная анимация — Приветственное помахивание (WaveLoop) как на эталонном экране
-                    val waveAnim = "SK_ZMikeAnim_ZMIKE_WaveLoop"
-                    val exitWave = "SK_ZMikeAnim_ZMIKE_ExitWave"
-                    val idleAnim = "SK_ZMikeAnim_ZMIKE_Idle"
-                    when {
-                        ctrl.animationNames.contains(waveAnim) -> {
-                            animChannel?.setAnim(waveAnim)
-                            animChannel?.setLoopMode(LoopMode.Loop)
-                        }
-                        ctrl.animationNames.contains(exitWave) -> {
-                            animChannel?.setAnim(exitWave)
-                            animChannel?.setLoopMode(LoopMode.Loop)
-                        }
-                        ctrl.animationNames.contains(idleAnim) -> {
-                            animChannel?.setAnim(idleAnim)
-                            animChannel?.setLoopMode(LoopMode.Loop)
-                        }
-                        ctrl.animationNames.isNotEmpty() -> {
-                            animChannel?.setAnim(ctrl.animationNames.first())
-                            animChannel?.setLoopMode(LoopMode.Loop)
-                        }
+                    isBarsModel = ctrl.animationNames.contains("Wave") || ctrl.animationNames.contains("Idle")
+
+                    // По умолчанию запускаем фирменный приветственный жест рукой (Wave)
+                    val defaultAnim = when {
+                        isBarsModel && ctrl.animationNames.contains("Wave") -> "Wave"
+                        isBarsModel && ctrl.animationNames.contains("Idle") -> "Idle"
+                        ctrl.animationNames.contains("SK_ZMikeAnim_ZMIKE_WaveLoop") -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
+                        ctrl.animationNames.isNotEmpty() -> ctrl.animationNames.first()
+                        else -> null
+                    }
+
+                    defaultAnim?.let {
+                        animChannel?.setAnim(it)
+                        animChannel?.setLoopMode(LoopMode.Loop)
                     }
                 }
             }
@@ -267,7 +316,6 @@ class BarsRobotJmeApp : SimpleApplication() {
         }
     }
 
-    /** Рекурсивно ищет AnimControl в дочерних нодах */
     private fun findAnimControl(spatial: Spatial): AnimControl? {
         if (spatial is com.jme3.scene.Node) {
             for (child in spatial.children) {
@@ -281,39 +329,48 @@ class BarsRobotJmeApp : SimpleApplication() {
     }
 
     override fun simpleUpdate(tpf: Float) {
-        // Робот смотрит прямо на пользователя без неконтролируемого вращения боком
+        // Робот смотрит прямо на пользователя
         robotModel?.localRotation = Quaternion.IDENTITY
 
-        // Применяем отложенную смену анимации с маппингом из общих имен в GLB-анимации Майка
         val rawAnim = consumePendingAnimation()
         if (rawAnim != null) {
             animControl?.let { ctrl ->
-                val mappedAnim = when (rawAnim.lowercase()) {
-                    "wave" -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
-                    "idle" -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
-                    "talk" -> "SK_ZMikeAnim_ZMIKE_IdleBreaker"
-                    "nod" -> "SK_ZMikeAnim_ZMIKE_ExitWave"
-                    "tilt" -> "SK_ZMikeAnim_ZMIKE_Blinking"
-                    "bluff" -> "SK_ZMikeAnim_ZMIKE_IdleAggro"
-                    "jump" -> "SK_ZMikeAnim_ZMIKE_Jump"
-                    else -> rawAnim
-                }
-                val targetAnim = if (ctrl.animationNames.contains(mappedAnim)) {
-                    mappedAnim
-                } else if (ctrl.animationNames.contains(rawAnim)) {
-                    rawAnim
+                val targetAnim = if (isBarsModel) {
+                    when (rawAnim.lowercase()) {
+                        "wave" -> "Wave"
+                        "idle" -> if (ctrl.animationNames.contains("Wave")) "Wave" else "Idle"
+                        "talk" -> if (ctrl.animationNames.contains("Wave")) "Wave" else "Idle"
+                        "nod", "yes" -> "Yes"
+                        "tilt", "sitting", "thinking" -> if (ctrl.animationNames.contains("Sitting")) "Sitting" else "Idle"
+                        "warn", "no" -> "No"
+                        "win", "thumbsup" -> "ThumbsUp"
+                        "punch", "hit", "bluff" -> "Punch"
+                        "death" -> "Death"
+                        "jump" -> "Jump"
+                        "dance" -> "Dance"
+                        else -> if (ctrl.animationNames.contains(rawAnim)) rawAnim else "Wave"
+                    }
                 } else {
-                    null
+                    when (rawAnim.lowercase()) {
+                        "wave", "idle" -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
+                        "talk" -> "SK_ZMikeAnim_ZMIKE_IdleBreaker"
+                        "nod" -> "SK_ZMikeAnim_ZMIKE_ExitWave"
+                        "tilt", "thinking" -> "SK_ZMikeAnim_ZMIKE_Blinking"
+                        "warn", "bluff" -> "SK_ZMikeAnim_ZMIKE_IdleAggro"
+                        "jump" -> "SK_ZMikeAnim_ZMIKE_Jump"
+                        "win" -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
+                        "punch" -> "SK_ZMikeAnim_ZMIKE_PunchR"
+                        "hit" -> "SK_ZMikeAnim_ZMIKE_HitRegisterFront"
+                        "death" -> "SK_ZMikeAnim_ZMIKE_HitRegisterFront_Death"
+                        else -> rawAnim
+                    }
                 }
-                if (targetAnim != null) {
-                    animChannel?.setAnim(targetAnim, 0.3f) // 0.3s blend
-                    animChannel?.setLoopMode(
-                        if (targetAnim.contains("Death") || targetAnim.contains("Hit") || targetAnim.contains("Jump")) {
-                            LoopMode.DontLoop
-                        } else {
-                            LoopMode.Loop
-                        }
-                    )
+
+                if (ctrl.animationNames.contains(targetAnim)) {
+                    animChannel?.setAnim(targetAnim, 0.25f)
+                    val isOneShot = targetAnim == "Death" || targetAnim == "Punch" || targetAnim == "Jump" ||
+                            targetAnim.contains("Death") || targetAnim.contains("Hit")
+                    animChannel?.setLoopMode(if (isOneShot) LoopMode.DontLoop else LoopMode.Loop)
                 }
             }
         }
