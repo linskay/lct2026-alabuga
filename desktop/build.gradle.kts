@@ -39,10 +39,23 @@ compose.desktop {
         nativeDistributions {
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "AlabugaArena"
-            packageVersion = "1.0.0"
+            packageVersion = "1.0.1"
             description = "Alabuga B2B Negotiation Arena Simulator"
             copyright = "Copyright (c) 2026 SEZ Alabuga"
             vendor = "SEZ Alabuga"
+
+            modules(
+                "java.base",
+                "java.desktop",
+                "java.logging",
+                "java.prefs",
+                "java.xml",
+                "java.management",
+                "java.instrument",
+                "java.naming",
+                "jdk.unsupported",
+                "jdk.crypto.ec"
+            )
 
             windows {
                 menu = true
