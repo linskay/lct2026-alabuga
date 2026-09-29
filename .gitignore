@@ -1,8 +1,50 @@
+# AI Studio Dev Server & Web Preview Files (локально для веб-песочницы)
+metadata.json
+package.json
+package-lock.json
+bun.lock
+pnpm-lock.yaml
+yarn.lock
+tsconfig.json
+vite.config.ts
+vite.config.js
+server.ts
+server.js
+index.html
 node_modules/
-build/
 dist/
-coverage/
-.DS_Store
+.pnp
+.pnp.js
+
+# Gradle & Android Build Artifacts
+.gradle/
+.kotlin/
+kotlin-js-store/
+build/
+app/build/
+desktop/build/
+shared/build/
+web/build/
+composeApp/build/
+bin-dist/
+bin-dist-web/
+release-binaries/
+*.apk
+*.aab
+*.msi
+*.exe
+local.properties
+.idea/
+*.iml
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 *.log
+
+# Environment & OS
 .env*
 !.env.example
+.DS_Store
+

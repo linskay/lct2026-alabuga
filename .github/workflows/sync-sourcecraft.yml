@@ -1,0 +1,81 @@
+name: 🔄 Sync & Deliver to SourceCraft
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_run:
+    workflows: ["Build & Publish Release (APK + MSI + JAR)"]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-sourcecraft:
+    name: 🚀 Mirror to SourceCraft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH Authentication
+        if: ${{ env.SOURCECRAFT_SSH_KEY != '' }}
+        env:
+          SOURCECRAFT_SSH_KEY: ${{ secrets.SOURCECRAFT_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SOURCECRAFT_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          cat << 'EOF' >> ~/.ssh/config
+          Host ssh.sourcecraft.dev
+            HostName ssh.sourcecraft.dev
+            User git
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Mirror to SourceCraft Repository
+        env:
+          SOURCECRAFT_SSH_KEY: ${{ secrets.SOURCECRAFT_SSH_KEY }}
+          SOURCECRAFT_TOKEN: ${{ secrets.SOURCECRAFT_TOKEN }}
+          SOURCECRAFT_USER: ${{ secrets.SOURCECRAFT_USER || 'linskay' }}
+        run: |
+          git config user.name "GitHub Sync Bot"
+          git config user.email "bot@alabuga-arena.ru"
+
+          if [ -n "$SOURCECRAFT_SSH_KEY" ]; then
+            echo "🚀 Использование SSH-подключения к SourceCraft..."
+            SSH_URL="ssh://git@ssh.sourcecraft.dev/lct-hackaton-2026/case-19-negotiation-simulator-team-12.git"
+            git remote add sourcecraft "$SSH_URL" 2>/dev/null || git remote set-url sourcecraft "$SSH_URL"
+            
+            echo "Отправка веток в SourceCraft через SSH..."
+            if git push sourcecraft main --force; then
+              echo "Отправка тегов в SourceCraft через SSH..."
+              git push sourcecraft --tags --force || true
+              echo "✅ Репозиторий успешно синхронизирован с SourceCraft через SSH!"
+              exit 0
+            else
+              echo "⚠️ SSH-push вернул ошибку, пробуем HTTPS..."
+            fi
+          fi
+
+          if [ -n "$SOURCECRAFT_TOKEN" ]; then
+            echo "🔄 Использование HTTPS токена..."
+            REMOTE_URL="https://${SOURCECRAFT_USER}:${SOURCECRAFT_TOKEN}@sourcecraft.dev/lct-hackaton-2026/case-19-negotiation-simulator-team-12.git"
+            git remote set-url sourcecraft "$REMOTE_URL" 2>/dev/null || git remote add sourcecraft "$REMOTE_URL"
+            git push sourcecraft main --force
+            git push sourcecraft --tags --force || true
+            echo "✅ Репозиторий успешно синхронизирован с SourceCraft через HTTPS!"
+          else
+            echo "❌ Ошибка: Не настроены ни SOURCECRAFT_SSH_KEY, ни SOURCECRAFT_TOKEN"
+            exit 1
+          fi

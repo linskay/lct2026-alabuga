@@ -1,0 +1,342 @@
+name: Build & Publish Release (APK + MSI + JAR)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Запускается при каждом пуше в main.
+# 1. tag-release          — патч-тег v0.1.X+1, удаляет старые релизы (≤5).
+# 2. build-android        — собирает APK.
+# 3. build-desktop-windows — собирает MSI + UberJar (EXE через WiX исключён:
+#                            ненадёжен на GitHub-раннерах, MSI работает стабильно).
+# 4. publish-release      — создаёт GitHub Release с артефактами.
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 1: авто-тег + очистка старых релизов
+  # ────────────────────────────────────────────────────────────────────
+  tag-release:
+    name: 🏷️ Auto-tag & Cleanup
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.bump.outputs.new_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump patch version and push tag
+        id: bump
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LAST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$LAST_TAG" ]; then
+            NEW_TAG="v0.1.0"
+          else
+            MAJOR=$(echo "$LAST_TAG" | cut -d. -f1 | tr -d 'v')
+            MINOR=$(echo "$LAST_TAG" | cut -d. -f2)
+            PATCH=$(echo "$LAST_TAG" | cut -d. -f3)
+            NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+          echo "Last tag : ${LAST_TAG:-<none>}"
+          echo "New tag  : ${NEW_TAG}"
+          echo "new_tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEW_TAG" -m "Auto-release ${NEW_TAG}"
+          git push origin "$NEW_TAG"
+
+      - name: Delete old releases (keep latest 5)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASES=$(gh release list --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[].tagName')
+          echo "All releases:"
+          echo "$RELEASES"
+          COUNT=0
+          while IFS= read -r TAG; do
+            [ -z "$TAG" ] && continue
+            COUNT=$((COUNT + 1))
+            if [ "$COUNT" -gt 5 ]; then
+              echo "🗑️  Deleting: ${TAG}"
+              gh release delete "$TAG" --yes --cleanup-tag || true
+            else
+              echo "✅ Keeping : ${TAG}"
+            fi
+          done <<< "$RELEASES"
+
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 2: Android APK
+  # ────────────────────────────────────────────────────────────────────
+  build-android:
+    name: 🤖 Build Android APK
+    needs: tag-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Android APK
+        run: |
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Show APK output tree
+        if: always()
+        run: find app/build/outputs/apk -type f 2>/dev/null || echo "No APK output directory found"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-android-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 3: Windows Desktop (MSI + UberJar)
+  # Примечание: packageExe (WiX) исключён — он стабильно падает на CI
+  # из-за несовместимости WiX 3.11 с кастомными .wxl в некоторых средах.
+  # MSI собирается нативно через jpackage без WiX-зависимости.
+  # ────────────────────────────────────────────────────────────────────
+  build-desktop-windows:
+    name: 🪟 Build Windows Desktop (MSI + JAR)
+    needs: tag-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: |
+          try {
+            choco install wixtoolset --no-progress -y
+            $wixPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin"
+            if (Test-Path $wixPath) {
+              Write-Host "Adding WiX to GITHUB_PATH: $wixPath"
+              "$wixPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            }
+          } catch {
+            Write-Warning "WiX installation via chocolatey failed: $_"
+          }
+
+      - name: Build Desktop Artifacts (UberJar + MSI)
+        shell: pwsh
+        run: |
+          $wixPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin"
+          if (Test-Path $wixPath) {
+            $env:PATH = "$wixPath;$env:PATH"
+            $env:WIX = "C:\Program Files (x86)\WiX Toolset v3.11"
+          }
+          Write-Host "Building standalone UberJar..."
+          .\gradlew.bat :desktop:packageUberJarForCurrentOS --no-daemon --stacktrace
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "UberJar build failed!"
+            exit 1
+          }
+
+          Write-Host "Building native MSI Distribution..."
+          .\gradlew.bat :desktop:packageDistributionForCurrentOS --no-daemon
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "MSI packaging exited with code $LASTEXITCODE. UberJar will serve as the primary Windows distribution artifact."
+            $global:LASTEXITCODE = 0
+          }
+
+      - name: Show jpackage logs on failure
+        if: always()
+        shell: pwsh
+        run: |
+          $logDir = "desktop\build\compose\logs"
+          if (Test-Path $logDir) {
+            Get-ChildItem $logDir -Recurse -Filter "*.txt" | ForEach-Object {
+              Write-Host "=== $($_.FullName) ==="
+              Get-Content $_.FullName
+            }
+          }
+
+      - name: Collect Windows artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path bin-dist
+          # MSI
+          Get-ChildItem -Path desktop\build\compose\binaries\main-release\msi -Recurse -Filter *.msi -ErrorAction SilentlyContinue |
+            Copy-Item -Destination bin-dist\ -Force
+          Get-ChildItem -Path desktop\build\compose\binaries\main\msi -Recurse -Filter *.msi -ErrorAction SilentlyContinue |
+            Copy-Item -Destination bin-dist\ -Force
+          # UberJar
+          Get-ChildItem -Path desktop\build\compose\jars -Recurse -Filter *.jar -ErrorAction SilentlyContinue |
+            Copy-Item -Destination bin-dist\ -Force
+          Write-Host "Collected:"
+          Get-ChildItem bin-dist
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-windows-desktop
+          path: bin-dist/*
+          if-no-files-found: error
+
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 4: Web Wasm Distribution
+  # ────────────────────────────────────────────────────────────────────
+  build-web-wasm:
+    name: 🌐 Build Web Wasm Distribution
+    needs: tag-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Web Wasm
+        run: ./gradlew :web:wasmJsBrowserDistribution --no-daemon --stacktrace
+
+      - name: Package Web Distribution
+        run: |
+          mkdir -p bin-dist-web
+          cd web/build/dist/wasmJs/productionExecutable
+          zip -r "$GITHUB_WORKSPACE/bin-dist-web/arena-web-wasm.zip" .
+          cd -
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-web-wasm
+          path: bin-dist-web/*
+          if-no-files-found: error
+
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 5: GitHub Release
+  # ────────────────────────────────────────────────────────────────────
+  publish-release:
+    name: 🚀 Publish GitHub Release
+    needs: [tag-release, build-android, build-desktop-windows, build-web-wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arena-android-apk
+          path: release-binaries-android/
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arena-windows-desktop
+          path: release-binaries-windows/
+
+      - name: Download Web Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arena-web-wasm
+          path: release-binaries-web/
+
+      - name: Normalize & Version Artifact Filenames
+        run: |
+          TAG="${{ needs.tag-release.outputs.new_tag }}"
+          mkdir -p final-release/
+          
+          # 1. Android APK -> AlabugaArena-<TAG>-android.apk
+          find release-binaries-android/ -type f -name "*.apk" | head -1 | while read -r f; do
+            echo "Packaging APK: $f -> final-release/AlabugaArena-${TAG}-android.apk"
+            cp "$f" "final-release/AlabugaArena-${TAG}-android.apk"
+          done
+          
+          # 2. Windows MSI -> AlabugaArena-<TAG>-windows.msi
+          find release-binaries-windows/ -type f -name "*.msi" | head -1 | while read -r f; do
+            echo "Packaging MSI: $f -> final-release/AlabugaArena-${TAG}-windows.msi"
+            cp "$f" "final-release/AlabugaArena-${TAG}-windows.msi"
+          done
+          
+          # 3. Universal JAR -> AlabugaArena-<TAG>-desktop.jar
+          find release-binaries-windows/ -type f -name "*.jar" | head -1 | while read -r f; do
+            echo "Packaging JAR: $f -> final-release/AlabugaArena-${TAG}-desktop.jar"
+            cp "$f" "final-release/AlabugaArena-${TAG}-desktop.jar"
+          done
+          
+          # 4. Web Wasm ZIP -> AlabugaArena-<TAG>-web-wasm.zip
+          find release-binaries-web/ -type f -name "*.zip" | head -1 | while read -r f; do
+            echo "Packaging ZIP: $f -> final-release/AlabugaArena-${TAG}-web-wasm.zip"
+            cp "$f" "final-release/AlabugaArena-${TAG}-web-wasm.zip"
+          done
+          
+          echo "Final Release Assets to upload:"
+          ls -la final-release/
+
+      - name: Prepare Clean Release Notes
+        run: |
+          cat << 'EOF' > release_body.md
+          ### 🚀 Арена Переговоров ОЭЗ «Алабуга» (${{ needs.tag-release.outputs.new_tag }})
+
+          **Кроссплатформенный интерактивный тренажер эффективных B2B-переговоров по лучшим мировым практикам (Гарвардская модель, BATNA, ZOPA и взаимовыгодные сделки Win-Win без уступок):**
+          - 🤖 Интерактивный 3D робот-наставник **Б.А.Р.С.** с динамическими реакциями и тактическим анализом
+          - 📊 Анализ коридора согласия ZOPA, защита красных линий BATNA и мониторинг психоэмоционального фона
+          - 🎯 Реалистичные переговорные кейсы с резидентами и инвесторами ОЭЗ «Алабуга»
+          - ⏳ Механика ретроспективного анализа и отката решений («Машина времени»)
+          - 📥 Генерация стилизованного аналитического PDF-отчета дебрифинга с персональными рекомендациями
+
+          #### 📦 Готовые пакеты установки и дистрибутивы:
+          - **Android APK** (`AlabugaArena-${{ needs.tag-release.outputs.new_tag }}-android.apk`) — мобильная версия для Android
+          - **Windows Installer** (`AlabugaArena-${{ needs.tag-release.outputs.new_tag }}-windows.msi`) — установщик для рабочего стола Windows (на русском языке)
+          - **Universal JAR** (`AlabugaArena-${{ needs.tag-release.outputs.new_tag }}-desktop.jar`) — запуск через Java Runtime
+          - **Web Wasm** (`AlabugaArena-${{ needs.tag-release.outputs.new_tag }}-web-wasm.zip`) — статический бандл Compose Multiplatform Wasm
+
+          *(Сборка выпущена автоматически релизным пайплайном ОЭЗ «Алабуга»)*
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.tag-release.outputs.new_tag }}
+          name: "Арена Переговоров ОЭЗ «Алабуга» — ${{ needs.tag-release.outputs.new_tag }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          body_path: release_body.md
+          files: final-release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
