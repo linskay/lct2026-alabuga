@@ -55,65 +55,61 @@ private const val BARS_HTML = """<!DOCTYPE html>
 </head>
 <body>
     <model-viewer id="mv"
-        src="mike.glb"
-        alt="3D Робот Майк (Б.А.Р.С. ОЭЗ Алабуга)"
+        src="bars.glb"
+        alt="3D Робот-наставник Б.А.Р.С."
         autoplay
         interaction-prompt="none"
         shadow-intensity="1.5"
         shadow-softness="0.75"
-        exposure="1.0"
+        exposure="1.1"
         environment-image="neutral"
-        camera-orbit="0deg 80deg 52%"
-        camera-target="0m 0.78m 0m">
+        camera-orbit="0deg 75deg 110%"
+        camera-target="0m 1.05m 0m">
     </model-viewer>
     <script>
         const mv = document.getElementById('mv');
         if (mv) {
             mv.addEventListener('error', function() {
-                if (mv.getAttribute('src') !== 'bars.glb') {
-                    mv.setAttribute('src', 'bars.glb');
+                if (mv.getAttribute('src') === 'bars.glb') {
+                    mv.setAttribute('src', 'mike.glb');
                 }
             });
         }
-        const ANIM_MAP = {
+        const BARS_ANIM_MAP = {
+            "wave": "Wave",
+            "idle": "Wave",
+            "talk": "Wave",
+            "nod": "Yes",
+            "tilt": "Sitting",
+            "warn": "No",
+            "win": "ThumbsUp",
+            "punch": "Punch",
+            "jump": "Jump",
+            "bluff": "Punch",
+            "death": "Death"
+        };
+        const MIKE_ANIM_MAP = {
             "idle": "SK_ZMikeAnim_ZMIKE_Idle",
             "talk": "SK_ZMikeAnim_ZMIKE_WaveLoop",
             "warn": "SK_ZMikeAnim_ZMIKE_IdleAggro",
             "win": "SK_ZMikeAnim_ZMIKE_WaveLoop",
             "wave": "SK_ZMikeAnim_ZMIKE_WaveLoop",
-            "nod": "SK_ZMikeAnim_ZMIKE_Blinking",
-            "tilt": "SK_ZMikeAnim_ZMIKE_Idle",
-            "punch": "SK_ZMikeAnim_ZMIKE_WaveLoop",
-            "hit": "SK_ZMikeAnim_ZMIKE_Idle",
-            "death": "SK_ZMikeAnim_ZMIKE_Idle",
+            "nod": "SK_ZMikeAnim_ZMIKE_ExitWave",
+            "tilt": "SK_ZMikeAnim_ZMIKE_Blinking",
+            "punch": "SK_ZMikeAnim_ZMIKE_PunchR",
+            "jump": "SK_ZMikeAnim_ZMIKE_Jump",
+            "death": "SK_ZMikeAnim_ZMIKE_HitRegisterFront_Death",
             "thinking": "SK_ZMikeAnim_ZMIKE_Blinking",
-            "bluff": "SK_ZMikeAnim_ZMIKE_Chomp",
-            "chomp": "SK_ZMikeAnim_ZMIKE_Chomp"
+            "bluff": "SK_ZMikeAnim_ZMIKE_IdleAggro"
         };
-
-        let angleDeg = 0;
-        let direction = 1;
-        function animateFrontalGaze() {
-            if (mv) {
-                angleDeg += direction * 0.15;
-                if (angleDeg > 18) {
-                    angleDeg = 18;
-                    direction = -1;
-                } else if (angleDeg < -18) {
-                    angleDeg = -18;
-                    direction = 1;
-                }
-                mv.setAttribute("camera-orbit", angleDeg.toFixed(1) + "deg 80deg 52%");
-            }
-            requestAnimationFrame(animateFrontalGaze);
-        }
-        requestAnimationFrame(animateFrontalGaze);
 
         window.setBarsAnim = function(animKey) {
             if (!mv) return;
-            const targetAnim = ANIM_MAP[animKey] || "SK_ZMikeAnim_ZMIKE_Idle";
+            const avail = mv.availableAnimations || [];
+            const isMike = avail.some(a => a.includes('SK_ZMike'));
+            const map = isMike ? MIKE_ANIM_MAP : BARS_ANIM_MAP;
+            const targetAnim = map[animKey] || (isMike ? "SK_ZMikeAnim_ZMIKE_WaveLoop" : "Wave");
             const updateAnim = () => {
-                const avail = mv.availableAnimations || [];
                 if (avail.includes(targetAnim)) {
                     mv.animationName = targetAnim;
                 } else if (avail.length > 0) {

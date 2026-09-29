@@ -14,6 +14,7 @@ actual fun BarsRobotView(
     BarsRobot3DView(
         animation = animation,
         modifier = modifier,
-        height = height
+        height = height,
+        onClick = onClick
     )
 }

@@ -63,17 +63,17 @@
 </head>
 <body>
     <model-viewer id="bars-3d-model-viewer"
-                  src="mike.glb"
-                  alt="3D робот Майк / Б.А.Р.С."
+                  src="bars.glb"
+                  alt="3D робот-наставник Б.А.Р.С."
                   tabindex="-1"
                   autoplay
-                  animation-name="SK_ZMikeAnim_ZMIKE_WaveLoop"
+                  animation-name="Wave"
                   camera-controls
                   disable-zoom
                   interaction-prompt="none"
                   touch-action="pan-y"
-                  camera-orbit="0deg 84deg 72%"
-                  camera-target="0m 0.82m 0m"
+                  camera-orbit="0deg 75deg 110%"
+                  camera-target="0m 1.05m 0m"
                   shadow-intensity="1.5"
                   shadow-softness="0.75"
                   exposure="1.2"
@@ -82,6 +82,20 @@
     </model-viewer>
 
     <script>
+        const BARS_ANIM_MAP = {
+            'wave': 'Wave',
+            'idle': 'Wave',
+            'talk': 'Wave',
+            'nod': 'Yes',
+            'tilt': 'Sitting',
+            'warn': 'No',
+            'win': 'ThumbsUp',
+            'punch': 'Punch',
+            'jump': 'Jump',
+            'bluff': 'Punch',
+            'death': 'Death'
+        };
+
         const MIKE_ANIM_MAP = {
             'wave': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
             'idle': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
@@ -89,13 +103,23 @@
             'nod': 'SK_ZMikeAnim_ZMIKE_ExitWave',
             'tilt': 'SK_ZMikeAnim_ZMIKE_Blinking',
             'bluff': 'SK_ZMikeAnim_ZMIKE_IdleAggro',
-            'jump': 'SK_ZMikeAnim_ZMIKE_Jump'
+            'jump': 'SK_ZMikeAnim_ZMIKE_Jump',
+            'win': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
+            'punch': 'SK_ZMikeAnim_ZMIKE_PunchR',
+            'warn': 'SK_ZMikeAnim_ZMIKE_IdleAggro'
         };
 
         function resolveAnimation(animName) {
-            if (!animName) return 'SK_ZMikeAnim_ZMIKE_WaveLoop';
+            const mv = document.getElementById('bars-3d-model-viewer');
+            const available = (mv && mv.availableAnimations) ? mv.availableAnimations : [];
+            const isMike = available.some(function(a) { return a.indexOf('SK_ZMike') !== -1; });
+            if (!animName) return isMike ? 'SK_ZMikeAnim_ZMIKE_WaveLoop' : 'Wave';
             const key = animName.toLowerCase();
-            if (MIKE_ANIM_MAP[key]) return MIKE_ANIM_MAP[key];
+            if (isMike) {
+                if (MIKE_ANIM_MAP[key]) return MIKE_ANIM_MAP[key];
+            } else {
+                if (BARS_ANIM_MAP[key]) return BARS_ANIM_MAP[key];
+            }
             return animName;
         }
 
@@ -189,13 +213,14 @@
             }
         }
 
-        // Fallback from mike.glb to bars.glb on error
+        // Fallback between bars.glb and mike.glb on error
         var mvElem = document.getElementById('bars-3d-model-viewer');
         if (mvElem) {
             mvElem.addEventListener('load', function() {
                 sanitizeModelViewer(mvElem);
                 try {
-                    mvElem.animationName = 'SK_ZMikeAnim_ZMIKE_WaveLoop';
+                    var anim = resolveAnimation('wave');
+                    mvElem.animationName = anim;
                     if (mvElem.play) mvElem.play();
                 } catch (e) {}
             });
@@ -211,9 +236,9 @@
             });
 
             mvElem.addEventListener('error', function(e) {
-                console.warn("Failed to load mike.glb, falling back to bars.glb", e);
-                if (mvElem.getAttribute('src') === 'mike.glb') {
-                    mvElem.setAttribute('src', 'bars.glb');
+                console.warn("Model loading error, trying fallback:", e);
+                if (mvElem.getAttribute('src') === 'bars.glb') {
+                    mvElem.setAttribute('src', 'mike.glb');
                 }
             });
 
