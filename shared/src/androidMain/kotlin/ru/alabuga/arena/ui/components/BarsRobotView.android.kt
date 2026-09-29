@@ -72,11 +72,11 @@ actual fun BarsRobotView(
     val (prefix, frameCount, durationMs) = remember(animation) {
         when (animation.lowercase()) {
             "wave" -> Triple("wave", AndroidBarsRobotAssets.WAVE_COUNT, 1400)
-            "punch", "hit", "bluff" -> Triple("punch", AndroidBarsRobotAssets.PUNCH_COUNT, 900)
-            "warn", "no" -> Triple("warn", AndroidBarsRobotAssets.WARN_COUNT, 1100)
-            "win", "jump", "dance" -> Triple("win", AndroidBarsRobotAssets.WIN_COUNT, 1100)
-            "idle", "talk", "nod", "yes", "tilt", "sitting", "thinking" -> Triple("wave", AndroidBarsRobotAssets.WAVE_COUNT, 1600)
-            else -> Triple("wave", AndroidBarsRobotAssets.WAVE_COUNT, 1500)
+            "punch", "hit", "bluff", "attack" -> Triple("punch", AndroidBarsRobotAssets.PUNCH_COUNT, 900)
+            "warn", "no", "danger", "angry" -> Triple("warn", AndroidBarsRobotAssets.WARN_COUNT, 1100)
+            "win", "jump", "dance", "victory", "celebrate" -> Triple("win", AndroidBarsRobotAssets.WIN_COUNT, 1100)
+            "idle", "talk", "nod", "yes", "tilt", "sitting", "thinking", "calm" -> Triple("idle", AndroidBarsRobotAssets.IDLE_COUNT, 1500)
+            else -> Triple("idle", AndroidBarsRobotAssets.IDLE_COUNT, 1500)
         }
     }
 

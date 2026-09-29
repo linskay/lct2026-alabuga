@@ -56,7 +56,7 @@ fun HomeScreen(
     var showBubble by remember { mutableStateOf(false) }
     var bubbleVersion by remember { mutableStateOf(0) }
 
-    val gentleAnims = remember { listOf("wave", "talk", "nod", "tilt", "bluff", "win", "punch", "warn", "idle") }
+    val gentleAnims = remember { listOf("punch", "warn", "win", "wave", "idle", "punch", "warn", "win", "wave") }
 
     val robotPhrases = remember {
         listOf(

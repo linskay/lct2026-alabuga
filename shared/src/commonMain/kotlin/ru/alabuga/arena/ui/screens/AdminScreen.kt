@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -79,20 +80,22 @@ fun AdminScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                        Column {
-                            Text(
-                                text = "КОНФИГУРАТОР ПЕРЕГОВОРОВ & BATNA",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "ОЭЗ «Алабуга» • Конструктор сценариев и психотипов",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
-                        }
+                    Column {
+                        Text(
+                            text = "КОНФИГУРАТОР BATNA",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "ОЭЗ «Алабуга» • Конструктор сценариев",
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 },
                 navigationIcon = {
@@ -111,22 +114,16 @@ fun AdminScreen(
                                 listOf(Color(0xFF7B2CBF), Color(0xFF00F0FF).copy(alpha = 0.5f))
                             )
                         ),
-                        modifier = Modifier.padding(end = 12.dp)
+                        modifier = Modifier.padding(end = 8.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = null,
-                                tint = Color(0xFF00F0FF),
-                                modifier = Modifier.size(14.dp)
-                            )
                             Text(
                                 text = "В арену",
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF00F0FF)
                             )
@@ -152,7 +149,7 @@ fun AdminScreen(
                     .widthIn(max = 860.dp)
                     .fillMaxWidth()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = if (isCompact) 14.dp else 24.dp, vertical = 20.dp),
+                    .padding(horizontal = if (isCompact) 14.dp else 24.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 // 1. Выбор сценария и кнопка создания нового
@@ -163,12 +160,12 @@ fun AdminScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "БОЕВЫЕ СЦЕНАРИИ ОЭЗ",
+                            text = if (isCompact) "БОЕВЫЕ СЦЕНАРИИ" else "БОЕВЫЕ СЦЕНАРИИ ОЭЗ",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF00F0FF),
                             fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
+                            letterSpacing = 0.5.sp
                         )
 
                         // Кнопка создания нового пользовательского сценария
@@ -177,11 +174,11 @@ fun AdminScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1B4B)),
                             border = BorderStroke(1.dp, Color(0xFF00FFCC)),
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color(0xFF00FFCC), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("СОЗДАТЬ СВОЙ СЦЕНАРИЙ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00FFCC))
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color(0xFF00FFCC), modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isCompact) "СОЗДАТЬ" else "СОЗДАТЬ СВОЙ СЦЕНАРИЙ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00FFCC))
                         }
                     }
 
