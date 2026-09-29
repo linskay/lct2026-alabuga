@@ -32,16 +32,20 @@ fun App() {
             color = MaterialTheme.colorScheme.background
         ) {
             var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
+            var returnScreenFromAdmin by remember { mutableStateOf(AppScreen.HOME) }
             var currentConfig by remember { mutableStateOf(ScenarioPresets.list.getOrElse(1) { ScenarioConfig() }) }
 
             when (currentScreen) {
                 AppScreen.HOME -> HomeScreen(
                     onEnterArena = { currentScreen = AppScreen.ARENA },
-                    onOpenAdmin = { currentScreen = AppScreen.ADMIN }
+                    onOpenAdmin = {
+                        returnScreenFromAdmin = AppScreen.HOME
+                        currentScreen = AppScreen.ADMIN
+                    }
                 )
                 AppScreen.ADMIN -> AdminScreen(
                     currentConfig = currentConfig,
-                    onBack = { currentScreen = AppScreen.HOME },
+                    onBack = { currentScreen = returnScreenFromAdmin },
                     onStartSimulation = { newConfig ->
                         currentConfig = newConfig
                         currentScreen = AppScreen.ARENA
@@ -49,7 +53,11 @@ fun App() {
                 )
                 AppScreen.ARENA -> ArenaScreen(
                     config = currentConfig,
-                    onBack = { currentScreen = AppScreen.HOME }
+                    onBack = { currentScreen = AppScreen.HOME },
+                    onOpenConfig = {
+                        returnScreenFromAdmin = AppScreen.ARENA
+                        currentScreen = AppScreen.ADMIN
+                    }
                 )
             }
         }

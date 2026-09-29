@@ -55,8 +55,8 @@ private const val BARS_HTML = """<!DOCTYPE html>
 </head>
 <body>
     <model-viewer id="mv"
-        src="bars.glb"
-        alt="3D Робот Б.А.Р.С. (ОЭЗ Алабуга)"
+        src="mike.glb"
+        alt="3D Робот Майк (Б.А.Р.С. ОЭЗ Алабуга)"
         autoplay
         interaction-prompt="none"
         shadow-intensity="1.5"
@@ -67,6 +67,14 @@ private const val BARS_HTML = """<!DOCTYPE html>
         camera-target="0m 0.78m 0m">
     </model-viewer>
     <script>
+        const mv = document.getElementById('mv');
+        if (mv) {
+            mv.addEventListener('error', function() {
+                if (mv.getAttribute('src') !== 'bars.glb') {
+                    mv.setAttribute('src', 'bars.glb');
+                }
+            });
+        }
         const ANIM_MAP = {
             "idle": "SK_ZMikeAnim_ZMIKE_Idle",
             "talk": "SK_ZMikeAnim_ZMIKE_WaveLoop",
@@ -82,8 +90,6 @@ private const val BARS_HTML = """<!DOCTYPE html>
             "bluff": "SK_ZMikeAnim_ZMIKE_Chomp",
             "chomp": "SK_ZMikeAnim_ZMIKE_Chomp"
         };
-
-        const mv = document.getElementById('mv');
 
         let angleDeg = 0;
         let direction = 1;
