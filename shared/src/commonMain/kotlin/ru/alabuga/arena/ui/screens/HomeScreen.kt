@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -55,7 +56,7 @@ fun HomeScreen(
     var showBubble by remember { mutableStateOf(false) }
     var bubbleVersion by remember { mutableStateOf(0) }
 
-    val gentleAnims = remember { listOf("wave", "nod", "tilt", "talk", "bluff", "idle") }
+    val gentleAnims = remember { listOf("punch", "warn", "win", "wave", "idle", "punch", "warn", "win", "wave") }
 
     val robotPhrases = remember {
         listOf(
@@ -311,7 +312,7 @@ fun HomeScreen(
                 )
             }
 
-            // ДИАЛОГОВЫЙ БАББЛ Б.А.Р.С. С НЕОНОВОЙ РАМКОЙ (ровно под заголовком как на фото 2)
+            // ДИАЛОГОВЫЙ БАББЛ Б.А.Р.С. С НЕОНОВОЙ РАМКОЙ (фиксированная высота без дерганья)
             Surface(
                 onClick = handleRobotTap,
                 shape = RoundedCornerShape(16.dp),
@@ -325,12 +326,13 @@ fun HomeScreen(
                 shadowElevation = 12.dp,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(68.dp)
                     .padding(horizontal = 4.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -358,74 +360,34 @@ fun HomeScreen(
                         } else {
                             "Калибровка систем... Перестань тыкать, жми «ВОЙТИ В ПЕРЕГОВОРНУЮ»!"
                         },
-                        fontSize = 12.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White,
                         textAlign = TextAlign.Center,
-                        lineHeight = 17.sp
+                        lineHeight = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Робот + Ромбовидный кибер-фон + Мягкая ареола (как на фото 2) + Тень
+            // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Робот + Мягкая неоновая аура + Тень (без лишних квадратов)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(340.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // ВНЕШНИЙ ПОВЕРНУТЫЙ РОМБ (Diamond Backdrop из фото 2)
+                // МЯГКОЕ НЕОНОВОЕ СВЕЧЕНИЕ (CYAN & PURPLE AURA)
                 Box(
                     modifier = Modifier
                         .size(240.dp)
-                        .rotate(45f)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF7B2CBF).copy(alpha = 0.35f),
-                                    Color(0xFF3B0764).copy(alpha = 0.20f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(22.dp)
-                        )
-                        .border(
-                            1.5.dp,
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF00F0FF).copy(alpha = 0.40f),
-                                    Color(0xFF7B2CBF).copy(alpha = 0.50f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(22.dp)
-                        )
-                )
-
-                // ВНУТРЕННИЙ ПОВЕРНУТЫЙ РОМБ (акцентный)
-                Box(
-                    modifier = Modifier
-                        .size(170.dp)
-                        .rotate(45f)
-                        .background(
-                            Color(0xFF4C1D95).copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                        .border(
-                            1.dp,
-                            Color(0xFF00F0FF).copy(alpha = 0.30f),
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                )
-
-                // МЯГКОЕ НЕОНОВОЕ СВЕЧЕНИЕ (CYAN AURA КАК НА ФОТО 2)
-                Box(
-                    modifier = Modifier
-                        .size(220.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
                                 listOf(
                                     Color(0xFF00F0FF).copy(alpha = glowAlpha * 0.70f),
-                                    Color(0xFF7B2CBF).copy(alpha = glowAlpha * 0.35f),
+                                    Color(0xFF7B2CBF).copy(alpha = glowAlpha * 0.40f),
                                     Color.Transparent
                                 )
                             )
@@ -474,7 +436,7 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. Кнопка «▶ ВОЙТИ В ПЕРЕГОВОРНУЮ»
+                // 1. Кнопка «▶ ВОЙТИ В ПЕРЕГОВОРНУЮ» (Cyber-Glass Style)
                 Button(
                     onClick = onEnterArena,
                     interactionSource = enterInteractionSource,
@@ -483,12 +445,22 @@ fun HomeScreen(
                         .height(54.dp)
                         .scale(enterScale)
                         .shadow(
-                            elevation = 14.dp,
+                            elevation = 16.dp,
                             shape = RoundedCornerShape(16.dp),
-                            ambientColor = Color(0xFF7B2CBF),
-                            spotColor = Color(0xFF7B2CBF)
+                            ambientColor = Color(0xFF00F0FF).copy(alpha = 0.35f),
+                            spotColor = Color(0xFF7B2CBF).copy(alpha = 0.65f)
                         ),
                     shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(
+                        1.5.dp,
+                        Brush.linearGradient(
+                            listOf(
+                                Color(0xFF00F0FF),
+                                Color(0xFF9D4EDD).copy(alpha = 0.90f),
+                                Color(0xFF00F0FF).copy(alpha = 0.70f)
+                            )
+                        )
+                    ),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                     contentPadding = PaddingValues(0.dp)
                 ) {
@@ -498,20 +470,25 @@ fun HomeScreen(
                             .background(
                                 Brush.horizontalGradient(
                                     colors = listOf(
-                                        Color(0xFF7B2CBF),
-                                        Color(0xFF9D4EDD),
-                                        Color(0xFF00F0FF)
+                                        Color(0xFF1E1038).copy(alpha = 0.92f),
+                                        Color(0xFF2D124D).copy(alpha = 0.88f),
+                                        Color(0xFF0F1E36).copy(alpha = 0.92f)
                                     )
                                 )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
+                        // Верхний стеклянный блик (Glass reflection)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(1.dp)
                                 .align(Alignment.TopCenter)
-                                .background(Color.White.copy(alpha = 0.35f))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color.Transparent, Color(0xFF00F0FF).copy(alpha = 0.80f), Color.Transparent)
+                                    )
+                                )
                         )
 
                         Row(
@@ -521,7 +498,7 @@ fun HomeScreen(
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                tint = Color(0xFF07080D),
+                                tint = Color(0xFF00F0FF),
                                 modifier = Modifier
                                     .offset(x = playIconOffset)
                                     .scale(playIconScale)
@@ -530,8 +507,8 @@ fun HomeScreen(
                             Text(
                                 text = "ВОЙТИ В ПЕРЕГОВОРНУЮ",
                                 fontSize = 15.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF07080D),
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
                                 letterSpacing = 1.2.sp
                             )
                         }

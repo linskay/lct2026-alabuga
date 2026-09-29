@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -75,34 +76,51 @@ fun AdminScreen(
     val uriHandler = LocalUriHandler.current
     val scrollState = rememberScrollState()
 
+    val applyAndReturn: () -> Unit = {
+        AppSettings.geminiApiKey = geminiKey.trim()
+        AppSettings.openRouterApiKey = openRouterKey.trim()
+        AppSettings.grafanaEndpoint = grafanaUrl.trim()
+        AppSettings.enableTelemetry = telemetryEnabled
+        val updated = config.copy(
+            toughnessLevel = toughness.toInt(),
+            batna = config.batna.copy(
+                minPricePerSqm = minPrice.toIntOrNull() ?: config.batna.minPricePerSqm,
+                maxGracePeriodMonths = maxGrace.toIntOrNull() ?: config.batna.maxGracePeriodMonths
+            )
+        )
+        onStartSimulation(updated)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                        Column {
-                            Text(
-                                text = "КОНФИГУРАТОР ПЕРЕГОВОРОВ & BATNA",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "ОЭЗ «Алабуга» • Конструктор сценариев и психотипов",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
-                        }
+                    Column {
+                        Text(
+                            text = "КОНФИГУРАТОР BATNA",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "ОЭЗ «Алабуга» • Конструктор сценариев",
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = applyAndReturn) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color(0xFF00F0FF))
                     }
                 },
                 actions = {
                     Surface(
-                        onClick = onBack,
+                        onClick = applyAndReturn,
                         shape = RoundedCornerShape(10.dp),
                         color = Color(0xFF1E1035).copy(alpha = 0.85f),
                         border = BorderStroke(
@@ -111,22 +129,16 @@ fun AdminScreen(
                                 listOf(Color(0xFF7B2CBF), Color(0xFF00F0FF).copy(alpha = 0.5f))
                             )
                         ),
-                        modifier = Modifier.padding(end = 12.dp)
+                        modifier = Modifier.padding(end = 8.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = null,
-                                tint = Color(0xFF00F0FF),
-                                modifier = Modifier.size(14.dp)
-                            )
                             Text(
                                 text = "В арену",
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF00F0FF)
                             )
@@ -138,12 +150,13 @@ fun AdminScreen(
         },
         containerColor = Color(0xFF07080D)
     ) { paddingValues ->
-        Box(
+        BoxWithConstraints(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues),
             contentAlignment = Alignment.TopCenter
         ) {
+            val isCompact = maxWidth < 640.dp
             // Центрированный контейнер с полями по бокам в веб-версии
             Column(
                 modifier = Modifier
@@ -151,7 +164,7 @@ fun AdminScreen(
                     .widthIn(max = 860.dp)
                     .fillMaxWidth()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                    .padding(horizontal = if (isCompact) 14.dp else 24.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 // 1. Выбор сценария и кнопка создания нового
@@ -162,12 +175,12 @@ fun AdminScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "БОЕВЫЕ СЦЕНАРИИ ОЭЗ",
+                            text = if (isCompact) "БОЕВЫЕ СЦЕНАРИИ" else "БОЕВЫЕ СЦЕНАРИИ ОЭЗ",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF00F0FF),
                             fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
+                            letterSpacing = 0.5.sp
                         )
 
                         // Кнопка создания нового пользовательского сценария
@@ -176,11 +189,11 @@ fun AdminScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1B4B)),
                             border = BorderStroke(1.dp, Color(0xFF00FFCC)),
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color(0xFF00FFCC), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("СОЗДАТЬ СВОЙ СЦЕНАРИЙ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00FFCC))
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color(0xFF00FFCC), modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isCompact) "СОЗДАТЬ" else "СОЗДАТЬ СВОЙ СЦЕНАРИЙ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00FFCC))
                         }
                     }
 
@@ -188,7 +201,7 @@ fun AdminScreen(
                     Column(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        scenariosList.chunked(2).forEach { rowPresets ->
+                        scenariosList.chunked(if (isCompact) 1 else 2).forEach { rowPresets ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -362,12 +375,8 @@ fun AdminScreen(
                             Text("🔑 ИНТЕГРАЦИЯ AI & БЭКЕНДА", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            // Google Gemini API Key
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        val geminiKeyBlock: @Composable (Modifier) -> Unit = { mod ->
+                            Column(modifier = mod, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("Google Gemini API Key", fontSize = 11.sp, color = Color(0xFFCBD5E1), fontWeight = FontWeight.SemiBold)
                                 OutlinedTextField(
                                     value = geminiKey,
@@ -397,9 +406,10 @@ fun AdminScreen(
                                     }
                                 )
                             }
+                        }
 
-                            // OpenRouter API Key
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        val openRouterKeyBlock: @Composable (Modifier) -> Unit = { mod ->
+                            Column(modifier = mod, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("OpenRouter API Key (Резерв)", fontSize = 11.sp, color = Color(0xFFCBD5E1), fontWeight = FontWeight.SemiBold)
                                 OutlinedTextField(
                                     value = openRouterKey,
@@ -431,6 +441,24 @@ fun AdminScreen(
                             }
                         }
 
+                        if (isCompact) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                geminiKeyBlock(Modifier.fillMaxWidth())
+                                openRouterKeyBlock(Modifier.fillMaxWidth())
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                geminiKeyBlock(Modifier.weight(1f))
+                                openRouterKeyBlock(Modifier.weight(1f))
+                            }
+                        }
+
                         Button(
                             onClick = {
                                 AppSettings.geminiApiKey = geminiKey.trim()
@@ -441,7 +469,7 @@ fun AdminScreen(
                                 containerColor = if (apiKeysSaved) Color(0xFF10B981) else Color(0xFF7B2CBF)
                             ),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.align(Alignment.End)
+                            modifier = Modifier.align(if (isCompact) Alignment.CenterHorizontally else Alignment.End)
                         ) {
                             Icon(imageVector = if (apiKeysSaved) Icons.Default.Check else Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -465,14 +493,15 @@ fun AdminScreen(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f, fill = false)
                             ) {
                                 Icon(imageVector = Icons.Default.BarChart, contentDescription = null, tint = Color(0xFF00F0FF))
-                                Text("📊 МОНИТОРИНГ & GRAFANA ТЕЛЕМЕТРИЯ", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("📊 МОНИТОРИНГ", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Потоковая телеметрия", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                Text(if (isCompact) "Телеметрия" else "Потоковая телеметрия", fontSize = 11.sp, color = Color(0xFF94A3B8))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Switch(
                                     checked = telemetryEnabled,
@@ -494,11 +523,7 @@ fun AdminScreen(
                             color = Color(0xFF94A3B8)
                         )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        val grafanaInputField: @Composable (Modifier) -> Unit = { mod ->
                             OutlinedTextField(
                                 value = grafanaUrl,
                                 onValueChange = {
@@ -508,10 +533,12 @@ fun AdminScreen(
                                 label = { Text("URL Grafana / Prometheus Endpoint") },
                                 placeholder = { Text("http://localhost:3001") },
                                 singleLine = true,
-                                modifier = Modifier.weight(1f),
+                                modifier = mod,
                                 shape = RoundedCornerShape(10.dp)
                             )
+                        }
 
+                        val grafanaTestButton: @Composable (Modifier) -> Unit = { mod ->
                             Button(
                                 onClick = {
                                     isTestingGrafana = true
@@ -524,7 +551,8 @@ fun AdminScreen(
                                 enabled = !isTestingGrafana,
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
                                 border = BorderStroke(1.dp, Color(0xFF00F0FF)),
-                                shape = RoundedCornerShape(10.dp)
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = mod
                             ) {
                                 if (isTestingGrafana) {
                                     CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color(0xFF00F0FF), strokeWidth = 2.dp)
@@ -533,6 +561,25 @@ fun AdminScreen(
                                 }
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("ТЕСТ СВЯЗИ", fontSize = 11.sp, color = Color(0xFF00F0FF), fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        if (isCompact) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                grafanaInputField(Modifier.fillMaxWidth())
+                                grafanaTestButton(Modifier.fillMaxWidth())
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                grafanaInputField(Modifier.weight(1f))
+                                grafanaTestButton(Modifier.wrapContentWidth())
                             }
                         }
 
@@ -551,27 +598,51 @@ fun AdminScreen(
                             }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(
-                                onClick = { showPrometheusModal = true }
+                        if (isCompact) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.Code, contentDescription = null, tint = Color(0xFF00FFCC), modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Показать Prometheus Metrics (0.0.4)", fontSize = 11.sp, color = Color(0xFF00FFCC))
-                            }
-
-                            Text(
-                                text = "🔗 Открыть дашборд Grafana (3001)",
-                                fontSize = 11.sp,
-                                color = Color(0xFF00F0FF),
-                                modifier = Modifier.clickable {
-                                    uriHandler.openUri(if (grafanaUrl.isNotBlank() && !grafanaUrl.contains(":3000")) grafanaUrl else "http://localhost:3001")
+                                TextButton(
+                                    onClick = { showPrometheusModal = true }
+                                ) {
+                                    Icon(imageVector = Icons.Default.Code, contentDescription = null, tint = Color(0xFF00FFCC), modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Показать Prometheus Metrics (0.0.4)", fontSize = 11.sp, color = Color(0xFF00FFCC))
                                 }
-                            )
+
+                                Text(
+                                    text = "🔗 Открыть дашборд Grafana (3001)",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF00F0FF),
+                                    modifier = Modifier.padding(start = 12.dp).clickable {
+                                        uriHandler.openUri(if (grafanaUrl.isNotBlank() && !grafanaUrl.contains(":3000")) grafanaUrl else "http://localhost:3001")
+                                    }
+                                )
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    onClick = { showPrometheusModal = true }
+                                ) {
+                                    Icon(imageVector = Icons.Default.Code, contentDescription = null, tint = Color(0xFF00FFCC), modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Показать Prometheus Metrics (0.0.4)", fontSize = 11.sp, color = Color(0xFF00FFCC))
+                                }
+
+                                Text(
+                                    text = "🔗 Открыть дашборд Grafana (3001)",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF00F0FF),
+                                    modifier = Modifier.clickable {
+                                        uriHandler.openUri(if (grafanaUrl.isNotBlank() && !grafanaUrl.contains(":3000")) grafanaUrl else "http://localhost:3001")
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -592,13 +663,44 @@ fun AdminScreen(
                         )
                         onStartSimulation(updated)
                     },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2CBF))
+                    border = BorderStroke(
+                        1.5.dp,
+                        Brush.linearGradient(
+                            listOf(Color(0xFF00F0FF), Color(0xFF9D4EDD), Color(0xFF00F0FF).copy(alpha = 0.6f))
+                        )
+                    ),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("ЗАПУСТИТЬ СИМУЛЯЦИЮ С ЭТИМИ ПАРАМЕТРАМИ", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        Color(0xFF1E1038).copy(alpha = 0.95f),
+                                        Color(0xFF2D124D).copy(alpha = 0.90f),
+                                        Color(0xFF0F1E36).copy(alpha = 0.95f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFF00F0FF))
+                            Text(
+                                text = "ЗАПУСТИТЬ СИМУЛЯЦИЮ С ЭТИМИ ПАРАМЕТРАМИ",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

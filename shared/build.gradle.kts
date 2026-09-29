@@ -54,6 +54,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.activity.compose)
         }
         val wasmJsMain by getting {
             dependencies {

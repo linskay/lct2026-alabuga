@@ -1,9 +1,20 @@
 package ru.alabuga.arena.util
 
 import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.FileOutputStream
 
+/**
+ * Android нативный генератор и экспортер официального PDF-отчета переговоров ОЭЗ «Алабуга».
+ * Создает валидный бинарный документ формата A4 и открывает его через системный просмотрщик PDF.
+ */
 actual fun exportPdfReport(
     scenarioName: String,
     opponentName: String,
@@ -20,243 +31,230 @@ actual fun exportPdfReport(
     try {
         val context = AppContextHolder.appContext?.get() ?: return
 
-        val outcomeLabel = if (outcome == "WON") "СДЕЛКА ЗАКЛЮЧЕНА" else if (outcome == "FAILED") "ПРОВАЛ ПЕРЕГОВОРОВ" else "КОМПРОМИСС"
-        val outcomeColor = if (outcome == "WON") "#059669" else if (outcome == "FAILED") "#DC2626" else "#7C3AED"
-        val outcomeBg = if (outcome == "WON") "#ECFDF5" else if (outcome == "FAILED") "#FEF2F2" else "#F5F3FF"
-        val tensionColor = if (tension >= 60) "#DC2626" else if (tension >= 40) "#D97706" else "#6366F1"
+        val pageWidth = 595
+        val pageHeight = 842
+        val document = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
+        val page = document.startPage(pageInfo)
+        val canvas: Canvas = page.canvas
 
-        val weakZonesHtml = weakZones.split("<br/>", "\n")
-            .filter { it.isNotBlank() }
-            .joinToString("") { "<div class=\"list-item item-risk\">${it.removePrefix("•").trim()}</div>" }
+        // Background
+        val bgPaint = Paint().apply { color = AndroidColor.WHITE }
+        canvas.drawRect(0f, 0f, pageWidth.toFloat(), pageHeight.toFloat(), bgPaint)
 
-        val recsHtml = recommendations.split("<br/>", "\n")
-            .filter { it.isNotBlank() }
-            .joinToString("") { "<div class=\"list-item item-rec\">${it.removePrefix("•").trim()}</div>" }
+        // Outer Border
+        val borderPaint = Paint().apply {
+            color = AndroidColor.rgb(226, 232, 240)
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+        }
+        val margin = 24f
+        canvas.drawRoundRect(RectF(margin, margin, pageWidth - margin, pageHeight - margin), 12f, 12f, borderPaint)
 
-        val htmlContent = """<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Отчет B2B-переговоров — ОЭЗ «Алабуга»</title>
-    <style>
-        @page { size: A4 portrait; margin: 12mm 10mm; }
-        * { box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #FFFFFF;
-            color: #0F172A;
-            margin: 0;
-            padding: 16px;
-            font-size: 13px;
-            line-height: 1.55;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+        // Header Background Bar
+        val headerBarPaint = Paint().apply {
+            color = AndroidColor.rgb(124, 58, 237)
         }
-        .container {
-            max-width: 820px;
-            margin: 0 auto;
-            background: #FFFFFF;
-            border: 1px solid #E2E8F0;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #7C3AED;
-            padding-bottom: 14px;
-            margin-bottom: 16px;
-        }
-        .title {
-            font-size: 18px;
-            font-weight: 900;
-            color: #0F172A;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .subtitle {
-            font-size: 11px;
-            color: #64748B;
-            margin-top: 4px;
-            font-weight: 500;
-        }
-        .badge {
-            background: #7C3AED15;
-            color: #7C3AED;
-            border: 1.5px solid #7C3AED;
-            padding: 6px 14px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 900;
-            font-family: monospace;
-        }
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 10px;
-            margin-bottom: 18px;
-        }
-        .metric-card {
-            background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 12px;
-            padding: 10px 12px;
-            text-align: center;
-        }
-        .metric-label {
-            font-size: 10px;
-            color: #64748B;
-            text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: 0.8px;
-        }
-        .metric-val {
-            font-size: 18px;
-            font-weight: 900;
-            margin: 4px 0;
-            font-family: monospace;
-        }
-        .progress-track {
-            width: 100%;
-            height: 4px;
-            background: #E2E8F0;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 4px;
-        }
-        .progress-bar {
-            height: 100%;
-            border-radius: 10px;
-        }
-        .section-header {
-            font-size: 12px;
-            font-weight: 800;
-            color: #0F172A;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-top: 14px;
-            margin-bottom: 6px;
-        }
-        .content-box {
-            background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 12px;
-            padding: 12px 14px;
-            font-size: 12px;
-            line-height: 1.6;
-            color: #334155;
-            margin-bottom: 12px;
-        }
-        .box-warning {
-            background: #FFFBEB;
-            border-color: #FDE68A;
-        }
-        .box-recommend {
-            background: #F5F3FF;
-            border-color: #DDD6FE;
-        }
-        .list-item {
-            margin-bottom: 6px;
-            padding-left: 14px;
-            position: relative;
-        }
-        .list-item:last-child { margin-bottom: 0; }
-        .list-item::before {
-            content: "—";
-            position: absolute;
-            left: 0;
-            font-weight: 800;
-        }
-        .item-risk::before { color: #DC2626; }
-        .item-rec::before { color: #7C3AED; }
-        .footer {
-            margin-top: 20px;
-            text-align: center;
-            font-size: 10px;
-            color: #94A3B8;
-            border-top: 1px solid #E2E8F0;
-            padding-top: 10px;
-            font-family: monospace;
-            display: flex;
-            justify-content: space-between;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div>
-                <div class="title">ОЭЗ «АЛАБУГА» • АРЕНА B2B-ПЕРЕГОВОРОВ</div>
-                <div class="subtitle">Сценарий: <b>$scenarioName</b> | Оппонент: <b>$opponentName</b></div>
-            </div>
-            <div class="badge">РАНГ $rating</div>
-        </div>
+        canvas.drawRect(margin, margin, pageWidth - margin, margin + 4f, headerBarPaint)
 
-        <div class="metrics-grid">
-            <div class="metric-card" style="background: $outcomeBg; border-color: ${outcomeColor}40;">
-                <div class="metric-label">Результат</div>
-                <div class="metric-val" style="color: $outcomeColor; font-size: 13px; font-weight: 900;">$outcomeLabel</div>
-                <div style="font-size: 9px; color: #64748B;">Шагов диалога: $steps</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Доверие</div>
-                <div class="metric-val" style="color: #0284C7;">$trust%</div>
-                <div class="progress-track"><div class="progress-bar" style="width: $trust%; background: #0284C7;"></div></div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Стресс</div>
-                <div class="metric-val" style="color: $tensionColor;">$tension%</div>
-                <div class="progress-track"><div class="progress-bar" style="width: $tension%; background: $tensionColor;"></div></div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Готовность</div>
-                <div class="metric-val" style="color: #059669;">$readiness%</div>
-                <div class="progress-track"><div class="progress-bar" style="width: $readiness%; background: #059669;"></div></div>
-            </div>
-        </div>
+        // Text Paints
+        val titlePaint = Paint().apply {
+            color = AndroidColor.rgb(15, 23, 42)
+            textSize = 15f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val subPaint = Paint().apply {
+            color = AndroidColor.rgb(100, 116, 139)
+            textSize = 9.5f
+            isAntiAlias = true
+        }
+        val sectionTitlePaint = Paint().apply {
+            color = AndroidColor.rgb(15, 23, 42)
+            textSize = 10.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val bodyPaint = Paint().apply {
+            color = AndroidColor.rgb(51, 65, 85)
+            textSize = 8.5f
+            isAntiAlias = true
+        }
 
-        <div class="section-header">Аналитическое резюме наставника Б.А.Р.С.</div>
-        <div class="content-box">$summary</div>
+        var curY = margin + 28f
 
-        <div class="section-header">Выявленные слабые зоны и риски</div>
-        <div class="content-box box-warning">$weakZonesHtml</div>
+        // Title
+        canvas.drawText("ОЭЗ «АЛАБУГА» • ИТОГОВЫЙ ОТЧЕТ ПЕРЕГОВОРОВ", margin + 14f, curY, titlePaint)
+        
+        // Rating Badge (Top Right)
+        val badgeBgPaint = Paint().apply {
+            color = AndroidColor.rgb(243, 232, 255)
+            style = Paint.Style.FILL
+        }
+        val badgeBorderPaint = Paint().apply {
+            color = AndroidColor.rgb(124, 58, 237)
+            style = Paint.Style.STROKE
+            strokeWidth = 1.2f
+        }
+        val badgeTextPaint = Paint().apply {
+            color = AndroidColor.rgb(124, 58, 237)
+            textSize = 11f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val badgeRect = RectF(pageWidth - margin - 90f, curY - 14f, pageWidth - margin - 14f, curY + 6f)
+        canvas.drawRoundRect(badgeRect, 6f, 6f, badgeBgPaint)
+        canvas.drawRoundRect(badgeRect, 6f, 6f, badgeBorderPaint)
+        canvas.drawText("РАНГ $rating", badgeRect.left + 12f, badgeRect.top + 14f, badgeTextPaint)
 
-        <div class="section-header">Тактические рекомендации для B2B-сделок</div>
-        <div class="content-box box-recommend">$recsHtml</div>
+        curY += 14f
+        canvas.drawText("Сценарий: $scenarioName | Оппонент: $opponentName | Шагов: $steps", margin + 14f, curY, subPaint)
 
-        <div class="footer">
-            <span>ОЭЗ «АЛАБУГА» • ТАКТИЧЕСКИЙ AI-ПОЛИГОН</span>
-            <span>NEO-B2B DASHBOARD • 2026</span>
-        </div>
-    </div>
-    <script>
-        window.onload = function() {
-            setTimeout(function() {
-                if (typeof window.print === 'function') {
-                    window.print();
+        // Divider
+        curY += 14f
+        val divPaint = Paint().apply { color = AndroidColor.rgb(226, 232, 240); strokeWidth = 1f }
+        canvas.drawLine(margin + 14f, curY, pageWidth - margin - 14f, curY, divPaint)
+
+        // Metrics Grid (4 cards)
+        curY += 12f
+        val cardWidth = (pageWidth - margin * 2f - 28f - 30f) / 4f
+        val cardHeight = 44f
+
+        val outcomeLabel = if (outcome == "WON") "СДЕЛКА" else if (outcome == "FAILED") "ПРОВАЛ" else "КОМПРОМИСС"
+        val metricsList = listOf(
+            Triple("РЕЗУЛЬТАТ", outcomeLabel, if (outcome == "WON") AndroidColor.rgb(5, 150, 105) else AndroidColor.rgb(220, 38, 38)),
+            Triple("ДОВЕРИЕ", "$trust%", AndroidColor.rgb(2, 132, 199)),
+            Triple("СТРЕСС", "$tension%", if (tension >= 50) AndroidColor.rgb(220, 38, 38) else AndroidColor.rgb(124, 58, 237)),
+            Triple("ГОТОВНОСТЬ", "$readiness%", AndroidColor.rgb(5, 150, 105))
+        )
+
+        metricsList.forEachIndexed { i, (label, valStr, colorInt) ->
+            val cardLeft = margin + 14f + i * (cardWidth + 10f)
+            val cardRect = RectF(cardLeft, curY, cardLeft + cardWidth, curY + cardHeight)
+            val cardBg = Paint().apply { color = AndroidColor.rgb(248, 250, 252) }
+            canvas.drawRoundRect(cardRect, 6f, 6f, cardBg)
+            canvas.drawRoundRect(cardRect, 6f, 6f, divPaint)
+
+            val mLabelPaint = Paint().apply {
+                color = AndroidColor.rgb(100, 116, 139)
+                textSize = 7.5f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                isAntiAlias = true
+            }
+            val mValPaint = Paint().apply {
+                color = colorInt
+                textSize = 12f
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                isAntiAlias = true
+            }
+
+            canvas.drawText(label, cardLeft + 8f, curY + 14f, mLabelPaint)
+            canvas.drawText(valStr, cardLeft + 8f, curY + 32f, mValPaint)
+        }
+
+        curY += cardHeight + 16f
+
+        // Helper function for wrapped text boxes
+        fun drawSectionBox(title: String, content: String, boxBgColor: Int, borderColorInt: Int) {
+            canvas.drawText(title, margin + 14f, curY, sectionTitlePaint)
+            curY += 6f
+
+            val lines = mutableListOf<String>()
+            val cleaned = content.replace("<br/>", "\n").replace("•", "").trim()
+            val rawParagraphs = cleaned.split("\n").filter { it.isNotBlank() }
+
+            val maxLineWidth = pageWidth - margin * 2f - 48f
+
+            rawParagraphs.forEach { para ->
+                val words = para.trim().split(Regex("\\s+"))
+                var currentLine = ""
+                words.forEach { word ->
+                    val testLine = if (currentLine.isEmpty()) "• $word" else "$currentLine $word"
+                    if (bodyPaint.measureText(testLine) < maxLineWidth) {
+                        currentLine = testLine
+                    } else {
+                        if (currentLine.isNotEmpty()) lines.add(currentLine)
+                        currentLine = "  $word"
+                    }
                 }
-            }, 500);
-        };
-    </script>
-</body>
-</html>"""
+                if (currentLine.isNotEmpty()) lines.add(currentLine)
+            }
 
+            val boxPadding = 8f
+            val lineHeight = 12f
+            val boxH = lines.size * lineHeight + boxPadding * 2f + 4f
+            val boxRect = RectF(margin + 14f, curY, pageWidth - margin - 14f, curY + boxH)
+
+            val bBg = Paint().apply { color = boxBgColor }
+            val bBorder = Paint().apply { color = borderColorInt; style = Paint.Style.STROKE; strokeWidth = 1f }
+            canvas.drawRoundRect(boxRect, 8f, 8f, bBg)
+            canvas.drawRoundRect(boxRect, 8f, 8f, bBorder)
+
+            var lineY = curY + boxPadding + 10f
+            lines.forEach { line ->
+                canvas.drawText(line, margin + 22f, lineY, bodyPaint)
+                lineY += lineHeight
+            }
+
+            curY += boxH + 12f
+        }
+
+        // 1. Заключение Б.А.Р.С.
+        drawSectionBox(
+            "АНАЛИТИЧЕСКОЕ РЕЗЮМЕ НАСТАВНИКА Б.А.Р.С.",
+            summary,
+            AndroidColor.rgb(248, 250, 252),
+            AndroidColor.rgb(226, 232, 240)
+        )
+
+        // 2. Выявленные слабые зоны и риски
+        drawSectionBox(
+            "ВЫЯВЛЕННЫЕ СЛАБЫЕ ЗОНЫ И РИСКИ",
+            weakZones,
+            AndroidColor.rgb(255, 251, 235),
+            AndroidColor.rgb(253, 230, 138)
+        )
+
+        // 3. Тактические рекомендации для B2B-сделок
+        drawSectionBox(
+            "ТАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ ДЛЯ B2B-СДЕЛОК",
+            recommendations,
+            AndroidColor.rgb(245, 243, 255),
+            AndroidColor.rgb(221, 214, 254)
+        )
+
+        // Footer
+        val footY = pageHeight - margin - 10f
+        canvas.drawLine(margin + 14f, footY - 10f, pageWidth - margin - 14f, footY - 10f, divPaint)
+        val footPaint = Paint().apply {
+            color = AndroidColor.rgb(148, 163, 184)
+            textSize = 7.5f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+        canvas.drawText("ОЭЗ «АЛАБУГА» • ТАКТИЧЕСКИЙ AI-ПОЛИГОН", margin + 14f, footY, footPaint)
+        val copyRight = "NEO-B2B DASHBOARD • 2026"
+        canvas.drawText(copyRight, pageWidth - margin - 14f - footPaint.measureText(copyRight), footY, footPaint)
+
+        document.finishPage(page)
+
+        // Save binary PDF
         val reportsDir = File(context.cacheDir, "reports").apply { mkdirs() }
-        val reportFile = File(reportsDir, "alabuga_negotiation_report.html")
-        reportFile.writeText(htmlContent, Charsets.UTF_8)
+        val pdfFile = File(reportsDir, "alabuga_negotiation_report.pdf")
+        FileOutputStream(pdfFile).use { out ->
+            document.writeTo(out)
+        }
+        document.close()
 
-        val uri = FileProvider.getUriForFile(context, "ru.alabuga.arena.fileprovider", reportFile)
-
+        // Open via system PDF viewer
+        val uri = FileProvider.getUriForFile(context, "ru.alabuga.arena.fileprovider", pdfFile)
         val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "text/html")
+            setDataAndType(uri, "application/pdf")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-        val chooser = Intent.createChooser(viewIntent, "Открыть отчет ОЭЗ «Алабуга»").apply {
+        val chooser = Intent.createChooser(viewIntent, "Открыть PDF-отчет ОЭЗ «Алабуга»").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)
