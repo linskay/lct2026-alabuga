@@ -80,5 +80,11 @@ actual fun BarsRobotView(
                 heightPx = (size.height / density.density).toDouble()
                 isPlaced = true
             }
-    )
+    ) {
+        BarsRobotCanvasView(
+            animationState = animation,
+            modifier = Modifier.fillMaxWidth().height(height),
+            onClick = onClick
+        )
+    }
 }
