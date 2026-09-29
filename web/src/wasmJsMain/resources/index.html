@@ -35,83 +35,33 @@
             user-select: none !important;
             -webkit-user-select: none !important;
         }
-        #bars-3d-model-viewer {
+        #bars-3d-model-viewer,
+        model-viewer {
             position: absolute;
             z-index: 50;
             background-color: transparent !important;
             --poster-color: transparent !important;
             pointer-events: auto;
             display: none;
-        }
-        #bars-3d-model-viewer:focus,
-        #bars-3d-model-viewer:focus-visible,
-        #bars-3d-model-viewer:active {
             outline: none !important;
             border: none !important;
             box-shadow: none !important;
         }
-        #bars-speech-bubble {
-            position: absolute;
-            z-index: 100;
-            background: rgba(12, 15, 28, 0.95);
-            border: 1px solid rgba(0, 240, 255, 0.7);
-            border-radius: 16px;
-            padding: 10px 16px;
-            box-shadow: 0 0 25px rgba(0, 240, 255, 0.35), 0 0 45px rgba(123, 44, 191, 0.25);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            color: #FFFFFF;
-            width: 320px;
-            max-width: 85vw;
-            text-align: center;
-            cursor: pointer;
-            transition: opacity 0.22s ease, transform 0.22s ease;
-            transform: translateY(0);
-            pointer-events: auto;
-            display: none;
-            box-sizing: border-box;
-        }
-        #bars-speech-bubble.hidden {
-            opacity: 0;
-            transform: translateY(-8px);
-            pointer-events: none;
-        }
-        .bubble-header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            font-family: monospace;
-            font-size: 11px;
-            font-weight: bold;
-            color: #00F0FF;
-            letter-spacing: 0.8px;
-            margin-bottom: 6px;
-        }
-        .bubble-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background-color: #00F0FF;
-            display: inline-block;
-        }
-        .bubble-content {
-            font-size: 13px;
-            line-height: 18px;
-            font-weight: 500;
-            color: #F1F5F9;
+        #bars-3d-model-viewer:focus,
+        #bars-3d-model-viewer:focus-visible,
+        #bars-3d-model-viewer:focus-within,
+        #bars-3d-model-viewer:active,
+        model-viewer:focus,
+        model-viewer:focus-visible,
+        model-viewer:focus-within,
+        model-viewer:active {
+            outline: none !important;
+            border: none !important;
+            box-shadow: none !important;
         }
     </style>
 </head>
 <body>
-    <div id="bars-speech-bubble" class="hidden">
-        <div class="bubble-header">
-            <span class="bubble-dot"></span>
-            <span>🤖 Б.А.Р.С. [НАСТАВНИК]</span>
-        </div>
-        <div id="bars-bubble-text" class="bubble-content"></div>
-    </div>
-
     <model-viewer id="bars-3d-model-viewer"
                   src="mike.glb"
                   alt="3D робот Майк / Б.А.Р.С."
@@ -132,18 +82,6 @@
     </model-viewer>
 
     <script>
-        const robotPhrases = [
-            "Не трогай меня, иди решай кейсы и договаривайся с инвестором!",
-            "Эй, не тыкай в сенсоры! Моя тактическая броня не для щекотки.",
-            "Хватит кликать! Направь эту боевую энергию в переговоры по CAPEX.",
-            "Калибровка тактических систем... Перестань тыкать, жми «ВОЙТИ В ПЕРЕГОВОРНУЮ»!",
-            "Я нейро-наставник Б.А.Р.С. ОЭЗ «Алабуга», а не тамагочи!",
-            "Внимание: уровень раздражения процессора 98%. Иди защищать ставку 460 ₽/м²!",
-            "Тактический совет №0: Перестань мучить робота и покажи класс на Арене!",
-            "Осторожно! Еще один клик, и я повышу жесткость торга оппонента на 20%!",
-            "Ты точно готов к переговорам? Твоя техника клика выдает легкое волнение."
-        ];
-
         const MIKE_ANIM_MAP = {
             'wave': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
             'idle': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
@@ -161,68 +99,50 @@
             return animName;
         }
 
-        const reactionAnims = [
-            "SK_ZMikeAnim_ZMIKE_WaveLoop",
-            "SK_ZMikeAnim_ZMIKE_ExitWave",
-            "SK_ZMikeAnim_ZMIKE_IdleBreaker",
-            "SK_ZMikeAnim_ZMIKE_Blinking",
-            "SK_ZMikeAnim_ZMIKE_IdleAggro",
-            "SK_ZMikeAnim_ZMIKE_Jump"
-        ];
-        let phraseIdx = 0;
-        let animIdx = 0;
-        let bubbleTimeout = null;
-
-        function showNextRobotPhrase() {
-            const bubble = document.getElementById('bars-speech-bubble');
-            const bubbleText = document.getElementById('bars-bubble-text');
-            const mv = document.getElementById('bars-3d-model-viewer');
-            if (!bubble || !bubbleText || !mv) return;
-
-            const text = robotPhrases[phraseIdx % robotPhrases.length];
-            phraseIdx++;
-            bubbleText.textContent = text;
-
-            // Position bubble right above the robot head
-            const mvRect = mv.getBoundingClientRect();
-            bubble.style.display = 'block';
-            bubble.classList.remove('hidden');
-
-            const bubbleWidth = bubble.offsetWidth || 320;
-            const bubbleHeight = bubble.offsetHeight || 60;
-            const bubbleLeft = mvRect.left + (mvRect.width - bubbleWidth) / 2;
-            const bubbleTop = Math.max(16, mvRect.top - bubbleHeight + 14);
-
-            bubble.style.left = Math.max(8, bubbleLeft) + 'px';
-            bubble.style.top = bubbleTop + 'px';
-
-            // Play reaction animation
-            const nextAnim = reactionAnims[animIdx % reactionAnims.length];
-            animIdx++;
+        function sanitizeModelViewer(mv) {
+            if (!mv) return;
             try {
-                mv.animationName = nextAnim;
-                if (mv.play) mv.play();
-            } catch (e) {}
-
-            // Auto-hide after 4.2 seconds
-            if (bubbleTimeout) clearTimeout(bubbleTimeout);
-            bubbleTimeout = setTimeout(function() {
-                bubble.classList.add('hidden');
-                setTimeout(function() {
-                    if (bubble.classList.contains('hidden')) {
-                        bubble.style.display = 'none';
+                mv.style.outline = 'none';
+                mv.style.border = 'none';
+                mv.style.boxShadow = 'none';
+                mv.tabIndex = -1;
+                if (mv.shadowRoot) {
+                    if (!mv.shadowRoot.getElementById('bars-no-outline')) {
+                        const style = document.createElement('style');
+                        style.id = 'bars-no-outline';
+                        style.textContent = `
+                            *, *:focus, *:focus-visible, *:active, canvas, .container, [part] {
+                                outline: none !important;
+                                border: none !important;
+                                box-shadow: none !important;
+                                -webkit-tap-highlight-color: transparent !important;
+                            }
+                            canvas {
+                                outline: none !important;
+                                border: none !important;
+                                box-shadow: none !important;
+                                -webkit-user-select: none !important;
+                                user-select: none !important;
+                            }
+                        `;
+                        mv.shadowRoot.appendChild(style);
                     }
-                }, 240);
-            }, 4200);
+                    const canvas = mv.shadowRoot.querySelector('canvas');
+                    if (canvas) {
+                        canvas.tabIndex = -1;
+                        canvas.style.outline = 'none';
+                        canvas.style.border = 'none';
+                        canvas.style.boxShadow = 'none';
+                    }
+                }
+            } catch (e) {}
         }
 
         window.setBars3D = function(visible, x, y, width, height, anim) {
             var mv = document.getElementById('bars-3d-model-viewer');
-            var bubble = document.getElementById('bars-speech-bubble');
             if (!mv) return;
             if (!visible || width <= 0 || height <= 0) {
                 mv.style.display = 'none';
-                if (bubble) bubble.style.display = 'none';
                 return;
             }
             mv.style.display = 'block';
@@ -231,10 +151,7 @@
             mv.style.width = width + 'px';
             mv.style.height = height + 'px';
 
-            // If entering arena (smaller height than home screen 400px), hide home bubble
-            if (height < 300 && bubble) {
-                bubble.style.display = 'none';
-            }
+            sanitizeModelViewer(mv);
 
             if (anim && anim !== '') {
                 var targetAnim = resolveAnimation(anim);
@@ -255,19 +172,28 @@
 
         window.hideBars3D = function() {
             var mv = document.getElementById('bars-3d-model-viewer');
-            var bubble = document.getElementById('bars-speech-bubble');
             if (mv) mv.style.display = 'none';
-            if (bubble) bubble.style.display = 'none';
         };
 
         // Fallback from mike.glb to bars.glb on error
         var mvElem = document.getElementById('bars-3d-model-viewer');
         if (mvElem) {
             mvElem.addEventListener('load', function() {
+                sanitizeModelViewer(mvElem);
                 try {
                     mvElem.animationName = 'SK_ZMikeAnim_ZMIKE_WaveLoop';
                     if (mvElem.play) mvElem.play();
                 } catch (e) {}
+            });
+
+            mvElem.addEventListener('focus', function() {
+                sanitizeModelViewer(mvElem);
+                if (mvElem.blur) mvElem.blur();
+            });
+
+            mvElem.addEventListener('focusin', function() {
+                sanitizeModelViewer(mvElem);
+                if (mvElem.blur) mvElem.blur();
             });
 
             mvElem.addEventListener('error', function(e) {
@@ -285,6 +211,7 @@
                 isDown = true;
                 startX = e.clientX;
                 startY = e.clientY;
+                sanitizeModelViewer(mvElem);
             });
 
             mvElem.addEventListener('pointerup', function(e) {
@@ -294,15 +221,12 @@
                 var dy = Math.abs(e.clientY - startY);
                 // If it's a tap/click (< 6px movement)
                 if (dx < 6 && dy < 6) {
-                    showNextRobotPhrase();
+                    if (typeof window.onBarsRobotClick === 'function') {
+                        window.onBarsRobotClick();
+                    }
                 }
-            });
-        }
-
-        var bubbleElem = document.getElementById('bars-speech-bubble');
-        if (bubbleElem) {
-            bubbleElem.addEventListener('click', function() {
-                showNextRobotPhrase();
+                sanitizeModelViewer(mvElem);
+                if (mvElem.blur) mvElem.blur();
             });
         }
     </script>

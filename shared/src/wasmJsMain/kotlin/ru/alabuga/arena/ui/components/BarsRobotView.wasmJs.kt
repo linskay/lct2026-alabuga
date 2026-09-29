@@ -22,6 +22,12 @@ private external fun jsSetBars3D(visible: Boolean, x: Double, y: Double, width: 
 @JsFun("() => { if (typeof window.hideBars3D === 'function') { window.hideBars3D(); } else if (typeof window.setBars3D === 'function') { window.setBars3D(false, 0, 0, 0, 0, ''); } }")
 private external fun jsHideBars3D()
 
+@JsFun("(callback) => { window.onBarsRobotClick = callback; }")
+private external fun jsSetRobotClickHandler(callback: () -> Unit)
+
+@JsFun("() => { window.onBarsRobotClick = null; }")
+private external fun jsClearRobotClickHandler()
+
 @Composable
 actual fun BarsRobotView(
     animation: String,
@@ -35,6 +41,17 @@ actual fun BarsRobotView(
     var widthPx by remember { mutableStateOf(0.0) }
     var heightPx by remember { mutableStateOf(0.0) }
     var isPlaced by remember { mutableStateOf(false) }
+
+    DisposableEffect(onClick) {
+        if (onClick != null) {
+            jsSetRobotClickHandler {
+                onClick()
+            }
+        }
+        onDispose {
+            jsClearRobotClickHandler()
+        }
+    }
 
     LaunchedEffect(animation, posX, posY, widthPx, heightPx, isPlaced) {
         if (isPlaced && widthPx > 0 && heightPx > 0) {
