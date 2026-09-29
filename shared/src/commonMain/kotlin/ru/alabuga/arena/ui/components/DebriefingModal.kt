@@ -763,9 +763,11 @@ private fun MetricResultCard(
             )
             Text(
                 text = "Шагов: $totalSteps • Ранг: $overallRating",
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 color = Color(0xFFCBD5E1),
-                fontFamily = FontFamily.Monospace
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                softWrap = false
             )
         }
     }

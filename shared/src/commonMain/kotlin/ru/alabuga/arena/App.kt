@@ -1,6 +1,8 @@
 package ru.alabuga.arena
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
@@ -12,6 +14,7 @@ import ru.alabuga.arena.model.ScenarioPresets
 import ru.alabuga.arena.ui.screens.AdminScreen
 import ru.alabuga.arena.ui.screens.ArenaScreen
 import ru.alabuga.arena.ui.screens.HomeScreen
+import ru.alabuga.arena.util.PlatformBackHandler
 
 enum class AppScreen {
     HOME, ARENA, ADMIN
@@ -27,14 +30,25 @@ fun App() {
             surface = Color(0xFF101424)
         )
     ) {
+        var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
+        var returnScreenFromAdmin by remember { mutableStateOf(AppScreen.HOME) }
+        var currentConfig by remember { mutableStateOf(ScenarioPresets.list.getOrElse(1) { ScenarioConfig() }) }
+
+        PlatformBackHandler(enabled = currentScreen != AppScreen.HOME) {
+            when (currentScreen) {
+                AppScreen.ARENA -> currentScreen = AppScreen.HOME
+                AppScreen.ADMIN -> currentScreen = returnScreenFromAdmin
+                AppScreen.HOME -> {}
+            }
+        }
+
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
             color = MaterialTheme.colorScheme.background
         ) {
-            var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
-            var returnScreenFromAdmin by remember { mutableStateOf(AppScreen.HOME) }
-            var currentConfig by remember { mutableStateOf(ScenarioPresets.list.getOrElse(1) { ScenarioConfig() }) }
-
             when (currentScreen) {
                 AppScreen.HOME -> HomeScreen(
                     onEnterArena = { currentScreen = AppScreen.ARENA },

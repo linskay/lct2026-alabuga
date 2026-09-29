@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -55,7 +56,7 @@ fun HomeScreen(
     var showBubble by remember { mutableStateOf(false) }
     var bubbleVersion by remember { mutableStateOf(0) }
 
-    val gentleAnims = remember { listOf("wave", "nod", "tilt", "talk", "bluff", "idle") }
+    val gentleAnims = remember { listOf("wave", "talk", "nod", "tilt", "bluff", "win", "punch", "warn", "idle") }
 
     val robotPhrases = remember {
         listOf(
@@ -311,7 +312,7 @@ fun HomeScreen(
                 )
             }
 
-            // ДИАЛОГОВЫЙ БАББЛ Б.А.Р.С. С НЕОНОВОЙ РАМКОЙ (ровно под заголовком как на фото 2)
+            // ДИАЛОГОВЫЙ БАББЛ Б.А.Р.С. С НЕОНОВОЙ РАМКОЙ (фиксированная высота без дерганья)
             Surface(
                 onClick = handleRobotTap,
                 shape = RoundedCornerShape(16.dp),
@@ -325,12 +326,13 @@ fun HomeScreen(
                 shadowElevation = 12.dp,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(68.dp)
                     .padding(horizontal = 4.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -358,74 +360,34 @@ fun HomeScreen(
                         } else {
                             "Калибровка систем... Перестань тыкать, жми «ВОЙТИ В ПЕРЕГОВОРНУЮ»!"
                         },
-                        fontSize = 12.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White,
                         textAlign = TextAlign.Center,
-                        lineHeight = 17.sp
+                        lineHeight = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Робот + Ромбовидный кибер-фон + Мягкая ареола (как на фото 2) + Тень
+            // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Робот + Мягкая неоновая аура + Тень (без лишних квадратов)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(340.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // ВНЕШНИЙ ПОВЕРНУТЫЙ РОМБ (Diamond Backdrop из фото 2)
+                // МЯГКОЕ НЕОНОВОЕ СВЕЧЕНИЕ (CYAN & PURPLE AURA)
                 Box(
                     modifier = Modifier
                         .size(240.dp)
-                        .rotate(45f)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF7B2CBF).copy(alpha = 0.35f),
-                                    Color(0xFF3B0764).copy(alpha = 0.20f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(22.dp)
-                        )
-                        .border(
-                            1.5.dp,
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF00F0FF).copy(alpha = 0.40f),
-                                    Color(0xFF7B2CBF).copy(alpha = 0.50f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(22.dp)
-                        )
-                )
-
-                // ВНУТРЕННИЙ ПОВЕРНУТЫЙ РОМБ (акцентный)
-                Box(
-                    modifier = Modifier
-                        .size(170.dp)
-                        .rotate(45f)
-                        .background(
-                            Color(0xFF4C1D95).copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                        .border(
-                            1.dp,
-                            Color(0xFF00F0FF).copy(alpha = 0.30f),
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                )
-
-                // МЯГКОЕ НЕОНОВОЕ СВЕЧЕНИЕ (CYAN AURA КАК НА ФОТО 2)
-                Box(
-                    modifier = Modifier
-                        .size(220.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
                                 listOf(
                                     Color(0xFF00F0FF).copy(alpha = glowAlpha * 0.70f),
-                                    Color(0xFF7B2CBF).copy(alpha = glowAlpha * 0.35f),
+                                    Color(0xFF7B2CBF).copy(alpha = glowAlpha * 0.40f),
                                     Color.Transparent
                                 )
                             )
