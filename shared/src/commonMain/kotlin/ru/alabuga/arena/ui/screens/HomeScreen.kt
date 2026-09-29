@@ -15,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -57,11 +58,12 @@ fun HomeScreen(
 
     val robotPhrases = remember {
         listOf(
+            "Не трогай меня, иди решай кейсы и договаривайся с инвестором!",
             "Эй, не тыкай в сенсоры! Моя тактическая броня не для щекотки.",
-            "Хватит кликать! Лучше направь эту энергию в переговоры с инвестором.",
-            "Калибровка систем... Перестань тыкать, жми «ВОЙТИ В ПЕРЕГОВОРНУЮ»!",
+            "Хватит кликать! Направь эту боевую энергию в переговоры по CAPEX.",
+            "Калибровка тактических систем... Перестань тыкать, жми «ВОЙТИ В ПЕРЕГОВОРНУЮ»!",
             "Я нейро-наставник Б.А.Р.С. ОЭЗ «Алабуга», а не тамагочи!",
-            "Внимание: уровень раздражения процессора 98%. Иди договариваться о CAPEX!",
+            "Внимание: уровень раздражения процессора 98%. Иди защищать ставку 460 ₽/м²!",
             "Тактический совет №0: Перестань мучить робота и покажи класс на Арене!",
             "Осторожно! Еще один клик, и я повышу жесткость торга оппонента на 20%!",
             "Ты точно готов к переговорам? Твоя техника клика выдает легкое волнение."
@@ -233,312 +235,384 @@ fun HomeScreen(
             }
         }
 
-        // 2. ЦЕНТРИРОВАННЫЙ БЛОК
-        Column(
+        // 2. ЦЕНТРИРОВАННЫЙ БЛОК: Защищен от растяжения на широких экранах, консоль с тонкими градиентными рамками
+        Surface(
             modifier = Modifier
-                .fillMaxHeight()
                 .widthIn(max = 480.dp)
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
                 .align(Alignment.Center)
-                .padding(vertical = 24.dp, horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(vertical = 16.dp, horizontal = 14.dp),
+            shape = RoundedCornerShape(26.dp),
+            color = Color(0xFF090B14).copy(alpha = 0.88f),
+            border = BorderStroke(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(
+                        Color(0xFF00F0FF).copy(alpha = 0.40f),
+                        Color(0xFF7B2CBF).copy(alpha = 0.50f),
+                        Color(0xFF00F0FF).copy(alpha = 0.20f)
+                    )
+                )
+            ),
+            shadowElevation = 24.dp
         ) {
-            // ВЕРХНЯЯ ЧАСТЬ: Брендинг и заголовок
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = Color(0xFF121524).copy(alpha = 0.9f),
-                    border = BorderStroke(1.dp, Color(0xFF00FFCC).copy(alpha = 0.4f)),
-                    shadowElevation = 8.dp
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Canvas(modifier = Modifier.size(10.dp)) {
-                            val path = Path().apply {
-                                moveTo(size.width / 2f, 0f)
-                                lineTo(size.width, size.height / 2f)
-                                lineTo(size.width / 2f, size.height)
-                                lineTo(0f, size.height / 2f)
-                                close()
-                            }
-                            drawPath(path, Color(0xFF00FFCC), style = Fill)
-                        }
-                        Text(
-                            text = "033 • ОЭЗ «АЛАБУГА»",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF00FFCC),
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 0.8.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = "АРЕНА ПЕРЕГОВОРОВ",
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    letterSpacing = 1.5.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "Интерактивный тренажер переговоров. Учись побеждать в B2B-сделках без уступок!",
-                    fontSize = 12.5.sp,
-                    color = Color(0xFF94A3B8),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 17.sp
-                )
-            }
-
-            // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Робот + Всплывающая подсказка при клике
-            Box(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(vertical = 2.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Радиальное неоновое свечение за роботом
-                Box(
-                    modifier = Modifier
-                        .size(420.dp)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    Color(0xFF7B2CBF).copy(alpha = glowAlpha),
-                                    Color(0xFF00F0FF).copy(alpha = glowAlpha * 0.25f),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-
-                // 3D-модель робота (высота 430dp, БЕЗ КВАДРАТНОЙ ПОДСВЕТКИ / RIPPLE)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(430.dp)
-                        .clickable(
-                            interactionSource = robotInteractionSource,
-                            indication = null
-                        ) { handleRobotTap() },
-                    contentAlignment = Alignment.Center
+                // ВЕРХНЯЯ ЧАСТЬ: Брендинг и заголовок
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    BarsRobotView(
-                        animation = robotAnimation,
-                        modifier = Modifier.fillMaxSize(),
-                        height = 430.dp,
-                        onClick = handleRobotTap
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFF121524).copy(alpha = 0.9f),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                listOf(Color(0xFF00FFCC).copy(alpha = 0.6f), Color(0xFF7B2CBF).copy(alpha = 0.4f))
+                            )
+                        ),
+                        shadowElevation = 8.dp
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Canvas(modifier = Modifier.size(10.dp)) {
+                                val path = Path().apply {
+                                    moveTo(size.width / 2f, 0f)
+                                    lineTo(size.width, size.height / 2f)
+                                    lineTo(size.width / 2f, size.height)
+                                    lineTo(0f, size.height / 2f)
+                                    close()
+                                }
+                                drawPath(path, Color(0xFF00FFCC), style = Fill)
+                            }
+                            Text(
+                                text = "033 • ОЭЗ «АЛАБУГА»",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00FFCC),
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 0.8.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "АРЕНА ПЕРЕГОВОРОВ",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        letterSpacing = 1.5.sp,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Интерактивный тренажер переговоров. Учись побеждать в B2B-сделках без уступок!",
+                        fontSize = 12.5.sp,
+                        color = Color(0xFF94A3B8),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 17.sp
                     )
                 }
 
-                // Мягкая эллиптическая тень под ногами робота на виртуальный пол
+                // ЦЕНТРАЛЬНАЯ ЧАСТЬ: Робот + Фон-кругляшок + Тень под ногами + Подсказки
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .offset(y = (-6).dp)
-                        .size(width = 220.dp, height = 26.dp)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.25f),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-
-                // ВСПЛЫВАЮЩИЙ ДИАЛОГОВЫЙ БАББЛ Б.А.Р.С. ПРИ КЛИКЕ («НЕ ТЫКАЙ В МЕНЯ»)
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = showBubble && currentPhraseIndex in robotPhrases.indices,
-                    enter = fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.85f) + slideInVertically { -20 },
-                    exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.85f),
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 8.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = Color(0xFF0E1222).copy(alpha = 0.95f),
-                        border = BorderStroke(1.5.dp, Color(0xFF00F0FF).copy(alpha = 0.8f)),
-                        shadowElevation = 16.dp,
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .widthIn(max = 380.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { handleRobotTap() }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color(0xFF00F0FF))
-                                )
-                                Text(
-                                    text = "🤖 Б.А.Р.С. [НАСТАВНИК]",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF00F0FF),
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 0.8.sp
-                                )
-                            }
-
-                            Text(
-                                text = robotPhrases.getOrElse(currentPhraseIndex) { "" },
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.White,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 18.sp
-                            )
-                        }
-                    }
-                }
-            }
-
-            // НИЖНЯЯ ЧАСТЬ: Премиальные кнопки с анимацией клика и интерактивными иконками
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // 1. Кнопка «▶ ВОЙТИ В ПЕРЕГОВОРНУЮ»
-                Button(
-                    onClick = onEnterArena,
-                    interactionSource = enterInteractionSource,
-                    modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
-                        .scale(enterScale)
-                        .shadow(
-                            elevation = 14.dp,
-                            shape = RoundedCornerShape(16.dp),
-                            ambientColor = Color(0xFF7B2CBF),
-                            spotColor = Color(0xFF7B2CBF)
-                        ),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                    contentPadding = PaddingValues(0.dp)
+                        .height(320.dp),
+                    contentAlignment = Alignment.Center
                 ) {
+                    // ФОН КРУГЛЯШОК: Яркий круговой градиентный диск прямо за роботом
+                    Box(
+                        modifier = Modifier
+                            .size(240.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        Color(0xFF7B2CBF).copy(alpha = glowAlpha * 1.3f),
+                                        Color(0xFF9D4EDD).copy(alpha = glowAlpha * 0.7f),
+                                        Color(0xFF00F0FF).copy(alpha = glowAlpha * 0.25f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+
+                    // 3D-модель робота (высота 320dp, БЕЗ КВАДРАТНОЙ РАМКИ)
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .clickable(
+                                interactionSource = robotInteractionSource,
+                                indication = null
+                            ) { handleRobotTap() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BarsRobotView(
+                            animation = robotAnimation,
+                            modifier = Modifier.fillMaxSize(),
+                            height = 320.dp,
+                            onClick = handleRobotTap
+                        )
+                    }
+
+                    // ТЕНЬ У РОБОТА: Мягкая темная эллиптическая тень ровно под ногами робота
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .offset(y = (-14).dp)
+                            .size(width = 170.dp, height = 20.dp)
+                            .clip(CircleShape)
                             .background(
-                                Brush.horizontalGradient(
+                                Brush.radialGradient(
                                     colors = listOf(
-                                        Color(0xFF7B2CBF),
-                                        Color(0xFF5A189A),
-                                        Color(0xFF480CA8)
+                                        Color.Black.copy(alpha = 0.90f),
+                                        Color.Black.copy(alpha = 0.45f),
+                                        Color.Transparent
                                     )
                                 )
+                            )
+                    )
+
+                    // ВСПЛЫВАЮЩИЙ ДИАЛОГОВЫЙ БАББЛ Б.А.Р.С. ПРИ КЛИКЕ («НЕ ТЫКАЙ В МЕНЯ»)
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showBubble && currentPhraseIndex in robotPhrases.indices,
+                        enter = fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.85f) + slideInVertically { -20 },
+                        exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.85f),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 4.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color(0xFF0C0F1E).copy(alpha = 0.95f),
+                            border = BorderStroke(
+                                1.dp,
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF00F0FF).copy(alpha = 0.8f), Color(0xFF7B2CBF).copy(alpha = 0.6f))
+                                )
                             ),
-                        contentAlignment = Alignment.Center
+                            shadowElevation = 16.dp,
+                            modifier = Modifier
+                                .padding(horizontal = 14.dp)
+                                .widthIn(max = 360.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { handleRobotTap() }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF00F0FF))
+                                    )
+                                    Text(
+                                        text = "🤖 Б.А.Р.С. [НАСТАВНИК]",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00F0FF),
+                                        fontFamily = FontFamily.Monospace,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                }
+
+                                Text(
+                                    text = robotPhrases.getOrElse(currentPhraseIndex) { "" },
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 17.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Компактный бейдж статуса под роботом с тонкой градиентной рамкой
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color(0xFF0C101F).copy(alpha = 0.90f),
+                    border = BorderStroke(
+                        1.dp,
+                        Brush.linearGradient(
+                            listOf(Color(0xFF00F0FF).copy(alpha = 0.45f), Color(0xFF7B2CBF).copy(alpha = 0.45f))
+                        )
+                    ),
+                    modifier = Modifier.clickable(
+                        interactionSource = robotInteractionSource,
+                        indication = null
+                    ) { handleRobotTap() }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .align(Alignment.TopCenter)
-                                .background(Color.White.copy(alpha = 0.25f))
+                                .size(7.dp)
+                                .clip(CircleShape)
+                            .background(Color(0xFF00FFCC))
                         )
+                        Text(
+                            text = "Б.А.Р.С. ONLINE • НАЖМИТЕ ДЛЯ СОВЕТА",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFCBD5E1),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
 
+                // НИЖНЯЯ ЧАСТЬ: Премиальные кнопки с анимацией клика и интерактивными иконками
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // 1. Кнопка «▶ ВОЙТИ В ПЕРЕГОВОРНУЮ»
+                    Button(
+                        onClick = onEnterArena,
+                        interactionSource = enterInteractionSource,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
+                            .scale(enterScale)
+                            .shadow(
+                                elevation = 14.dp,
+                                shape = RoundedCornerShape(16.dp),
+                                ambientColor = Color(0xFF7B2CBF),
+                                spotColor = Color(0xFF7B2CBF)
+                            ),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color(0xFF7B2CBF),
+                                            Color(0xFF9D4EDD),
+                                            Color(0xFF00F0FF)
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .align(Alignment.TopCenter)
+                                    .background(Color.White.copy(alpha = 0.35f))
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color(0xFF07080D),
+                                    modifier = Modifier
+                                        .offset(x = playIconOffset)
+                                        .scale(playIconScale)
+                                        .size(22.dp)
+                                )
+                                Text(
+                                    text = "ВОЙТИ В ПЕРЕГОВОРНУЮ",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF07080D),
+                                    letterSpacing = 1.2.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // 2. Кнопка «⚙ ПАНЕЛЬ АДМИНИСТРАТОРА»
+                    OutlinedButton(
+                        onClick = onOpenAdmin,
+                        interactionSource = adminInteractionSource,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .scale(adminScale),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                listOf(Color.White.copy(alpha = 0.20f), Color(0xFF7B2CBF).copy(alpha = 0.45f))
+                            )
+                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xFF141624).copy(alpha = 0.65f),
+                            contentColor = Color(0xFFE2E8F0)
+                        )
+                    ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.PlayArrow,
+                                imageVector = Icons.Default.Settings,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = Color(0xFF00F0FF),
                                 modifier = Modifier
-                                    .offset(x = playIconOffset)
-                                    .scale(playIconScale)
-                                    .size(22.dp)
+                                    .rotate(settingsIconRotation)
+                                    .scale(settingsIconScale)
+                                    .size(18.dp)
                             )
                             Text(
-                                text = "ВОЙТИ В ПЕРЕГОВОРНУЮ",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 1.5.sp
+                                text = "ПАНЕЛЬ АДМИНИСТРАТОРА",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFCBD5E1)
                             )
                         }
                     }
-                }
 
-                // 2. Кнопка «⚙ ПАНЕЛЬ АДМИНИСТРАТОРА»
-                OutlinedButton(
-                    onClick = onOpenAdmin,
-                    interactionSource = adminInteractionSource,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .scale(adminScale),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xFF161926).copy(alpha = 0.45f),
-                        contentColor = Color(0xFFE2E8F0)
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        text = "NO PHP - NO PROBLEMS - 2026",
+                        fontSize = 10.sp,
+                        color = Color(0xFF64748B),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.sp,
+                        textAlign = TextAlign.Center
                     )
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = Color(0xFFD8B4FE),
-                            modifier = Modifier
-                                .rotate(settingsIconRotation)
-                                .scale(settingsIconScale)
-                                .size(18.dp)
-                        )
-                        Text(
-                            text = "ПАНЕЛЬ АДМИНИСТРАТОРА",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFCBD5E1)
-                        )
-                    }
                 }
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = "NO PHP - NO PROBLEMS - 2026",
-                    fontSize = 10.sp,
-                    color = Color(0xFF64748B),
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.sp,
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }

@@ -49,7 +49,12 @@ fun ZopaMapCard(
             .clip(RoundedCornerShape(20.dp))
             .background(Color(0xFF131520))
             .border(
-                BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+                BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        listOf(Color(0xFF00FFCC).copy(alpha = 0.35f), Color(0xFF7B2CBF).copy(alpha = 0.40f))
+                    )
+                ),
                 RoundedCornerShape(20.dp)
             )
             .padding(14.dp),

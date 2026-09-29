@@ -24,18 +24,24 @@
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
+        #bars-3d-model-viewer,
+        #bars-3d-model-viewer *,
+        model-viewer,
+        model-viewer * {
+            outline: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
         #bars-3d-model-viewer {
             position: absolute;
             z-index: 50;
             background-color: transparent !important;
             --poster-color: transparent !important;
-            outline: none !important;
-            border: none !important;
-            box-shadow: none !important;
             pointer-events: auto;
             display: none;
-            user-select: none;
-            -webkit-user-select: none;
         }
         #bars-3d-model-viewer:focus,
         #bars-3d-model-viewer:focus-visible,
@@ -47,11 +53,11 @@
         #bars-speech-bubble {
             position: absolute;
             z-index: 100;
-            background: rgba(14, 18, 34, 0.96);
-            border: 1.5px solid #00F0FF;
-            border-radius: 18px;
-            padding: 12px 18px;
-            box-shadow: 0 8px 32px rgba(0, 240, 255, 0.35);
+            background: rgba(12, 15, 28, 0.95);
+            border: 1px solid rgba(0, 240, 255, 0.7);
+            border-radius: 16px;
+            padding: 10px 16px;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.35), 0 0 45px rgba(123, 44, 191, 0.25);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             color: #FFFFFF;
@@ -112,6 +118,8 @@
                   tabindex="-1"
                   autoplay
                   camera-controls
+                  disable-zoom
+                  interaction-prompt="none"
                   touch-action="pan-y"
                   camera-orbit="0deg 82deg 72%"
                   camera-target="0m 0.82m 0m"
@@ -126,11 +134,12 @@
 
     <script>
         const robotPhrases = [
+            "Не трогай меня, иди решай кейсы и договаривайся с инвестором!",
             "Эй, не тыкай в сенсоры! Моя тактическая броня не для щекотки.",
-            "Хватит кликать! Лучше направь эту энергию в переговоры с инвестором.",
-            "Калибровка систем... Перестань тыкать, жми «ВОЙТИ В ПЕРЕГОВОРНУЮ»!",
+            "Хватит кликать! Направь эту боевую энергию в переговоры по CAPEX.",
+            "Калибровка тактических систем... Перестань тыкать, жми «ВОЙТИ В ПЕРЕГОВОРНУЮ»!",
             "Я нейро-наставник Б.А.Р.С. ОЭЗ «Алабуга», а не тамагочи!",
-            "Внимание: уровень раздражения процессора 98%. Иди договариваться о CAPEX!",
+            "Внимание: уровень раздражения процессора 98%. Иди защищать ставку 460 ₽/м²!",
             "Тактический совет №0: Перестань мучить робота и покажи класс на Арене!",
             "Осторожно! Еще один клик, и я повышу жесткость торга оппонента на 20%!",
             "Ты точно готов к переговорам? Твоя техника клика выдает легкое волнение."
@@ -157,8 +166,9 @@
             bubble.classList.remove('hidden');
 
             const bubbleWidth = bubble.offsetWidth || 320;
+            const bubbleHeight = bubble.offsetHeight || 60;
             const bubbleLeft = mvRect.left + (mvRect.width - bubbleWidth) / 2;
-            const bubbleTop = Math.max(12, mvRect.top + 8);
+            const bubbleTop = Math.max(16, mvRect.top - bubbleHeight + 14);
 
             bubble.style.left = Math.max(8, bubbleLeft) + 'px';
             bubble.style.top = bubbleTop + 'px';

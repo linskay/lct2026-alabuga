@@ -211,87 +211,96 @@ fun ArenaScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF00F0FF))
-                        )
-                        Column {
-                            Text(
-                                text = config.opponentName,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "${config.opponentCompany} • ${config.opponentRole}",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color(0xFF00F0FF))
-                    }
-                },
-                actions = {
-                    // Парящий Cyber-Glass таймер переговоров
-                    val timerMinutes = elapsedSeconds / 60
-                    val timerSeconds = elapsedSeconds % 60
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFF0F172A).copy(alpha = 0.85f),
-                        border = BorderStroke(
-                            1.dp,
-                            Brush.linearGradient(
-                                listOf(Color(0xFF00F0FF).copy(alpha = 0.45f), Color(0xFF7B2CBF).copy(alpha = 0.35f))
-                            )
-                        ),
-                        modifier = Modifier.padding(end = 6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Timer,
-                                contentDescription = "Таймер переговоров",
-                                tint = Color(0xFF00F0FF),
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = "${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00F0FF),
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                    }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF0A0C16).copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(modifier = Modifier.widthIn(max = 1180.dp).fillMaxWidth()) {
+                    TopAppBar(
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF00F0FF))
+                                )
+                                Column {
+                                    Text(
+                                        text = config.opponentName,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "${config.opponentCompany} • ${config.opponentRole}",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                }
+                            }
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color(0xFF00F0FF))
+                            }
+                        },
+                        actions = {
+                            // Парящий Cyber-Glass таймер переговоров
+                            val timerMinutes = elapsedSeconds / 60
+                            val timerSeconds = elapsedSeconds % 60
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = Color(0xFF0F172A).copy(alpha = 0.85f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFF00F0FF).copy(alpha = 0.45f), Color(0xFF7B2CBF).copy(alpha = 0.35f))
+                                    )
+                                ),
+                                modifier = Modifier.padding(end = 6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Timer,
+                                        contentDescription = "Таймер переговоров",
+                                        tint = Color(0xFF00F0FF),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = "${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00F0FF),
+                                        fontFamily = FontFamily.Monospace,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+                            }
 
-                    IconButton(onClick = { showDebriefing = true }) {
-                        Icon(imageVector = Icons.Default.FileDownload, contentDescription = "Скачать PDF результатов", tint = Color(0xFF00FFCC))
-                    }
-                    IconButton(onClick = { showTimeTravel = true }) {
-                        Icon(imageVector = Icons.Default.History, contentDescription = "Машина времени", tint = Color(0xFF00F0FF))
-                    }
-                    IconButton(onClick = { showDebriefing = true }) {
-                        Icon(imageVector = Icons.Default.EmojiEvents, contentDescription = "Дебрифинг", tint = Color(0xFFD8B4FE))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0C16).copy(alpha = 0.85f))
-            )
+                            IconButton(onClick = { showDebriefing = true }) {
+                                Icon(imageVector = Icons.Default.FileDownload, contentDescription = "Скачать PDF результатов", tint = Color(0xFF00FFCC))
+                            }
+                            IconButton(onClick = { showTimeTravel = true }) {
+                                Icon(imageVector = Icons.Default.History, contentDescription = "Машина времени", tint = Color(0xFF00F0FF))
+                            }
+                            IconButton(onClick = { showDebriefing = true }) {
+                                Icon(imageVector = Icons.Default.EmojiEvents, contentDescription = "Дебрифинг", tint = Color(0xFFD8B4FE))
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                    )
+                }
+            }
         },
         containerColor = Color(0xFF06070B)
     ) { paddingValues ->
@@ -994,8 +1003,13 @@ private fun ArenaChatContent(
                     .fillMaxWidth()
             },
             shape = RoundedCornerShape(18.dp),
-            color = Color(0xFF131520).copy(alpha = 0.70f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            color = Color(0xFF101322).copy(alpha = 0.75f),
+            border = BorderStroke(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(Color(0xFF00F0FF).copy(alpha = 0.30f), Color(0xFF7B2CBF).copy(alpha = 0.40f))
+                )
+            )
         ) {
             LazyColumn(
                 state = listState,
@@ -1309,12 +1323,17 @@ private fun ArenaTacticalContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 1. Карточка «Б.А.Р.С. СОВЕТ»
+        // 1. Карточка «Б.А.Р.С. СОВЕТ» (с тонкой неоновой градиентной рамкой)
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             color = Color(0xFF131520),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            border = BorderStroke(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(Color(0xFF00FFCC).copy(alpha = 0.40f), Color(0xFF7B2CBF).copy(alpha = 0.45f))
+                )
+            )
         ) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
@@ -1345,12 +1364,17 @@ private fun ArenaTacticalContent(
             }
         }
 
-        // 2. Метрики переговоров и Шкала напряженности
+        // 2. Метрики переговоров и Шкала напряженности (с тонкой градиентной рамкой)
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             color = Color(0xFF131520),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            border = BorderStroke(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(Color(0xFF7B2CBF).copy(alpha = 0.35f), Color(0xFF00F0FF).copy(alpha = 0.25f))
+                )
+            )
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -1423,12 +1447,17 @@ private fun ArenaTacticalContent(
         // 3. Интерактивная карта ZOPA / BATNA
         ZopaMapCard(zopa = zopaState)
 
-        // 4. Повестка переговоров (Agenda topics)
+        // 4. Повестка переговоров (Agenda topics с тонкой градиентной рамкой)
         Surface(
             modifier = if (isMobile) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().weight(1f),
             shape = RoundedCornerShape(18.dp),
             color = Color(0xFF131520),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            border = BorderStroke(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(Color(0xFF7B2CBF).copy(alpha = 0.35f), Color(0xFF00F0FF).copy(alpha = 0.25f))
+                )
+            )
         ) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
