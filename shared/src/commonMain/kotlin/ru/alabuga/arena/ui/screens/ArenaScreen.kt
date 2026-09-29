@@ -1032,7 +1032,7 @@ private fun ArenaChatContent(
     ) {
         // 1. Окно прямого эфира оппонента (3D Робот Майк / Б.А.Р.С.) с динамической рамкой и фоном стресса
         if (!showDebriefing && !showTimeTravel) {
-            val avatarHeight = if (isMobile) 130.dp else 220.dp
+            val avatarHeight = if (isMobile) 115.dp else 220.dp
             Surface(
                 modifier = if (isMobile) {
                     Modifier
@@ -1058,7 +1058,8 @@ private fun ArenaChatContent(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
+                        .then(if (isMobile) Modifier.wrapContentHeight() else Modifier.fillMaxSize())
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
@@ -1071,10 +1072,11 @@ private fun ArenaChatContent(
                 ) {
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
+                            .then(if (isMobile) Modifier.wrapContentHeight() else Modifier.fillMaxSize())
                             .padding(horizontal = 8.dp, vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = if (isMobile) Arrangement.spacedBy(4.dp) else Arrangement.SpaceBetween
                     ) {
                         // ТАКТИЧЕСКИЙ БАББЛ РОБОТА В ПЕРЕГОВОРНОЙ
                         Surface(
