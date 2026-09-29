@@ -117,18 +117,17 @@
                   alt="3D робот Майк / Б.А.Р.С."
                   tabindex="-1"
                   autoplay
+                  animation-name="SK_ZMikeAnim_ZMIKE_WaveLoop"
                   camera-controls
                   disable-zoom
                   interaction-prompt="none"
                   touch-action="pan-y"
-                  camera-orbit="0deg 82deg 72%"
+                  camera-orbit="0deg 84deg 72%"
                   camera-target="0m 0.82m 0m"
                   shadow-intensity="1.5"
                   shadow-softness="0.75"
                   exposure="1.2"
-                  environment-image="neutral"
-                  auto-rotate
-                  rotation-per-second="8deg">
+                  environment-image="neutral">
         <div slot="progress-bar" style="display: none;"></div>
     </model-viewer>
 
@@ -145,7 +144,31 @@
             "Ты точно готов к переговорам? Твоя техника клика выдает легкое волнение."
         ];
 
-        const reactionAnims = ["wave", "nod", "tilt", "talk", "bluff", "idle"];
+        const MIKE_ANIM_MAP = {
+            'wave': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
+            'idle': 'SK_ZMikeAnim_ZMIKE_WaveLoop',
+            'talk': 'SK_ZMikeAnim_ZMIKE_IdleBreaker',
+            'nod': 'SK_ZMikeAnim_ZMIKE_ExitWave',
+            'tilt': 'SK_ZMikeAnim_ZMIKE_Blinking',
+            'bluff': 'SK_ZMikeAnim_ZMIKE_IdleAggro',
+            'jump': 'SK_ZMikeAnim_ZMIKE_Jump'
+        };
+
+        function resolveAnimation(animName) {
+            if (!animName) return 'SK_ZMikeAnim_ZMIKE_WaveLoop';
+            const key = animName.toLowerCase();
+            if (MIKE_ANIM_MAP[key]) return MIKE_ANIM_MAP[key];
+            return animName;
+        }
+
+        const reactionAnims = [
+            "SK_ZMikeAnim_ZMIKE_WaveLoop",
+            "SK_ZMikeAnim_ZMIKE_ExitWave",
+            "SK_ZMikeAnim_ZMIKE_IdleBreaker",
+            "SK_ZMikeAnim_ZMIKE_Blinking",
+            "SK_ZMikeAnim_ZMIKE_IdleAggro",
+            "SK_ZMikeAnim_ZMIKE_Jump"
+        ];
         let phraseIdx = 0;
         let animIdx = 0;
         let bubbleTimeout = null;
@@ -214,12 +237,19 @@
             }
 
             if (anim && anim !== '') {
+                var targetAnim = resolveAnimation(anim);
                 try {
-                    mv.animationName = anim;
-                    if (mv.play) mv.play();
+                    if (mv.animationName !== targetAnim) {
+                        mv.animationName = targetAnim;
+                    }
+                    if (mv.paused && mv.play) {
+                        mv.play();
+                    }
                 } catch (e) {
                     console.warn("Failed to set animation:", e);
                 }
+            } else if (mv.paused && mv.play) {
+                mv.play();
             }
         };
 
@@ -233,6 +263,13 @@
         // Fallback from mike.glb to bars.glb on error
         var mvElem = document.getElementById('bars-3d-model-viewer');
         if (mvElem) {
+            mvElem.addEventListener('load', function() {
+                try {
+                    mvElem.animationName = 'SK_ZMikeAnim_ZMIKE_WaveLoop';
+                    if (mvElem.play) mvElem.play();
+                } catch (e) {}
+            });
+
             mvElem.addEventListener('error', function(e) {
                 console.warn("Failed to load mike.glb, falling back to bars.glb", e);
                 if (mvElem.getAttribute('src') === 'mike.glb') {

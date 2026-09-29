@@ -238,14 +238,27 @@ class BarsRobotJmeApp : SimpleApplication() {
 
                 animControl?.let { ctrl ->
                     animChannel = ctrl.createChannel()
-                    // Начальная анимация — Idle
+                    // Начальная анимация — Приветственное помахивание (WaveLoop) как на эталонном экране
+                    val waveAnim = "SK_ZMikeAnim_ZMIKE_WaveLoop"
+                    val exitWave = "SK_ZMikeAnim_ZMIKE_ExitWave"
                     val idleAnim = "SK_ZMikeAnim_ZMIKE_Idle"
-                    if (ctrl.animationNames.contains(idleAnim)) {
-                        animChannel?.setAnim(idleAnim)
-                        animChannel?.setLoopMode(LoopMode.Loop)
-                    } else if (ctrl.animationNames.isNotEmpty()) {
-                        animChannel?.setAnim(ctrl.animationNames.first())
-                        animChannel?.setLoopMode(LoopMode.Loop)
+                    when {
+                        ctrl.animationNames.contains(waveAnim) -> {
+                            animChannel?.setAnim(waveAnim)
+                            animChannel?.setLoopMode(LoopMode.Loop)
+                        }
+                        ctrl.animationNames.contains(exitWave) -> {
+                            animChannel?.setAnim(exitWave)
+                            animChannel?.setLoopMode(LoopMode.Loop)
+                        }
+                        ctrl.animationNames.contains(idleAnim) -> {
+                            animChannel?.setAnim(idleAnim)
+                            animChannel?.setLoopMode(LoopMode.Loop)
+                        }
+                        ctrl.animationNames.isNotEmpty() -> {
+                            animChannel?.setAnim(ctrl.animationNames.first())
+                            animChannel?.setLoopMode(LoopMode.Loop)
+                        }
                     }
                 }
             }
@@ -268,18 +281,34 @@ class BarsRobotJmeApp : SimpleApplication() {
     }
 
     override fun simpleUpdate(tpf: Float) {
-        // Авто-вращение (10°/сек)
-        autoRotateAngle += tpf * FastMath.DEG_TO_RAD * 10f
-        robotModel?.localRotation = Quaternion().fromAngleAxis(autoRotateAngle, Vector3f.UNIT_Y)
+        // Робот смотрит прямо на пользователя без неконтролируемого вращения боком
+        robotModel?.localRotation = Quaternion.IDENTITY
 
-        // Применяем отложенную смену анимации
-        val newAnim = consumePendingAnimation()
-        if (newAnim != null) {
+        // Применяем отложенную смену анимации с маппингом из общих имен в GLB-анимации Майка
+        val rawAnim = consumePendingAnimation()
+        if (rawAnim != null) {
             animControl?.let { ctrl ->
-                if (ctrl.animationNames.contains(newAnim)) {
-                    animChannel?.setAnim(newAnim, 0.3f) // 0.3s blend
+                val mappedAnim = when (rawAnim.lowercase()) {
+                    "wave" -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
+                    "idle" -> "SK_ZMikeAnim_ZMIKE_WaveLoop"
+                    "talk" -> "SK_ZMikeAnim_ZMIKE_IdleBreaker"
+                    "nod" -> "SK_ZMikeAnim_ZMIKE_ExitWave"
+                    "tilt" -> "SK_ZMikeAnim_ZMIKE_Blinking"
+                    "bluff" -> "SK_ZMikeAnim_ZMIKE_IdleAggro"
+                    "jump" -> "SK_ZMikeAnim_ZMIKE_Jump"
+                    else -> rawAnim
+                }
+                val targetAnim = if (ctrl.animationNames.contains(mappedAnim)) {
+                    mappedAnim
+                } else if (ctrl.animationNames.contains(rawAnim)) {
+                    rawAnim
+                } else {
+                    null
+                }
+                if (targetAnim != null) {
+                    animChannel?.setAnim(targetAnim, 0.3f) // 0.3s blend
                     animChannel?.setLoopMode(
-                        if (newAnim.contains("Death") || newAnim.contains("Hit") || newAnim.contains("Jump")) {
+                        if (targetAnim.contains("Death") || targetAnim.contains("Hit") || targetAnim.contains("Jump")) {
                             LoopMode.DontLoop
                         } else {
                             LoopMode.Loop
