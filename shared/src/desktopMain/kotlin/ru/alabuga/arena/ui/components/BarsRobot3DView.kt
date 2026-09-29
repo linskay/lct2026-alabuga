@@ -52,8 +52,20 @@ object BarsRobot3DManager {
         clickCallback = callback
     }
 
+    private val logFile = java.io.File(System.getProperty("user.home"), "bars_debug.txt")
+
+    private fun log(msg: String, error: Throwable? = null) {
+        try {
+            val text = "[${java.time.LocalDateTime.now()}] $msg ${error?.stackTraceToString() ?: ""}\n"
+            logFile.appendText(text)
+            println("[BarsRobot3D] $msg")
+            error?.printStackTrace()
+        } catch (_: Exception) {}
+    }
+
     @Synchronized
     fun getOrCreateCanvas(): Canvas? {
+        log("getOrCreateCanvas() called. isFailed=$isFailed, canvas=$canvas, initAttempted=$initAttempted")
         if (isFailed) return null
         if (canvas != null) return canvas
         if (initAttempted) return null
@@ -61,25 +73,35 @@ object BarsRobot3DManager {
 
         // Попытка 1: Запуск с современным LWJGL OpenGL 3
         try {
+            log("Attempting initJme with LWJGL_OPENGL3")
             val c = initJme(AppSettings.LWJGL_OPENGL3)
-            if (c != null) return c
+            if (c != null) {
+                log("initJme LWJGL_OPENGL3 succeeded: $c")
+                return c
+            }
         } catch (e: Throwable) {
-            println("[BarsRobot3D] OpenGL 3 init failed, falling back to OpenGL 2: ${e.message}")
+            log("initJme OpenGL 3 failed, falling back to OpenGL 2", e)
         }
 
         // Попытка 2: Fallback на совместимый OpenGL 2
         try {
+            log("Attempting initJme with LWJGL_OPENGL2")
             val c = initJme(AppSettings.LWJGL_OPENGL2)
-            if (c != null) return c
+            if (c != null) {
+                log("initJme LWJGL_OPENGL2 succeeded: $c")
+                return c
+            }
         } catch (e: Throwable) {
-            println("[BarsRobot3D] OpenGL 2 init failed: ${e.message}")
+            log("initJme OpenGL 2 failed", e)
         }
 
+        log("All JME init attempts failed! Setting isFailed=true")
         isFailed = true
         return null
     }
 
     private fun initJme(renderer: String): Canvas? {
+        log("initJme start with renderer: $renderer")
         val settings = AppSettings(true).apply {
             setRenderer(renderer)
             isFullscreen = false
@@ -111,6 +133,7 @@ object BarsRobot3DManager {
 
         app = jmeApp
         canvas = c
+        log("initJme finished successfully with canvas: $c")
         return c
     }
 
