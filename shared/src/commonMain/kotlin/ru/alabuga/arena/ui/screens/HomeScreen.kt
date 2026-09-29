@@ -416,21 +416,7 @@ fun HomeScreen(
                         )
                 )
 
-                // ЦЕНТРАЛЬНОЕ НЕОНОВОЕ СВЕЧЕНИЕ (CYAN RADIAL AURA)
-                Box(
-                    modifier = Modifier
-                        .size(230.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    Color(0xFF00F0FF).copy(alpha = glowAlpha * 1.1f),
-                                    Color(0xFF7B2CBF).copy(alpha = glowAlpha * 0.7f),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
+
 
                 // 3D-модель робота (высота 340dp)
                 Box(

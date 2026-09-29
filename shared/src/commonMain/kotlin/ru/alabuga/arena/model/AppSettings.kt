@@ -7,7 +7,7 @@ object AppSettings {
 
     // Grafana & Prometheus Telemetry Integration
     var enableTelemetry: Boolean = true
-    var grafanaEndpoint: String = "http://localhost:3000"
+    var grafanaEndpoint: String = "http://localhost:3001"
     var prometheusPushGateway: String = "http://localhost:9091"
     var grafanaApiKey: String = ""
 }

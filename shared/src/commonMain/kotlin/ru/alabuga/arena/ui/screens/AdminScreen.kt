@@ -65,7 +65,7 @@ fun AdminScreen(
     var apiKeysSaved by remember { mutableStateOf(AppSettings.geminiApiKey.isNotBlank() || AppSettings.openRouterApiKey.isNotBlank()) }
 
     var telemetryEnabled by remember { mutableStateOf(AppSettings.enableTelemetry) }
-    var grafanaUrl by remember { mutableStateOf(AppSettings.grafanaEndpoint) }
+    var grafanaUrl by remember { mutableStateOf(if (AppSettings.grafanaEndpoint.isBlank() || AppSettings.grafanaEndpoint.contains(":3000")) "http://localhost:3001" else AppSettings.grafanaEndpoint) }
     var grafanaTestStatus by remember { mutableStateOf<String?>(null) }
     var isTestingGrafana by remember { mutableStateOf(false) }
     var showPrometheusModal by remember { mutableStateOf(false) }
@@ -569,7 +569,7 @@ fun AdminScreen(
                                 fontSize = 11.sp,
                                 color = Color(0xFF00F0FF),
                                 modifier = Modifier.clickable {
-                                    uriHandler.openUri(if (grafanaUrl.isNotBlank()) grafanaUrl else "http://localhost:3001")
+                                    uriHandler.openUri(if (grafanaUrl.isNotBlank() && !grafanaUrl.contains(":3000")) grafanaUrl else "http://localhost:3001")
                                 }
                             )
                         }

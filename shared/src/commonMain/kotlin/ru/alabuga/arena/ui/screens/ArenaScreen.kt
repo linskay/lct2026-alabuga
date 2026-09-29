@@ -490,78 +490,128 @@ fun ArenaScreen(
                 }
             }
 
-            // Адаптивный контейнер: на мобильных экранах переключатель «Диалог» / «Тактика», на десктопе — side-by-side
-            BoxWithConstraints(
+            // Центрированный адаптивный контейнер: защищен от растяжения на ультрашироких экранах (макс. 1240dp)
+            Box(
                 modifier = modifier
-                    .fillMaxSize()
-                    .widthIn(max = 1180.dp)
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .fillMaxHeight()
+                    .widthIn(max = 1240.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
             ) {
-                val isMobile = maxWidth < 840.dp
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    val isMobile = maxWidth < 840.dp
 
-                if (isMobile) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Cyber-Glass Segmented Switch
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF0F172A).copy(alpha = 0.85f))
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-                                .padding(3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    if (isMobile) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Box(
+                            // Cyber-Glass Segmented Switch
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(11.dp))
-                                    .background(
-                                        if (mobileSelectedTab == 0) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.25f), Color(0xFF7B2CBF).copy(alpha = 0.35f)))
-                                        else SolidColor(Color.Transparent)
-                                    )
-                                    .clickable { mobileSelectedTab = 0 }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF0F172A).copy(alpha = 0.85f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                                    .padding(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    text = "💬 ДИАЛОГ",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (mobileSelectedTab == 0) Color(0xFF00F0FF) else Color(0xFF94A3B8),
-                                    fontFamily = FontFamily.Monospace
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(11.dp))
+                                        .background(
+                                            if (mobileSelectedTab == 0) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.25f), Color(0xFF7B2CBF).copy(alpha = 0.35f)))
+                                            else SolidColor(Color.Transparent)
+                                        )
+                                        .clickable { mobileSelectedTab = 0 }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "💬 ДИАЛОГ",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (mobileSelectedTab == 0) Color(0xFF00F0FF) else Color(0xFF94A3B8),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(11.dp))
+                                        .background(
+                                            if (mobileSelectedTab == 1) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.25f), Color(0xFF7B2CBF).copy(alpha = 0.35f)))
+                                            else SolidColor(Color.Transparent)
+                                        )
+                                        .clickable { mobileSelectedTab = 1 }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "📊 ТАКТИКА И ZOPA",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (mobileSelectedTab == 1) Color(0xFF00F0FF) else Color(0xFF94A3B8),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
                             }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(11.dp))
-                                    .background(
-                                        if (mobileSelectedTab == 1) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.25f), Color(0xFF7B2CBF).copy(alpha = 0.35f)))
-                                        else SolidColor(Color.Transparent)
-                                    )
-                                    .clickable { mobileSelectedTab = 1 }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "📊 ТАКТИКА И ZOPA",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (mobileSelectedTab == 1) Color(0xFF00F0FF) else Color(0xFF94A3B8),
-                                    fontFamily = FontFamily.Monospace
+
+                            if (mobileSelectedTab == 0) {
+                                ArenaChatContent(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .imePadding(),
+                                    isMobile = true,
+                                    config = config,
+                                    messages = messages,
+                                    listState = listState,
+                                    isGeneratingReply = isGeneratingReply,
+                                    robotAnimation = robotAnimation,
+                                    showDebriefing = showDebriefing,
+                                    showTimeTravel = showTimeTravel,
+                                    inputText = inputText,
+                                    onInputTextChanged = { inputText = it },
+                                    onSend = onSendMessage,
+                                    canSend = canSend,
+                                    hasPlaceholders = hasPlaceholders,
+                                    isBazaarInput = isBazaarInput,
+                                    onHintSelected = { hint ->
+                                        inputText = hint
+                                        lastInsertedTemplate = hint
+                                    },
+                                    sendInteractionSource = sendInteractionSource,
+                                    sendScale = sendScale
+                                )
+                            } else {
+                                ArenaTacticalContent(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(vertical = 4.dp),
+                                    latestBarsAdvice = latestBarsAdvice,
+                                    metrics = metrics,
+                                    atmosphereColor = atmosphereColor,
+                                    zopaState = zopaState,
+                                    config = config,
+                                    isMobile = true
                                 )
                             }
                         }
-
-                        if (mobileSelectedTab == 0) {
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
                             ArenaChatContent(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .imePadding(),
-                                isMobile = true,
+                                    .weight(0.60f)
+                                    .fillMaxHeight(),
+                                isMobile = false,
                                 config = config,
                                 messages = messages,
                                 listState = listState,
@@ -582,63 +632,19 @@ fun ArenaScreen(
                                 sendInteractionSource = sendInteractionSource,
                                 sendScale = sendScale
                             )
-                        } else {
+
                             ArenaTacticalContent(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(vertical = 4.dp),
+                                    .weight(0.40f)
+                                    .fillMaxHeight(),
                                 latestBarsAdvice = latestBarsAdvice,
                                 metrics = metrics,
                                 atmosphereColor = atmosphereColor,
                                 zopaState = zopaState,
                                 config = config,
-                                isMobile = true
+                                isMobile = false
                             )
                         }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        ArenaChatContent(
-                            modifier = Modifier
-                                .weight(0.65f)
-                                .fillMaxHeight(),
-                            isMobile = false,
-                            config = config,
-                            messages = messages,
-                            listState = listState,
-                            isGeneratingReply = isGeneratingReply,
-                            robotAnimation = robotAnimation,
-                            showDebriefing = showDebriefing,
-                            showTimeTravel = showTimeTravel,
-                            inputText = inputText,
-                            onInputTextChanged = { inputText = it },
-                            onSend = onSendMessage,
-                            canSend = canSend,
-                            hasPlaceholders = hasPlaceholders,
-                            isBazaarInput = isBazaarInput,
-                            onHintSelected = { hint ->
-                                inputText = hint
-                                lastInsertedTemplate = hint
-                            },
-                            sendInteractionSource = sendInteractionSource,
-                            sendScale = sendScale
-                        )
-
-                        ArenaTacticalContent(
-                            modifier = Modifier
-                                .weight(0.35f)
-                                .fillMaxHeight(),
-                            latestBarsAdvice = latestBarsAdvice,
-                            metrics = metrics,
-                            atmosphereColor = atmosphereColor,
-                            zopaState = zopaState,
-                            config = config,
-                            isMobile = false
-                        )
                     }
                 }
             }
@@ -995,7 +1001,7 @@ private fun ArenaChatContent(
     ) {
         // 1. Окно прямого эфира оппонента (3D Робот Майк / Б.А.Р.С.)
         if (!showDebriefing && !showTimeTravel) {
-            val avatarHeight = if (isMobile) 130.dp else 240.dp
+            val avatarHeight = if (isMobile) 130.dp else 280.dp
             Box(
                 modifier = if (isMobile) {
                     Modifier
