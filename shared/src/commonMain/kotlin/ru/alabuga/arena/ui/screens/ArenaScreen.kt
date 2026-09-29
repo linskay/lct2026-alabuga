@@ -66,6 +66,7 @@ import kotlin.random.Random
 fun ArenaScreen(
     config: ScenarioConfig,
     onBack: () -> Unit,
+    onOpenConfig: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var metrics by remember { mutableStateOf(NegotiationMetrics(trust = 55, tension = 35, dealReadiness = 40)) }
@@ -283,6 +284,37 @@ fun ArenaScreen(
                                         color = Color(0xFF00F0FF),
                                         fontFamily = FontFamily.Monospace,
                                         letterSpacing = 1.sp
+                                    )
+                                }
+                            }
+
+                            // Кнопка "🎛 Конфигуратор" (Cyber-Glass pill с неоновым бордером)
+                            Surface(
+                                onClick = onOpenConfig,
+                                shape = RoundedCornerShape(50),
+                                color = Color(0xFF1E1035).copy(alpha = 0.85f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFF7B2CBF), Color(0xFF00F0FF).copy(alpha = 0.5f))
+                                    )
+                                ),
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "🎛",
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        text = "Конфигуратор",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFE2E8F0)
                                     )
                                 }
                             }
