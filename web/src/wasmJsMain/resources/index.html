@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Арена B2B-переговоров | ОЭЗ «Алабуга» — 3D Б.А.Р.С. & Майк</title>
+    <link rel="icon" type="image/svg+xml" href="alabuga-logo.svg">
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent !important;
+            outline: none !important;
+        }
+        *:focus, *:focus-visible {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #06070B;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #bars-3d-model-viewer {
+            position: absolute;
+            z-index: 50;
+            background-color: transparent !important;
+            --poster-color: transparent !important;
+            outline: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            pointer-events: auto;
+            display: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #bars-3d-model-viewer:focus,
+        #bars-3d-model-viewer:focus-visible,
+        #bars-3d-model-viewer:active {
+            outline: none !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        #bars-speech-bubble {
+            position: absolute;
+            z-index: 100;
+            background: rgba(14, 18, 34, 0.96);
+            border: 1.5px solid #00F0FF;
+            border-radius: 18px;
+            padding: 12px 18px;
+            box-shadow: 0 8px 32px rgba(0, 240, 255, 0.35);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: #FFFFFF;
+            width: 320px;
+            max-width: 85vw;
+            text-align: center;
+            cursor: pointer;
+            transition: opacity 0.22s ease, transform 0.22s ease;
+            transform: translateY(0);
+            pointer-events: auto;
+            display: none;
+            box-sizing: border-box;
+        }
+        #bars-speech-bubble.hidden {
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+        }
+        .bubble-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: bold;
+            color: #00F0FF;
+            letter-spacing: 0.8px;
+            margin-bottom: 6px;
+        }
+        .bubble-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: #00F0FF;
+            display: inline-block;
+        }
+        .bubble-content {
+            font-size: 13px;
+            line-height: 18px;
+            font-weight: 500;
+            color: #F1F5F9;
+        }
+    </style>
+</head>
+<body>
+    <div id="bars-speech-bubble" class="hidden">
+        <div class="bubble-header">
+            <span class="bubble-dot"></span>
+            <span>🤖 Б.А.Р.С. [НАСТАВНИК]</span>
+        </div>
+        <div id="bars-bubble-text" class="bubble-content"></div>
+    </div>
+
+    <model-viewer id="bars-3d-model-viewer"
+                  src="mike.glb"
+                  alt="3D робот Майк / Б.А.Р.С."
+                  tabindex="-1"
+                  autoplay
+                  camera-controls
+                  touch-action="pan-y"
+                  camera-orbit="0deg 82deg 72%"
+                  camera-target="0m 0.82m 0m"
+                  shadow-intensity="1.5"
+                  shadow-softness="0.75"
+                  exposure="1.2"
+                  environment-image="neutral"
+                  auto-rotate
+                  rotation-per-second="8deg">
+        <div slot="progress-bar" style="display: none;"></div>
+    </model-viewer>
+
+    <script>
+        const robotPhrases = [
+            "Эй, не тыкай в сенсоры! Моя тактическая броня не для щекотки.",
+            "Хватит кликать! Лучше направь эту энергию в переговоры с инвестором.",
+            "Калибровка систем... Перестань тыкать, жми «ВОЙТИ В ПЕРЕГОВОРНУЮ»!",
+            "Я нейро-наставник Б.А.Р.С. ОЭЗ «Алабуга», а не тамагочи!",
+            "Внимание: уровень раздражения процессора 98%. Иди договариваться о CAPEX!",
+            "Тактический совет №0: Перестань мучить робота и покажи класс на Арене!",
+            "Осторожно! Еще один клик, и я повышу жесткость торга оппонента на 20%!",
+            "Ты точно готов к переговорам? Твоя техника клика выдает легкое волнение."
+        ];
+
+        const reactionAnims = ["wave", "nod", "tilt", "talk", "bluff", "idle"];
+        let phraseIdx = 0;
+        let animIdx = 0;
+        let bubbleTimeout = null;
+
+        function showNextRobotPhrase() {
+            const bubble = document.getElementById('bars-speech-bubble');
+            const bubbleText = document.getElementById('bars-bubble-text');
+            const mv = document.getElementById('bars-3d-model-viewer');
+            if (!bubble || !bubbleText || !mv) return;
+
+            const text = robotPhrases[phraseIdx % robotPhrases.length];
+            phraseIdx++;
+            bubbleText.textContent = text;
+
+            // Position bubble right above the robot head
+            const mvRect = mv.getBoundingClientRect();
+            bubble.style.display = 'block';
+            bubble.classList.remove('hidden');
+
+            const bubbleWidth = bubble.offsetWidth || 320;
+            const bubbleLeft = mvRect.left + (mvRect.width - bubbleWidth) / 2;
+            const bubbleTop = Math.max(12, mvRect.top + 8);
+
+            bubble.style.left = Math.max(8, bubbleLeft) + 'px';
+            bubble.style.top = bubbleTop + 'px';
+
+            // Play reaction animation
+            const nextAnim = reactionAnims[animIdx % reactionAnims.length];
+            animIdx++;
+            try {
+                mv.animationName = nextAnim;
+                if (mv.play) mv.play();
+            } catch (e) {}
+
+            // Auto-hide after 4.2 seconds
+            if (bubbleTimeout) clearTimeout(bubbleTimeout);
+            bubbleTimeout = setTimeout(function() {
+                bubble.classList.add('hidden');
+                setTimeout(function() {
+                    if (bubble.classList.contains('hidden')) {
+                        bubble.style.display = 'none';
+                    }
+                }, 240);
+            }, 4200);
+        }
+
+        window.setBars3D = function(visible, x, y, width, height, anim) {
+            var mv = document.getElementById('bars-3d-model-viewer');
+            var bubble = document.getElementById('bars-speech-bubble');
+            if (!mv) return;
+            if (!visible || width <= 0 || height <= 0) {
+                mv.style.display = 'none';
+                if (bubble) bubble.style.display = 'none';
+                return;
+            }
+            mv.style.display = 'block';
+            mv.style.left = x + 'px';
+            mv.style.top = y + 'px';
+            mv.style.width = width + 'px';
+            mv.style.height = height + 'px';
+
+            // If entering arena (smaller height than home screen 400px), hide home bubble
+            if (height < 300 && bubble) {
+                bubble.style.display = 'none';
+            }
+
+            if (anim && anim !== '') {
+                try {
+                    mv.animationName = anim;
+                    if (mv.play) mv.play();
+                } catch (e) {
+                    console.warn("Failed to set animation:", e);
+                }
+            }
+        };
+
+        window.hideBars3D = function() {
+            var mv = document.getElementById('bars-3d-model-viewer');
+            var bubble = document.getElementById('bars-speech-bubble');
+            if (mv) mv.style.display = 'none';
+            if (bubble) bubble.style.display = 'none';
+        };
+
+        // Fallback from mike.glb to bars.glb on error
+        var mvElem = document.getElementById('bars-3d-model-viewer');
+        if (mvElem) {
+            mvElem.addEventListener('error', function(e) {
+                console.warn("Failed to load mike.glb, falling back to bars.glb", e);
+                if (mvElem.getAttribute('src') === 'mike.glb') {
+                    mvElem.setAttribute('src', 'bars.glb');
+                }
+            });
+
+            // Click handling with drag suppression
+            var isDown = false;
+            var startX = 0, startY = 0;
+
+            mvElem.addEventListener('pointerdown', function(e) {
+                isDown = true;
+                startX = e.clientX;
+                startY = e.clientY;
+            });
+
+            mvElem.addEventListener('pointerup', function(e) {
+                if (!isDown) return;
+                isDown = false;
+                var dx = Math.abs(e.clientX - startX);
+                var dy = Math.abs(e.clientY - startY);
+                // If it's a tap/click (< 6px movement)
+                if (dx < 6 && dy < 6) {
+                    showNextRobotPhrase();
+                }
+            });
+        }
+
+        var bubbleElem = document.getElementById('bars-speech-bubble');
+        if (bubbleElem) {
+            bubbleElem.addEventListener('click', function() {
+                showNextRobotPhrase();
+            });
+        }
+    </script>
+
+    <script src="composeApp.js"></script>
+</body>
+</html>
