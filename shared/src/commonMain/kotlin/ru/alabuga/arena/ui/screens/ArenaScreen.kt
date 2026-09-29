@@ -119,7 +119,37 @@ fun ArenaScreen(
         )
     }
 
-    LaunchedEffect(config.id) {
+    LaunchedEffect(config.id, config.toughnessLevel, config.batna.minPricePerSqm) {
+        messages.clear()
+        messages.add(
+            Message(
+                id = "init_opp_${config.id}",
+                actor = MessageActor.OPPONENT,
+                text = config.initialOpponentUtterance,
+                stepIndex = 0,
+                snapshotMetrics = NegotiationMetrics(trust = 55, tension = 35, dealReadiness = 40),
+                emotionEmoji = "😠",
+                emotionLabel = "Давление / Выпад",
+                contextHints = config.initialDynamicHints
+            )
+        )
+        metrics = NegotiationMetrics(trust = 55, tension = 35, dealReadiness = 40)
+        currentStep = 1
+        inputText = ""
+        lastInsertedTemplate = ""
+        latestBarsAdvice = config.initialBarsAdvice
+        zopaState = ZopaState(
+            sellerMin = config.batna.minPricePerSqm,
+            sellerMax = 520,
+            buyerMin = 300,
+            buyerMax = 380,
+            currentOffer = 350,
+            isOverlap = false,
+            overlapMin = null,
+            overlapMax = null,
+            status = "narrowing",
+            changeReason = "Оппонент (${config.opponentName}) удерживает заниженную планку, коридор сделки пока закрыт."
+        )
         TelemetryService.recordNegotiationStart(config.id)
     }
 

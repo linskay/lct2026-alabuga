@@ -76,6 +76,21 @@ fun AdminScreen(
     val uriHandler = LocalUriHandler.current
     val scrollState = rememberScrollState()
 
+    val applyAndReturn: () -> Unit = {
+        AppSettings.geminiApiKey = geminiKey.trim()
+        AppSettings.openRouterApiKey = openRouterKey.trim()
+        AppSettings.grafanaEndpoint = grafanaUrl.trim()
+        AppSettings.enableTelemetry = telemetryEnabled
+        val updated = config.copy(
+            toughnessLevel = toughness.toInt(),
+            batna = config.batna.copy(
+                minPricePerSqm = minPrice.toIntOrNull() ?: config.batna.minPricePerSqm,
+                maxGracePeriodMonths = maxGrace.toIntOrNull() ?: config.batna.maxGracePeriodMonths
+            )
+        )
+        onStartSimulation(updated)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -99,13 +114,13 @@ fun AdminScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = applyAndReturn) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color(0xFF00F0FF))
                     }
                 },
                 actions = {
                     Surface(
-                        onClick = onBack,
+                        onClick = applyAndReturn,
                         shape = RoundedCornerShape(10.dp),
                         color = Color(0xFF1E1035).copy(alpha = 0.85f),
                         border = BorderStroke(
