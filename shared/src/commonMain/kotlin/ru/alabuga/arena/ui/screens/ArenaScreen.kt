@@ -18,9 +18,11 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,6 +42,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
@@ -72,6 +75,7 @@ fun ArenaScreen(
 
     var showTimeTravel by remember { mutableStateOf(false) }
     var showDebriefing by remember { mutableStateOf(false) }
+    var mobileSelectedTab by remember { mutableStateOf(0) } // 0: Чат / 3D, 1: Тактика / ZOPA
 
     var zopaState by remember {
         mutableStateOf(
@@ -164,10 +168,7 @@ fun ArenaScreen(
     val trimmed = inputText.trim()
     val words = remember(trimmed) { trimmed.split(Regex("\\s+")).filter { it.isNotBlank() } }
     val hasPlaceholders = remember(trimmed) {
-        trimmed.contains("[") || trimmed.contains("]") || trimmed.contains("...")
-    }
-    val isExactTemplate = remember(trimmed, lastInsertedTemplate) {
-        lastInsertedTemplate.isNotEmpty() && trimmed == lastInsertedTemplate.trim()
+        trimmed.contains("[") || trimmed.contains("]")
     }
 
     // ИИ-Цензор ввода: запрет на «базарные» цифры и фразы короче 4 слов без аргументов
@@ -182,13 +183,16 @@ fun ArenaScreen(
                     trimmed.contains("готовы", ignoreCase = true) ||
                     trimmed.contains("предлагаем", ignoreCase = true) ||
                     trimmed.contains("capex", ignoreCase = true) ||
-                    trimmed.contains("каникул", ignoreCase = true)
+                    trimmed.contains("каникул", ignoreCase = true) ||
+                    trimmed.contains("тариф", ignoreCase = true) ||
+                    trimmed.contains("мощност", ignoreCase = true) ||
+                    trimmed.contains("срок", ignoreCase = true)
             val isTooShortWithoutArgs = words.size < 4 && !hasB2BKeywords
             isJustNumber || isTooShortWithoutArgs
         }
     }
 
-    val canSend = trimmed.isNotEmpty() && !hasPlaceholders && !isExactTemplate && !isBazaarInput && !isGeneratingReply
+    val canSend = trimmed.isNotEmpty() && !hasPlaceholders && !isBazaarInput && !isGeneratingReply
 
     val sendInteractionSource = remember { MutableInteractionSource() }
     val isSendPressed by sendInteractionSource.collectIsPressedAsState()
@@ -343,677 +347,257 @@ fun ArenaScreen(
                 }
             }
 
-            // Центрированный рабочий контейнер с ограничением ширины max = 1180.dp
-            Row(
-                modifier = modifier
-                    .fillMaxHeight()
-                    .widthIn(max = 1180.dp)
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // ЛЕВАЯ ЧАСТЬ (65%): Окно 3D-аватара + Чат сообщений + Ввод
-                Column(
-                    modifier = Modifier
-                        .weight(0.65f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // 1. Окно прямого эфира оппонента (3D Робот Б.А.Р.С. в прозрачном общем пространстве)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(0.38f)
-                            .background(Color.Transparent),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // 3D Робот Б.А.Р.С.
-                        if (!showDebriefing && !showTimeTravel) {
-                            BarsRobotView(
-                                animation = robotAnimation,
-                                modifier = Modifier.fillMaxSize(),
-                                height = 240.dp
+            val onSendMessage: () -> Unit = {
+                if (canSend && !isGeneratingReply) {
+                    val userText = trimmed
+                    inputText = ""
+                    lastInsertedTemplate = ""
+
+                    currentStep++
+
+                    val userMsg = Message(
+                        id = "user_${currentStep}_${Random.nextInt(100000)}",
+                        actor = MessageActor.USER,
+                        text = userText,
+                        stepIndex = currentStep,
+                        snapshotMetrics = metrics
+                    )
+                    messages.add(userMsg)
+
+                    isGeneratingReply = true
+                    coroutineScope.launch {
+                        try {
+                            val replyDto = geminiService.sendMessage(
+                                history = messages.toList(),
+                                userMessage = userText,
+                                config = config,
+                                currentMetrics = metrics
                             )
-                        }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                            val updatedTrust = (metrics.trust + replyDto.metricsDelta.trust).coerceIn(0, 100)
+                            val updatedTension = (metrics.tension + replyDto.metricsDelta.tension).coerceIn(0, 100)
+                            val updatedReadiness = (metrics.dealReadiness + replyDto.metricsDelta.dealReadiness).coerceIn(0, 100)
+                            val newMetrics = NegotiationMetrics(updatedTrust, updatedTension, updatedReadiness)
+                            metrics = newMetrics
 
-                    // 2. Чат сообщений (Стеклянная подложка Cyber-Glass)
-                    Surface(
-                        modifier = Modifier
-                            .weight(0.42f)
-                            .fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF131520).copy(alpha = 0.70f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
-                    ) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            items(messages) { message ->
-                                val isOpponent = message.actor == MessageActor.OPPONENT
-                                Box(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    contentAlignment = if (isOpponent) Alignment.CenterStart else Alignment.CenterEnd
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .widthIn(max = 540.dp)
-                                            .clip(
-                                                if (isOpponent) RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
-                                                else RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
-                                            )
-                                            .background(
-                                                if (isOpponent) Color(0xFF161926)
-                                                else Color(0xFF32145A)
-                                            )
-                                            .border(
-                                                1.dp,
-                                                Color.White.copy(alpha = 0.05f),
-                                                if (isOpponent) RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
-                                                else RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
-                                            )
-                                            .padding(14.dp)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.wrapContentSize(),
-                                            horizontalAlignment = if (isOpponent) Alignment.Start else Alignment.End,
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Row(
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                if (isOpponent) {
-                                                    Text(
-                                                        text = config.opponentName.ifBlank { "Валерий Строганов" },
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        color = Color(0xFF00FFCC),
-                                                        fontFamily = FontFamily.Monospace,
-                                                        textAlign = TextAlign.Start
-                                                    )
-                                                    if (message.emotionEmoji.isNotBlank()) {
-                                                        Text(
-                                                            text = "${message.emotionEmoji} ${message.emotionLabel}",
-                                                            fontSize = 11.sp,
-                                                            color = Color(0xFF94A3B8)
-                                                        )
-                                                    }
-                                                } else {
-                                                    Text(
-                                                        text = "ВЫ (ОЭЗ «АЛАБУГА»)",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        color = Color(0xFFD8B4FE),
-                                                        fontFamily = FontFamily.Monospace,
-                                                        textAlign = TextAlign.End
-                                                    )
-                                                }
-                                            }
+                            latestBarsAdvice = replyDto.barsFeedback
+                            robotAnimation = replyDto.barsAnimation
 
-                                            Text(
-                                                text = message.text,
-                                                fontSize = 15.sp,
-                                                color = Color(0xFFF1F5F9),
-                                                lineHeight = 22.sp,
-                                                textAlign = TextAlign.Start
-                                            )
-                                        }
-                                    }
-                                }
+                            val (emoEmoji, emoLabel) = when {
+                                replyDto.barsAnimation == "warn" -> "😠" to "Недовольство / Напряжение"
+                                replyDto.barsAnimation == "win" -> "🤝" to "Сближение позиций"
+                                replyDto.metricsDelta.tension > 10 -> "⚡" to "Обострение"
+                                replyDto.metricsDelta.dealReadiness > 5 -> "💡" to "Интерес"
+                                else -> "💼" to "Деловой анализ"
                             }
 
-                            if (isGeneratingReply) {
-                                item {
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        contentAlignment = Alignment.CenterStart
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
-                                                .background(Color(0xFF161926))
-                                                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
-                                                .padding(horizontal = 16.dp, vertical = 10.dp)
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier.size(14.dp),
-                                                    color = Color(0xFF00FFCC),
-                                                    strokeWidth = 2.dp
-                                                )
-                                                Text(
-                                                    text = "${config.opponentName.ifBlank { "Валерий Строганов" }} формулирует ответ...",
-                                                    fontSize = 13.sp,
-                                                    color = Color(0xFF94A3B8),
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                            val deltaOffer = if (replyDto.metricsDelta.dealReadiness > 0) {
+                                (replyDto.metricsDelta.dealReadiness * 2).coerceIn(5, 40)
+                            } else if (replyDto.metricsDelta.dealReadiness < 0) {
+                                (-10).coerceAtLeast(-30)
+                            } else {
+                                0
                             }
-                        }
-                    }
-
-                    // 3. Переговорные чипсы-подсказки (Парящие капсулы Cyber-Glass с микро-анимацией наведения)
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) {
-                        val hintsScrollState = rememberScrollState()
-
-                        val rawHints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints
-                        val hints = if (!rawHints.isNullOrEmpty()) rawHints else listOf(
-                            "Мы готовы пойти навстречу по ставке до [укажите цифру] ₽/м², если вы возьмете на себя пусконаладку [обязательство]...",
-                            "Поймите, ставка [укажите цифру] ₽/м² обусловлена тем, что мы берем на себя все сети. У других резидентов [аргумент]...",
-                            "Давайте зафиксируем [укажите цифру] ₽/м², но увеличим срок каникул до [укажите срок] месяцев, чтобы компенсировать [риск]...",
-                            "У нас есть запрос от другого инвестора на эти площади, но мы хотим работать с вами. Давайте сойдемся на [условие]..."
-                        )
-
-                        if (hints.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 8.dp)
-                                    .horizontalScroll(hintsScrollState)
-                                    .pointerInput(Unit) {
-                                        detectHorizontalDragGestures { change, dragAmount ->
-                                            change.consume()
-                                            coroutineScope.launch {
-                                                hintsScrollState.scrollBy(-dragAmount)
-                                            }
-                                        }
-                                    },
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                hints.forEach { hint ->
-                                    val chipInteractionSource = remember { MutableInteractionSource() }
-                                    val isChipHovered by chipInteractionSource.collectIsHoveredAsState()
-                                    val isChipPressed by chipInteractionSource.collectIsPressedAsState()
-
-                                    val chipOffsetY by animateDpAsState(
-                                        targetValue = if (isChipHovered) (-2).dp else 0.dp,
-                                        label = "chipOffsetY"
-                                    )
-                                    val chipScale by animateFloatAsState(
-                                        targetValue = if (isChipPressed) 0.96f else if (isChipHovered) 1.03f else 1f,
-                                        label = "chipScale"
-                                    )
-
-                                    Box(
-                                        modifier = Modifier
-                                            .offset(y = chipOffsetY)
-                                            .scale(chipScale)
-                                            .clip(RoundedCornerShape(18.dp))
-                                            .background(
-                                                if (isChipHovered) Brush.linearGradient(
-                                                    listOf(Color(0xFF1E2B52).copy(alpha = 0.95f), Color(0xFF2C1952).copy(alpha = 0.95f))
-                                                ) else Brush.linearGradient(
-                                                    listOf(Color(0xFF0F172A).copy(alpha = 0.85f), Color(0xFF191233).copy(alpha = 0.80f))
-                                                )
-                                            )
-                                            .border(
-                                                1.dp,
-                                                if (isChipHovered) Brush.linearGradient(listOf(Color(0xFF00FFCC), Color(0xFFC084FC)))
-                                                else Brush.linearGradient(listOf(Color(0xFF00FFCC).copy(alpha = 0.40f), Color(0xFF7B2CBF).copy(alpha = 0.35f))),
-                                                RoundedCornerShape(18.dp)
-                                            )
-                                            .clickable(
-                                                interactionSource = chipInteractionSource,
-                                                indication = null
-                                            ) {
-                                                inputText = hint
-                                                lastInsertedTemplate = hint
-                                            }
-                                            .padding(horizontal = 16.dp, vertical = 11.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Lightbulb,
-                                                contentDescription = null,
-                                                tint = if (isChipHovered) Color(0xFF00FFCC) else Color(0xFF00FFCC).copy(alpha = 0.75f),
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                            Text(
-                                                text = hint,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = if (isChipHovered) Color.White else Color(0xFFE2E8F0),
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
+                            val oppOffer = (zopaState.currentOffer + deltaOffer).coerceIn(300, 520)
+                            val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
+                            zopaState = zopaState.copy(
+                                buyerMax = oppOffer,
+                                currentOffer = oppOffer,
+                                isOverlap = isOverlapNow,
+                                overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
+                                overlapMax = if (isOverlapNow) oppOffer else null,
+                                changeReason = if (isOverlapNow) {
+                                    "Коридор сделки открыт! Стороны сошлись в цене от ${config.batna.minPricePerSqm} ₽/м²."
+                                } else if (deltaOffer > 0) {
+                                    "Оппонент скорректировал позицию до $oppOffer ₽/м² на основе встречных аргументов."
+                                } else if (deltaOffer < 0) {
+                                    "Оппонент ужесточил позицию ($oppOffer ₽/м²) из-за слабого обоснования цены."
+                                } else {
+                                    zopaState.changeReason
                                 }
-                            }
-                        }
-
-                        // Плашка-памятка «Конструктор аргумента ZOPA»
-                        if (trimmed.isNotEmpty()) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color(0xFF0F172A).copy(alpha = 0.85f),
-                                border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.40f)),
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = "💡 Стратегия ZOPA: Предложите уступку (срок/объемы/гарантии), чтобы сдвинуть оппонента по цене. Избегайте пустых торгов.",
-                                        fontSize = 12.sp,
-                                        color = Color(0xFF7DD3FC),
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                            }
-                        }
-
-                        // ИИ-Цензор: предупреждение о базарных цифрах и коротких репликах без аргументов
-                        if (isBazaarInput) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color(0xFF451A03).copy(alpha = 0.90f),
-                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.70f)),
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = "⚠️ B2B-переговоры — это не базар. Назовите уступку или обоснуйте цену. Например: \"Мы готовы согласовать 460 ₽/м², но при условии...\"",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFFFDE68A),
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                            }
-                        }
-
-                        if (hasPlaceholders || isExactTemplate) {
-                            Text(
-                                text = "Заполните параметры [в скобках] перед отправкой!",
-                                fontSize = 11.sp,
-                                color = Color(0xFFFBBF24),
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(bottom = 4.dp)
                             )
-                        }
 
-                        // 4. Крупное окно ввода (стиль Google AI Studio, Cyber-Glass)
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color(0xFF0D101B).copy(alpha = 0.75f),
-                            border = BorderStroke(
-                                1.dp,
-                                if (canSend) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.7f), Color(0xFF7B2CBF).copy(alpha = 0.5f)))
-                                else Brush.linearGradient(listOf(Color(0xFF282F48).copy(alpha = 0.6f), Color(0xFF1E2235).copy(alpha = 0.4f)))
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                TextField(
-                                    value = inputText,
-                                    onValueChange = { inputText = it },
-                                    placeholder = { Text("Введите встречный аргумент или выберите тактическую подсказку...", fontSize = 15.sp, color = Color(0xFF64748B)) },
-                                    modifier = Modifier.weight(1f),
-                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = Color.White, lineHeight = 22.sp),
-                                    colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        disabledContainerColor = Color.Transparent,
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent,
-                                        disabledIndicatorColor = Color.Transparent,
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White
-                                    ),
-                                    maxLines = 3
+                            messages.add(
+                                Message(
+                                    id = "opp_${currentStep}_${Random.nextInt(100000)}",
+                                    actor = MessageActor.OPPONENT,
+                                    text = replyDto.getResolvedReply(),
+                                    stepIndex = currentStep,
+                                    snapshotMetrics = newMetrics,
+                                    emotionEmoji = emoEmoji,
+                                    emotionLabel = emoLabel,
+                                    contextHints = replyDto.dynamicHints
                                 )
+                            )
 
-                                IconButton(
-                                    onClick = {
-                                        if (canSend && !isGeneratingReply) {
-                                            val userText = trimmed
-                                            inputText = ""
-                                            lastInsertedTemplate = ""
-
-                                            currentStep++
-
-                                            val userMsg = Message(
-                                                id = "user_${currentStep}_${Random.nextInt(100000)}",
-                                                actor = MessageActor.USER,
-                                                text = userText,
-                                                stepIndex = currentStep,
-                                                snapshotMetrics = metrics
-                                            )
-                                            messages.add(userMsg)
-
-                                            isGeneratingReply = true
-                                            coroutineScope.launch {
-                                                try {
-                                                    val replyDto = geminiService.sendMessage(
-                                                        history = messages.toList(),
-                                                        userMessage = userText,
-                                                        config = config,
-                                                        currentMetrics = metrics
-                                                    )
-
-                                                    val updatedTrust = (metrics.trust + replyDto.metricsDelta.trust).coerceIn(0, 100)
-                                                    val updatedTension = (metrics.tension + replyDto.metricsDelta.tension).coerceIn(0, 100)
-                                                    val updatedReadiness = (metrics.dealReadiness + replyDto.metricsDelta.dealReadiness).coerceIn(0, 100)
-                                                    val newMetrics = NegotiationMetrics(updatedTrust, updatedTension, updatedReadiness)
-                                                    metrics = newMetrics
-
-                                                    latestBarsAdvice = replyDto.barsFeedback
-                                                    robotAnimation = replyDto.barsAnimation
-
-                                                    val (emoEmoji, emoLabel) = when {
-                                                        replyDto.barsAnimation == "warn" -> "😠" to "Недовольство / Напряжение"
-                                                        replyDto.barsAnimation == "win" -> "🤝" to "Сближение позиций"
-                                                        replyDto.metricsDelta.tension > 10 -> "⚡" to "Обострение"
-                                                        replyDto.metricsDelta.dealReadiness > 5 -> "💡" to "Интерес"
-                                                        else -> "💼" to "Деловой анализ"
-                                                    }
-
-                                                    val deltaOffer = if (replyDto.metricsDelta.dealReadiness > 0) {
-                                                        (replyDto.metricsDelta.dealReadiness * 2).coerceIn(5, 40)
-                                                    } else if (replyDto.metricsDelta.dealReadiness < 0) {
-                                                        (-10).coerceAtLeast(-30)
-                                                    } else {
-                                                        0
-                                                    }
-                                                    val oppOffer = (zopaState.currentOffer + deltaOffer).coerceIn(300, 520)
-                                                    val isOverlapNow = oppOffer >= config.batna.minPricePerSqm
-                                                    zopaState = zopaState.copy(
-                                                        buyerMax = oppOffer,
-                                                        currentOffer = oppOffer,
-                                                        isOverlap = isOverlapNow,
-                                                        overlapMin = if (isOverlapNow) config.batna.minPricePerSqm else null,
-                                                        overlapMax = if (isOverlapNow) oppOffer else null,
-                                                        changeReason = if (isOverlapNow) {
-                                                            "Коридор сделки открыт! Стороны сошлись в цене от ${config.batna.minPricePerSqm} ₽/м²."
-                                                        } else if (deltaOffer > 0) {
-                                                            "Оппонент скорректировал позицию до $oppOffer ₽/м² на основе встречных аргументов."
-                                                        } else if (deltaOffer < 0) {
-                                                            "Оппонент ужесточил позицию ($oppOffer ₽/м²) из-за слабого обоснования цены."
-                                                        } else {
-                                                            zopaState.changeReason
-                                                        }
-                                                    )
-
-                                                    messages.add(
-                                                        Message(
-                                                            id = "opp_${currentStep}_${Random.nextInt(100000)}",
-                                                            actor = MessageActor.OPPONENT,
-                                                            text = replyDto.getResolvedReply(),
-                                                            stepIndex = currentStep,
-                                                            snapshotMetrics = newMetrics,
-                                                            emotionEmoji = emoEmoji,
-                                                            emotionLabel = emoLabel,
-                                                            contextHints = replyDto.dynamicHints
-                                                        )
-                                                    )
-
-                                                    TelemetryService.recordRound(
-                                                        scenarioId = config.id,
-                                                        roundIndex = currentStep,
-                                                        playerTextLength = userText.length,
-                                                        dealReadiness = updatedReadiness,
-                                                        trust = updatedTrust,
-                                                        stress = updatedTension,
-                                                        currentOffer = oppOffer,
-                                                        censorBlocked = false
-                                                    )
-                                                } catch (_: Throwable) {
-                                                    // Fallback handled inside KtorGeminiService
-                                                } finally {
-                                                    isGeneratingReply = false
-                                                }
-                                            }
-                                        }
-                                    },
-                                    interactionSource = sendInteractionSource,
-                                    enabled = canSend,
-                                    modifier = Modifier
-                                        .size(46.dp)
-                                        .scale(sendScale)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(if (canSend) Color(0xFF00F0FF) else Color(0xFF1E2640))
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = "Отправить",
-                                        tint = if (canSend) Color(0xFF07080D) else Color.Gray
-                                    )
-                                }
-                            }
+                            TelemetryService.recordRound(
+                                scenarioId = config.id,
+                                roundIndex = currentStep,
+                                playerTextLength = userText.length,
+                                dealReadiness = updatedReadiness,
+                                trust = updatedTrust,
+                                stress = updatedTension,
+                                currentOffer = oppOffer,
+                                censorBlocked = false
+                            )
+                        } catch (_: Throwable) {
+                            // Fallback handled inside KtorGeminiService
+                        } finally {
+                            isGeneratingReply = false
                         }
                     }
                 }
+            }
 
-                // ПРАВАЯ ЧАСТЬ (35%): Тактический центр (Карточка «Б.А.Р.С. СОВЕТ», Метрики, ZOPA, Повестка)
-                Column(
-                    modifier = Modifier
-                        .weight(0.35f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    // 1. Карточка «Б.А.Р.С. СОВЕТ» (Визуальный центр сайдбара Cyber-Glass)
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF131520),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            // Адаптивный контейнер: на мобильных экранах переключатель «Диалог» / «Тактика», на десктопе — side-by-side
+            BoxWithConstraints(
+                modifier = modifier
+                    .fillMaxSize()
+                    .widthIn(max = 1180.dp)
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                val isMobile = maxWidth < 840.dp
+
+                if (isMobile) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // Верхний отблеск стекла
+                        // Cyber-Glass Segmented Switch
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFF0F172A).copy(alpha = 0.85f))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(1.dp)
-                                    .background(Color.White.copy(alpha = 0.04f))
-                            )
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(11.dp))
+                                    .background(
+                                        if (mobileSelectedTab == 0) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.25f), Color(0xFF7B2CBF).copy(alpha = 0.35f)))
+                                        else SolidColor(Color.Transparent)
+                                    )
+                                    .clickable { mobileSelectedTab = 0 }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF00FFCC))
-                                )
                                 Text(
-                                    text = "🤖 Б.А.Р.С. • ТАКТИЧЕСКИЙ СОВЕТ",
-                                    fontSize = 11.sp,
+                                    text = "💬 ДИАЛОГ",
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF00FFCC),
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 0.8.sp
+                                    color = if (mobileSelectedTab == 0) Color(0xFF00F0FF) else Color(0xFF94A3B8),
+                                    fontFamily = FontFamily.Monospace
                                 )
                             }
-                            Text(
-                                text = latestBarsAdvice,
-                                fontSize = 13.sp,
-                                color = Color(0xFFF1F5F9),
-                                lineHeight = 19.sp
-                            )
-                        }
-                    }
-
-                    // 2. Метрики переговоров и Шкала напряженности (Cyber-Glass)
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF131520),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(11.dp))
+                                    .background(
+                                        if (mobileSelectedTab == 1) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.25f), Color(0xFF7B2CBF).copy(alpha = 0.35f)))
+                                        else SolidColor(Color.Transparent)
+                                    )
+                                    .clickable { mobileSelectedTab = 1 }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("ДОВЕРИЕ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
-                                    Text("${metrics.trust}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F0FF), fontFamily = FontFamily.Monospace)
-                                }
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("НАПРЯЖЕНИЕ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
-                                    Text("${metrics.tension}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = atmosphereColor, fontFamily = FontFamily.Monospace)
-                                }
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("ГОТОВНОСТЬ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
-                                    Text("${metrics.dealReadiness}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981), fontFamily = FontFamily.Monospace)
-                                }
+                                Text(
+                                    text = "📊 ТАКТИКА И ZOPA",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (mobileSelectedTab == 1) Color(0xFF00F0FF) else Color(0xFF94A3B8),
+                                    fontFamily = FontFamily.Monospace
+                                )
                             }
+                        }
 
-                            // Неоновый индикатор шкалы напряженности (перенесен из карточки робота)
-                            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "УРОВЕНЬ НАПРЯЖЕННОСТИ",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF94A3B8),
-                                        fontFamily = FontFamily.Monospace,
-                                        letterSpacing = 0.6.sp
-                                    )
-                                    Text(
-                                        text = "${metrics.tension}%",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = atmosphereColor,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(50))
-                                        .background(Color(0xFF161928))
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .fillMaxWidth((metrics.tension / 100f).coerceIn(0.05f, 1f))
-                                            .clip(RoundedCornerShape(50))
-                                            .background(
-                                                Brush.horizontalGradient(
-                                                    listOf(Color(0xFF7B2CBF), Color(0xFFE11D48), Color(0xFFFF1E56))
-                                                )
-                                            )
-                                    )
-                                }
-                            }
+                        if (mobileSelectedTab == 0) {
+                            ArenaChatContent(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .imePadding(),
+                                isMobile = true,
+                                config = config,
+                                messages = messages,
+                                listState = listState,
+                                isGeneratingReply = isGeneratingReply,
+                                robotAnimation = robotAnimation,
+                                showDebriefing = showDebriefing,
+                                showTimeTravel = showTimeTravel,
+                                inputText = inputText,
+                                onInputTextChanged = { inputText = it },
+                                onSend = onSendMessage,
+                                canSend = canSend,
+                                hasPlaceholders = hasPlaceholders,
+                                isBazaarInput = isBazaarInput,
+                                onHintSelected = { hint ->
+                                    inputText = hint
+                                    lastInsertedTemplate = hint
+                                },
+                                sendInteractionSource = sendInteractionSource,
+                                sendScale = sendScale
+                            )
+                        } else {
+                            ArenaTacticalContent(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(vertical = 4.dp),
+                                latestBarsAdvice = latestBarsAdvice,
+                                metrics = metrics,
+                                atmosphereColor = atmosphereColor,
+                                zopaState = zopaState,
+                                config = config,
+                                isMobile = true
+                            )
                         }
                     }
-
-                    // 3. Интерактивная карта ZOPA / BATNA
-                    ZopaMapCard(zopa = zopaState)
-
-                    // 4. Повестка переговоров (Agenda topics)
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF131520),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "ПОВЕСТКА ПЕРЕГОВОРОВ (AGENDA)",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF94A3B8),
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp
-                            )
+                        ArenaChatContent(
+                            modifier = Modifier
+                                .weight(0.65f)
+                                .fillMaxHeight(),
+                            isMobile = false,
+                            config = config,
+                            messages = messages,
+                            listState = listState,
+                            isGeneratingReply = isGeneratingReply,
+                            robotAnimation = robotAnimation,
+                            showDebriefing = showDebriefing,
+                            showTimeTravel = showTimeTravel,
+                            inputText = inputText,
+                            onInputTextChanged = { inputText = it },
+                            onSend = onSendMessage,
+                            canSend = canSend,
+                            hasPlaceholders = hasPlaceholders,
+                            isBazaarInput = isBazaarInput,
+                            onHintSelected = { hint ->
+                                inputText = hint
+                                lastInsertedTemplate = hint
+                            },
+                            sendInteractionSource = sendInteractionSource,
+                            sendScale = sendScale
+                        )
 
-                            config.agendaTopics.forEach { topic ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(Color(0xFF141829).copy(alpha = 0.65f), RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
-                                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
-                                        Text(topic.title, fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                                        Text(topic.detail, fontSize = 11.sp, color = Color(0xFF94A3B8), maxLines = 1)
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(50))
-                                            .background(
-                                                when (topic.status) {
-                                                    "agreed" -> Color(0xFF10B981).copy(alpha = 0.18f)
-                                                    "disputed" -> Color(0xFFFF3366).copy(alpha = 0.18f)
-                                                    else -> Color(0xFFFBBF24).copy(alpha = 0.18f)
-                                                }
-                                            )
-                                            .border(
-                                                1.dp,
-                                                when (topic.status) {
-                                                    "agreed" -> Color(0xFF10B981).copy(alpha = 0.45f)
-                                                    "disputed" -> Color(0xFFFF3366).copy(alpha = 0.45f)
-                                                    else -> Color(0xFFFBBF24).copy(alpha = 0.45f)
-                                                },
-                                                RoundedCornerShape(50)
-                                            )
-                                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                                    ) {
-                                        Text(
-                                            text = when (topic.status) {
-                                                "agreed" -> "СОГЛАСОВАНО"
-                                                "disputed" -> "СПОРНО"
-                                                else -> "ОБСУЖДАЕТСЯ"
-                                            },
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = when (topic.status) {
-                                                "agreed" -> Color(0xFF10B981)
-                                                "disputed" -> Color(0xFFFF3366)
-                                                else -> Color(0xFFFBBF24)
-                                            },
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        ArenaTacticalContent(
+                            modifier = Modifier
+                                .weight(0.35f)
+                                .fillMaxHeight(),
+                            latestBarsAdvice = latestBarsAdvice,
+                            metrics = metrics,
+                            atmosphereColor = atmosphereColor,
+                            zopaState = zopaState,
+                            config = config,
+                            isMobile = false
+                        )
                     }
                 }
             }
@@ -1036,57 +620,22 @@ fun ArenaScreen(
 
             // Модалка Дебрифинга
             if (showDebriefing) {
-                val isRateAgreed = config.agendaTopics.any { it.id == "rate" && it.status == "agreed" } || zopaState.currentOffer >= 460
-                val isPowerCapexAgreed = config.agendaTopics.any { it.id == "power_capex" && it.status == "agreed" } || metrics.dealReadiness >= 70
+                val isRateAgreed = config.agendaTopics.any { it.id == "rate" && it.status == "agreed" } || zopaState.currentOffer >= config.batna.minPricePerSqm
+                val isPowerCapexAgreed = config.agendaTopics.any { (it.id == "power_capex" || it.id == "capex") && it.status == "agreed" } || metrics.dealReadiness >= 70
                 val rating = if (metrics.dealReadiness >= 75) "S" else if (metrics.dealReadiness >= 50) "A" else "B"
 
-                val achievementsList = listOf(
-                    ru.alabuga.arena.model.Achievement(
-                        id = "batna_shield",
-                        title = "Железная BATNA",
-                        subtitle = "Несокрушимая защита ОЭЗ",
-                        description = "Удержал базовую ставку не ниже 460 ₽/м² и лимит каникул, не сдав красные линии ОЭЗ «Алабуга».",
-                        isUnlocked = isRateAgreed,
-                        tier = ru.alabuga.arena.model.AchievementTier.EPIC,
-                        conditionText = "Зафиксировать ставку от 460 ₽/м² (BATNA)"
-                    ),
-                    ru.alabuga.arena.model.Achievement(
-                        id = "bluff_buster",
-                        title = "Детектор лжи",
-                        subtitle = "Калужский блеф-бастер",
-                        description = "Хладнокровно парировал блеф оппонента о конкурентах, используя факты о дефиците мощностей 110 кВ.",
-                        isUnlocked = currentStep >= 2,
-                        tier = ru.alabuga.arena.model.AchievementTier.RARE,
-                        conditionText = "Отразить минимум 1 манипуляцию или блеф"
-                    ),
-                    ru.alabuga.arena.model.Achievement(
-                        id = "hidden_pain",
-                        title = "Рентген потребностей",
-                        subtitle = "Истинная цель раскрыта",
-                        description = "Вскрыл скрытую боль инвестора: критическую зависимость от сроков ввода оборудования к 3-му кварталу.",
-                        isUnlocked = metrics.trust >= 60,
-                        tier = ru.alabuga.arena.model.AchievementTier.RARE,
-                        conditionText = "Выявить скрытую боль и истинный дедлайн"
-                    ),
-                    ru.alabuga.arena.model.Achievement(
-                        id = "power_capex",
-                        title = "Энергетический барон",
-                        subtitle = "8 МВт под 1.2 млрд ₽",
-                        description = "Не уступил бесплатные энергомощности, а разменял подключение 8 МВт на встречные инвестиции 1.2 млрд ₽.",
-                        isUnlocked = isPowerCapexAgreed,
-                        tier = ru.alabuga.arena.model.AchievementTier.EPIC,
-                        conditionText = "Связать 8 МВт с обязательством CAPEX 1.2 млрд ₽"
-                    ),
-                    ru.alabuga.arena.model.Achievement(
-                        id = "grandmaster_s",
-                        title = "Гроссмейстер Алабуги",
-                        subtitle = "Безупречный ранг S",
-                        description = "Провел глубокие жесткие переговоры (6+ раундов), раскрыл боли, парировал атаки и закрыл идеальную сделку.",
-                        isUnlocked = rating == "S" && currentStep >= 4,
-                        tier = ru.alabuga.arena.model.AchievementTier.LEGENDARY,
-                        conditionText = "Получить высший ранг S (6+ раундов без спешки)"
+                val achievementsList = remember(config.id, isRateAgreed, isPowerCapexAgreed, currentStep, metrics, rating) {
+                    getScenarioAchievements(
+                        scenarioId = config.id,
+                        batnaMin = config.batna.minPricePerSqm,
+                        currentOffer = zopaState.currentOffer,
+                        metrics = metrics,
+                        currentStep = currentStep,
+                        rating = rating,
+                        isRateAgreed = isRateAgreed,
+                        isPowerCapexAgreed = isPowerCapexAgreed
                     )
-                )
+                }
 
                 LaunchedEffect(showDebriefing) {
                     if (showDebriefing) {
@@ -1128,6 +677,822 @@ fun ArenaScreen(
                     },
                     onClose = { showDebriefing = false }
                 )
+            }
+        }
+    }
+}
+
+fun getDefaultHintsForScenario(config: ScenarioConfig): List<String> {
+    return when (config.id) {
+        "valeriy_stroganov_anchor" -> listOf(
+            "Мы готовы согласовать ставку ${config.batna.minPricePerSqm} ₽/м², если вы подтвердите объем инвестиций от 800 млн ₽ в первый год.",
+            "Ставка ${config.batna.minPricePerSqm + 20} ₽/м² включает полную подводку сетей и нулевой налог на имущество на 10 лет.",
+            "Давайте зафиксируем 3 месяца арендных каникул в обмен на график создания 150 рабочих мест до конца года.",
+            "Мы можем предоставить приоритет на расширение 2-й очереди при условии подписания твердого договора аренды сейчас."
+        )
+        "chinese_equipment_consortium" -> listOf(
+            "Мы гарантируем сертификацию по ГОСТ и технадзор, если вы зафиксируете срок шеф-монтажа до 45 дней.",
+            "Предоплата 40% возможна только под безотзывный аккредитив топ-3 банков и фиксированную рублевую гарантию.",
+            "Готовы предоставить складскую площадку в ОЭЗ на льготных условиях при гарантии локализации 30% сервиса.",
+            "Давайте включим штраф 0.1% в день за срыв пусконаладки взамен на ускоренную приемку первой партии оборудования."
+        )
+        "hr_top_engineer_retention" -> listOf(
+            "Мы готовы повысить базовый оклад на 18% с опционом бонуса за запуск цеха композитов в 3-м квартале.",
+            "Предлагаем позицию главного инженера направления с прямым подчинением гендиректору и собственной лабораторией.",
+            "Готовы компенсировать аренду жилья в Альметьевске и предоставить служебный автомобиль при контракте на 3 года.",
+            "Давайте согласуем полугодовую аттестацию с возможностью пересмотра грейда по результатам ввода линии."
+        )
+        "investor_infrastructure_subsidies" -> listOf(
+            "Мы подключаем 8 МВт по льготному тарифу при условии подписания инвестсоглашения на 1.2 млрд ₽.",
+            "Строительство подъездных ж/д путей берет на себя ОЭЗ в обмен на встречное обязательство по грузообороту.",
+            "Предлагаем поэтапное субсидирование энергозатрат: 100% компенсации в первый год и 50% во второй.",
+            "Готовы ускорить выдачу ТУ на газ до 2 недель при фиксации даты старта строительства в мае."
+        )
+        "ai_datacenter_lease" -> listOf(
+            "Мы гарантируем резервирование по схеме 2N и PUE до 1.25 при базовой ставке ${config.batna.minPricePerSqm} ₽/кВт⋅ч.",
+            "Готовы зафиксировать коридор расширения до 25 МВт на 3 года при подписании 5-летнего контракта.",
+            "Предлагаем переложить часть затрат на кабельные трассы на ОЭЗ взамен на SLA 99.982% по доступности.",
+            "Можем предоставить 2 месяца каникул на монтаж суперкомпьютерных стоек при авансировании квартала."
+        )
+        else -> listOf(
+            "Мы готовы зафиксировать базовую ставку ${config.batna.minPricePerSqm} ₽ при встречных гарантиях объемов ввода.",
+            "Наше предложение учитывает инфраструктурные преференции ОЭЗ: налоговые льготы и готовые инженерные сети.",
+            "Предлагаем закрепить поэтапный график инвестиций с жесткими SLA и взаимными гарантиями сроков.",
+            "Давайте найдем компромисс в коридоре ZOPA: встречная уступка по срокам взамен на твердую ставку."
+        )
+    }
+}
+
+fun getScenarioAchievements(
+    scenarioId: String,
+    batnaMin: Int,
+    currentOffer: Int,
+    metrics: NegotiationMetrics,
+    currentStep: Int,
+    rating: String,
+    isRateAgreed: Boolean,
+    isPowerCapexAgreed: Boolean
+): List<Achievement> {
+    return when (scenarioId) {
+        "hr_top_engineer_retention" -> listOf(
+            Achievement(
+                id = "batna_shield",
+                title = "Железная BATNA",
+                subtitle = "Удержание ФОТ",
+                description = "Сохранил баланс ФОТ ОЭЗ, удержав индексацию оклада в пределах плановых +18-20% без переплат.",
+                isUnlocked = isRateAgreed || metrics.dealReadiness >= 60,
+                tier = AchievementTier.EPIC,
+                conditionText = "Не превысить плановый лимит оклада (+20%)"
+            ),
+            Achievement(
+                id = "bluff_buster",
+                title = "Детектор лжи",
+                subtitle = "Оффер из Сколково",
+                description = "Разобрался в деталях внешнего оффера и показал реальные преимущества стабильности лаборатории «Алабуги».",
+                isUnlocked = currentStep >= 2,
+                tier = AchievementTier.RARE,
+                conditionText = "Отразить ультиматум и провести объективный анализ альтернатив"
+            ),
+            Achievement(
+                id = "hidden_pain",
+                title = "Рентген потребностей",
+                subtitle = "Научная самостоятельность",
+                description = "Выявил истинную мотивацию инженера: не просто оклад, а статус R&D-лидера и авторство разработок.",
+                isUnlocked = metrics.trust >= 60,
+                tier = AchievementTier.RARE,
+                conditionText = "Найти нематериальный драйвер и потребность в автономии"
+            ),
+            Achievement(
+                id = "power_capex",
+                title = "Золотой фонд кадров",
+                subtitle = "Служебное жилье и опцион",
+                description = "Предложил встречный пакет: лаборатория, служебное жилье и бонус за запуск цеха взамен на 3-летний контракт.",
+                isUnlocked = isPowerCapexAgreed || metrics.dealReadiness >= 70,
+                tier = AchievementTier.EPIC,
+                conditionText = "Согласовать комплексный мотивационный пакет на 3 года"
+            ),
+            Achievement(
+                id = "grandmaster_s",
+                title = "Гроссмейстер Алабуги",
+                subtitle = "Сохранение таланта",
+                description = "Провел образцовые переговоры, удержал ключевого специалиста и укрепил лояльность к ОЭЗ.",
+                isUnlocked = rating == "S" && currentStep >= 4,
+                tier = AchievementTier.LEGENDARY,
+                conditionText = "Получить высший ранг S (4+ раунда без спешки)"
+            )
+        )
+        "chinese_equipment_consortium" -> listOf(
+            Achievement(
+                id = "batna_shield",
+                title = "Железная BATNA",
+                subtitle = "Защита бюджета",
+                description = "Не допустил 100% авансирования и зафиксировал расчеты в рублях под банковский аккредитив.",
+                isUnlocked = isRateAgreed || currentOffer >= batnaMin,
+                tier = AchievementTier.EPIC,
+                conditionText = "Зафиксировать расчеты в рублях/аккредитиве (BATNA ОЭЗ)"
+            ),
+            Achievement(
+                id = "bluff_buster",
+                title = "Детектор лжи",
+                subtitle = "Задержки на таможне",
+                description = "Парировал попытки переложить логистические риски на ОЭЗ, указав на прямые обязанности поставщика.",
+                isUnlocked = currentStep >= 2,
+                tier = AchievementTier.RARE,
+                conditionText = "Отразить манипуляции сроками и логистикой"
+            ),
+            Achievement(
+                id = "hidden_pain",
+                title = "Рентген потребностей",
+                subtitle = "Вход на рынок РФ",
+                description = "Понял, что китайскому консорциуму критически важно референс-внедрение в ОЭЗ для масштабирования в СНГ.",
+                isUnlocked = metrics.trust >= 60,
+                tier = AchievementTier.RARE,
+                conditionText = "Выявить ключевой стратегический интерес консорциума"
+            ),
+            Achievement(
+                id = "power_capex",
+                title = "Локализация и ГОСТ",
+                subtitle = "Шеф-монтаж под ключ",
+                description = "Добился жестких гарантий сертификации по стандартам РФ и локализации 30% сервиса в ОЭЗ.",
+                isUnlocked = isPowerCapexAgreed || metrics.dealReadiness >= 70,
+                tier = AchievementTier.EPIC,
+                conditionText = "Закрепить шеф-монтаж и сертификацию по ГОСТ"
+            ),
+            Achievement(
+                id = "grandmaster_s",
+                title = "Гроссмейстер Алабуги",
+                subtitle = "Международный альянс",
+                description = "Сформировал сбалансированный контракт без рисков простоя производства при ранге S.",
+                isUnlocked = rating == "S" && currentStep >= 4,
+                tier = AchievementTier.LEGENDARY,
+                conditionText = "Закрыть сделку на высший ранг S (4+ раунда)"
+            )
+        )
+        "ai_datacenter_lease" -> listOf(
+            Achievement(
+                id = "batna_shield",
+                title = "Железная BATNA",
+                subtitle = "Тариф 4.80 ₽/кВт⋅ч",
+                description = "Удержал базовую планку тарифа не ниже 4.80 ₽/кВт⋅ч с учетом энергобаланса кластера ОЭЗ.",
+                isUnlocked = isRateAgreed || currentOffer >= batnaMin,
+                tier = AchievementTier.EPIC,
+                conditionText = "Удержать ставку от 4.80 ₽/кВт⋅ч (BATNA ОЭЗ)"
+            ),
+            Achievement(
+                id = "bluff_buster",
+                title = "Детектор лжи",
+                subtitle = "Сравнение с Сибирью",
+                description = "Опроверг сравнение с дешевой сибирской ГЭС аргументами о прямом доступе к магистралям связи и надежности 2N.",
+                isUnlocked = currentStep >= 2,
+                tier = AchievementTier.RARE,
+                conditionText = "Отразить ценовой демпинг удаленных регионов"
+            ),
+            Achievement(
+                id = "hidden_pain",
+                title = "Рентген потребностей",
+                subtitle = "Дефицит мегаватт",
+                description = "Вскрыл жесткий дедлайн запуска кластера нейросетей к ноябрю и отсутствие альтернативных 20 МВт в регионе.",
+                isUnlocked = metrics.trust >= 60,
+                tier = AchievementTier.RARE,
+                conditionText = "Вскрыть дедлайн запуска кластера нейросетей"
+            ),
+            Achievement(
+                id = "power_capex",
+                title = "Энергетический барон",
+                subtitle = "20 МВт и PUE 1.25",
+                description = "Связал бронь 20 МВт с обязательством оператора ЦОД инвестировать в современную систему энергоэффективности.",
+                isUnlocked = isPowerCapexAgreed || metrics.dealReadiness >= 70,
+                tier = AchievementTier.EPIC,
+                conditionText = "Связать 20 МВт с SLA и энергоэффективностью PUE <= 1.25"
+            ),
+            Achievement(
+                id = "grandmaster_s",
+                title = "Гроссмейстер Алабуги",
+                subtitle = "Цифровой флагман",
+                description = "Привлек стратегического ИИ-резидента на выгодных условиях с безупречным результатом ранга S.",
+                isUnlocked = rating == "S" && currentStep >= 4,
+                tier = AchievementTier.LEGENDARY,
+                conditionText = "Получить высший ранг S (4+ раунда без спешки)"
+            )
+        )
+        else -> listOf(
+            Achievement(
+                id = "batna_shield",
+                title = "Железная BATNA",
+                subtitle = "Несокрушимая защита ОЭЗ",
+                description = "Удержал базовую ставку не ниже ${batnaMin} ₽/м² и лимит каникул, не сдав красные линии ОЭЗ «Алабуга».",
+                isUnlocked = isRateAgreed || currentOffer >= batnaMin,
+                tier = AchievementTier.EPIC,
+                conditionText = "Зафиксировать ставку от ${batnaMin} ₽/м² (BATNA)"
+            ),
+            Achievement(
+                id = "bluff_buster",
+                title = "Детектор лжи",
+                subtitle = "Калужский блеф-бастер",
+                description = "Хладнокровно парировал блеф оппонента о конкурентах, используя факты о дефиците мощностей 110 кВ.",
+                isUnlocked = currentStep >= 2,
+                tier = AchievementTier.RARE,
+                conditionText = "Отразить минимум 1 манипуляцию или блеф"
+            ),
+            Achievement(
+                id = "hidden_pain",
+                title = "Рентген потребностей",
+                subtitle = "Истинная цель раскрыта",
+                description = "Вскрыл скрытую боль инвестора: критическую зависимость от сроков ввода оборудования к 3-му кварталу.",
+                isUnlocked = metrics.trust >= 60,
+                tier = AchievementTier.RARE,
+                conditionText = "Выявить скрытую боль и истинный дедлайн"
+            ),
+            Achievement(
+                id = "power_capex",
+                title = "Энергетический барон",
+                subtitle = "8 МВт под 1.2 млрд ₽",
+                description = "Не уступил бесплатные энергомощности, а разменял подключение 8 МВт на встречные инвестиции 1.2 млрд ₽.",
+                isUnlocked = isPowerCapexAgreed || metrics.dealReadiness >= 70,
+                tier = AchievementTier.EPIC,
+                conditionText = "Связать 8 МВт с обязательством CAPEX 1.2 млрд ₽"
+            ),
+            Achievement(
+                id = "grandmaster_s",
+                title = "Гроссмейстер Алабуги",
+                subtitle = "Безупречный ранг S",
+                description = "Провел глубокие жесткие переговоры (4+ раунда), раскрыл боли, парировал атаки и закрыл идеальную сделку.",
+                isUnlocked = rating == "S" && currentStep >= 4,
+                tier = AchievementTier.LEGENDARY,
+                conditionText = "Получить высший ранг S (4+ раунда без спешки)"
+            )
+        )
+    }
+}
+
+@Composable
+private fun ArenaChatContent(
+    modifier: Modifier,
+    isMobile: Boolean,
+    config: ScenarioConfig,
+    messages: List<Message>,
+    listState: LazyListState,
+    isGeneratingReply: Boolean,
+    robotAnimation: String,
+    showDebriefing: Boolean,
+    showTimeTravel: Boolean,
+    inputText: String,
+    onInputTextChanged: (String) -> Unit,
+    onSend: () -> Unit,
+    canSend: Boolean,
+    hasPlaceholders: Boolean,
+    isBazaarInput: Boolean,
+    onHintSelected: (String) -> Unit,
+    sendInteractionSource: MutableInteractionSource,
+    sendScale: Float
+) {
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // 1. Окно прямого эфира оппонента (3D Робот Майк / Б.А.Р.С.)
+        if (!showDebriefing && !showTimeTravel) {
+            val avatarHeight = if (isMobile) 130.dp else 240.dp
+            Box(
+                modifier = if (isMobile) {
+                    Modifier
+                        .fillMaxWidth()
+                        .height(avatarHeight)
+                        .background(Color.Transparent)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(0.38f)
+                        .background(Color.Transparent)
+                },
+                contentAlignment = Alignment.Center
+            ) {
+                BarsRobotView(
+                    animation = robotAnimation,
+                    modifier = Modifier.fillMaxSize(),
+                    height = avatarHeight
+                )
+            }
+        }
+
+        if (!isMobile) {
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        // 2. Чат сообщений (Стеклянная подложка Cyber-Glass)
+        Surface(
+            modifier = if (isMobile) {
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            } else {
+                Modifier
+                    .weight(0.42f)
+                    .fillMaxWidth()
+            },
+            shape = RoundedCornerShape(18.dp),
+            color = Color(0xFF131520).copy(alpha = 0.70f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(messages) { message ->
+                    val isOpponent = message.actor == MessageActor.OPPONENT
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = if (isOpponent) Alignment.CenterStart else Alignment.CenterEnd
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = if (isMobile) 320.dp else 540.dp)
+                                .clip(
+                                    if (isOpponent) RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+                                    else RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+                                )
+                                .background(
+                                    if (isOpponent) Color(0xFF161926)
+                                    else Color(0xFF32145A)
+                                )
+                                .border(
+                                    1.dp,
+                                    Color.White.copy(alpha = 0.05f),
+                                    if (isOpponent) RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+                                    else RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+                                )
+                                .padding(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.wrapContentSize(),
+                                horizontalAlignment = if (isOpponent) Alignment.Start else Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (isOpponent) {
+                                        Text(
+                                            text = config.opponentName.ifBlank { "Валерий Строганов" },
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFF00FFCC),
+                                            fontFamily = FontFamily.Monospace,
+                                            textAlign = TextAlign.Start
+                                        )
+                                        if (message.emotionEmoji.isNotBlank()) {
+                                            Text(
+                                                text = "${message.emotionEmoji} ${message.emotionLabel}",
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF94A3B8)
+                                            )
+                                        }
+                                    } else {
+                                        Text(
+                                            text = "ВЫ (ОЭЗ «АЛАБУГА»)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFFD8B4FE),
+                                            fontFamily = FontFamily.Monospace,
+                                            textAlign = TextAlign.End
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = message.text,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFF1F5F9),
+                                    lineHeight = 20.sp,
+                                    textAlign = TextAlign.Start
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (isGeneratingReply) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                    .background(Color(0xFF161926))
+                                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        color = Color(0xFF00FFCC),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text(
+                                        text = "${config.opponentName.ifBlank { "Валерий Строганов" }} формулирует ответ...",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF94A3B8),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Переговорные подсказки и Ввод
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+        ) {
+            val hintsScrollState = rememberScrollState()
+            val rawHints = messages.lastOrNull { it.contextHints.isNotEmpty() }?.contextHints
+            val hints = if (!rawHints.isNullOrEmpty()) rawHints else getDefaultHintsForScenario(config)
+
+            if (hints.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                        .horizontalScroll(hintsScrollState)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures { change, dragAmount ->
+                                change.consume()
+                                coroutineScope.launch {
+                                    hintsScrollState.scrollBy(-dragAmount)
+                                }
+                            }
+                        },
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    hints.forEach { hint ->
+                        val chipInteractionSource = remember { MutableInteractionSource() }
+                        val isChipHovered by chipInteractionSource.collectIsHoveredAsState()
+                        val isChipPressed by chipInteractionSource.collectIsPressedAsState()
+
+                        val chipOffsetY by animateDpAsState(
+                            targetValue = if (isChipHovered) (-2).dp else 0.dp,
+                            label = "chipOffsetY"
+                        )
+                        val chipScale by animateFloatAsState(
+                            targetValue = if (isChipPressed) 0.96f else if (isChipHovered) 1.02f else 1f,
+                            label = "chipScale"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .offset(y = chipOffsetY)
+                                .scale(chipScale)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (isChipHovered) Brush.linearGradient(
+                                        listOf(Color(0xFF1E2B52).copy(alpha = 0.95f), Color(0xFF2C1952).copy(alpha = 0.95f))
+                                    ) else Brush.linearGradient(
+                                        listOf(Color(0xFF0F172A).copy(alpha = 0.85f), Color(0xFF191233).copy(alpha = 0.80f))
+                                    )
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isChipHovered) Brush.linearGradient(listOf(Color(0xFF00FFCC), Color(0xFFC084FC)))
+                                    else Brush.linearGradient(listOf(Color(0xFF00FFCC).copy(alpha = 0.40f), Color(0xFF7B2CBF).copy(alpha = 0.35f))),
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .clickable(
+                                    interactionSource = chipInteractionSource,
+                                    indication = null
+                                ) {
+                                    onHintSelected(hint)
+                                }
+                                .padding(horizontal = 14.dp, vertical = 9.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lightbulb,
+                                    contentDescription = null,
+                                    tint = if (isChipHovered) Color(0xFF00FFCC) else Color(0xFF00FFCC).copy(alpha = 0.75f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = hint,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (isChipHovered) Color.White else Color(0xFFE2E8F0),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ИИ-Цензор: предупреждение о базарных цифрах
+            if (isBazaarInput) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF451A03).copy(alpha = 0.90f),
+                    border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.70f)),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "⚠️ B2B-переговоры — это не базар. Обоснуйте цифру встречной уступкой или условием.",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFDE68A),
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+
+            if (hasPlaceholders) {
+                Text(
+                    text = "Заполните параметры [в скобках] перед отправкой!",
+                    fontSize = 11.sp,
+                    color = Color(0xFFFBBF24),
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+            }
+
+            // 4. Окно ввода Cyber-Glass
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0xFF0D101B).copy(alpha = 0.85f),
+                border = BorderStroke(
+                    1.dp,
+                    if (canSend) Brush.linearGradient(listOf(Color(0xFF00F0FF).copy(alpha = 0.7f), Color(0xFF7B2CBF).copy(alpha = 0.5f)))
+                    else Brush.linearGradient(listOf(Color(0xFF282F48).copy(alpha = 0.6f), Color(0xFF1E2235).copy(alpha = 0.4f)))
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextField(
+                        value = inputText,
+                        onValueChange = onInputTextChanged,
+                        placeholder = { Text("Введите встречный аргумент или выберите подсказку...", fontSize = 14.sp, color = Color(0xFF64748B)) },
+                        modifier = Modifier.weight(1f),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = Color.White, lineHeight = 20.sp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        maxLines = 3
+                    )
+
+                    IconButton(
+                        onClick = onSend,
+                        interactionSource = sendInteractionSource,
+                        enabled = canSend,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .scale(sendScale)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (canSend) Color(0xFF00F0FF) else Color(0xFF1E2640))
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Отправить",
+                            tint = if (canSend) Color(0xFF07080D) else Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArenaTacticalContent(
+    modifier: Modifier,
+    latestBarsAdvice: String,
+    metrics: NegotiationMetrics,
+    atmosphereColor: Color,
+    zopaState: ZopaState,
+    config: ScenarioConfig,
+    isMobile: Boolean = false
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // 1. Карточка «Б.А.Р.С. СОВЕТ»
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = Color(0xFF131520),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF00FFCC))
+                    )
+                    Text(
+                        text = "🤖 Б.А.Р.С. • ТАКТИЧЕСКИЙ СОВЕТ",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00FFCC),
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 0.8.sp
+                    )
+                }
+                Text(
+                    text = latestBarsAdvice,
+                    fontSize = 13.sp,
+                    color = Color(0xFFF1F5F9),
+                    lineHeight = 19.sp
+                )
+            }
+        }
+
+        // 2. Метрики переговоров и Шкала напряженности
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = Color(0xFF131520),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("ДОВЕРИЕ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
+                        Text("${metrics.trust}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F0FF), fontFamily = FontFamily.Monospace)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("НАПРЯЖЕНИЕ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
+                        Text("${metrics.tension}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = atmosphereColor, fontFamily = FontFamily.Monospace)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("ГОТОВНОСТЬ", fontSize = 10.sp, color = Color(0xFF94A3B8), fontFamily = FontFamily.Monospace)
+                        Text("${metrics.dealReadiness}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981), fontFamily = FontFamily.Monospace)
+                    }
+                }
+
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "УРОВЕНЬ НАПРЯЖЕННОСТИ",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF94A3B8),
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.6.sp
+                        )
+                        Text(
+                            text = "${metrics.tension}%",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = atmosphereColor,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFF161928))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth((metrics.tension / 100f).coerceIn(0.05f, 1f))
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color(0xFF7B2CBF), Color(0xFFE11D48), Color(0xFFFF1E56))
+                                    )
+                                )
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. Интерактивная карта ZOPA / BATNA
+        ZopaMapCard(zopa = zopaState)
+
+        // 4. Повестка переговоров (Agenda topics)
+        Surface(
+            modifier = if (isMobile) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().weight(1f),
+            shape = RoundedCornerShape(18.dp),
+            color = Color(0xFF131520),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "ПОВЕСТКА ПЕРЕГОВОРОВ (AGENDA)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF94A3B8),
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.sp
+                )
+
+                config.agendaTopics.forEach { topic ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF141829).copy(alpha = 0.65f), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
+                            Text(topic.title, fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(topic.detail, fontSize = 11.sp, color = Color(0xFF94A3B8), maxLines = 1)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    when (topic.status) {
+                                        "agreed" -> Color(0xFF10B981).copy(alpha = 0.18f)
+                                        "disputed" -> Color(0xFFFF3366).copy(alpha = 0.18f)
+                                        else -> Color(0xFFFBBF24).copy(alpha = 0.18f)
+                                    }
+                                )
+                                .border(
+                                    1.dp,
+                                    when (topic.status) {
+                                        "agreed" -> Color(0xFF10B981).copy(alpha = 0.45f)
+                                        "disputed" -> Color(0xFFFF3366).copy(alpha = 0.45f)
+                                        else -> Color(0xFFFBBF24).copy(alpha = 0.45f)
+                                    },
+                                    RoundedCornerShape(50)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = when (topic.status) {
+                                    "agreed" -> "СОГЛАСОВАНО"
+                                    "disputed" -> "СПОРНО"
+                                    else -> "ОБСУЖДАЕТСЯ"
+                                },
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when (topic.status) {
+                                    "agreed" -> Color(0xFF10B981)
+                                    "disputed" -> Color(0xFFFF3366)
+                                    else -> Color(0xFFFBBF24)
+                                },
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
             }
         }
     }

@@ -34,6 +34,9 @@ kotlin {
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
         val desktopMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)

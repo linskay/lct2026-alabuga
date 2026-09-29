@@ -217,7 +217,15 @@ class BarsRobotJmeApp : SimpleApplication() {
         // Загрузка GLB-модели из classpath ресурсов
         try {
             assetManager.registerLocator("/", ClasspathLocator::class.java)
-            robotModel = assetManager.loadModel("bars.glb")
+            robotModel = try {
+                assetManager.loadModel("mike.glb")
+            } catch (_: Exception) {
+                try {
+                    assetManager.loadModel("bars.glb")
+                } catch (_: Exception) {
+                    null
+                }
+            }
             robotModel?.let { model ->
                 // Масштабируем и позиционируем
                 model.setLocalScale(1.0f)
