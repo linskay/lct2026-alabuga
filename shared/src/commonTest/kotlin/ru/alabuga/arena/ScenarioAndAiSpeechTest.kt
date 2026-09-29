@@ -187,4 +187,52 @@ class ScenarioAndAiSpeechTest {
             assertTrue(ach.isUnlocked, "Achievement ${ach.id} should be unlocked on successful S-rank round")
         }
     }
+
+    @Test
+    fun testOffensiveLanguageProducesEthicalRebuke() {
+        val geminiService = KtorGeminiService()
+        val scenario = ScenarioPresets.getById("synergy_investor")!!
+        val metrics = NegotiationMetrics(trust = 50, tension = 30, dealReadiness = 40)
+
+        val result = geminiService.createDynamicContextFallback(
+            userMessage = "Валерий, мы согласны на 500р, если вы не долбаёб",
+            config = scenario,
+            currentMetrics = metrics
+        )
+
+        assertNotNull(result)
+        val reply = result.getResolvedReply()
+        assertTrue(
+            reply.contains("деловую этику") || reply.contains("Подобные выражения недопустимы"),
+            "Should rebuke offensive language: $reply"
+        )
+        assertEquals("warn", result.barsAnimation)
+        assertTrue(result.metricsDelta.tension > 0, "Tension should increase on insult")
+        assertTrue(result.metricsDelta.trust < 0, "Trust should drop on insult")
+    }
+
+    @Test
+    fun testPriceExtractionInSynergyInvestor() {
+        val geminiService = KtorGeminiService()
+        val scenario = ScenarioPresets.getById("synergy_investor")!!
+        val metrics = NegotiationMetrics(trust = 50, tension = 30, dealReadiness = 40)
+
+        // 500р is >= 460 BATNA, with B2B condition
+        val result = geminiService.createDynamicContextFallback(
+            userMessage = "Валерий, мы готовы зафиксировать ставку 500р при условии встречного соглашения.",
+            config = scenario,
+            currentMetrics = metrics
+        )
+
+        assertNotNull(result)
+        val reply = result.getResolvedReply()
+        assertTrue(
+            reply.contains("500 ₽/м²") || reply.contains("500"),
+            "Opponent must reference the proposed price 500: $reply"
+        )
+        assertFalse(
+            reply.contains("каникулы составляют строго 4 месяца, мы вынуждены"),
+            "Must NOT return static 4-month vacation script for price offer"
+        )
+    }
 }

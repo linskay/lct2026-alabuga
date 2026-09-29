@@ -107,9 +107,49 @@ class KtorGeminiService(private val defaultApiKey: String = "") {
 
         val geminiKey = AppSettings.geminiApiKey.ifBlank { defaultApiKey }.trim()
         val openRouterKey = AppSettings.openRouterApiKey.trim()
+        val preferredProvider = AppSettings.selectedProvider.trim().lowercase()
 
-        // 1. Попытка запроса через Google Gemini (если есть ключ)
-        if (geminiKey.isNotBlank() && geminiKey.startsWith("AIzaSy")) {
+        suspend fun callOpenRouter(modelName: String): OpponentReplyDto? {
+            if (openRouterKey.isBlank()) return null
+            try {
+                val openRouterResp: OpenRouterChatResponse = client.post("https://openrouter.ai/api/v1/chat/completions") {
+                    contentType(ContentType.Application.Json)
+                    header("Authorization", "Bearer $openRouterKey")
+                    header("HTTP-Referer", "http://localhost:8085")
+                    header("X-Title", "Alabuga Arena")
+                    setBody(
+                        buildJsonObject {
+                            put("model", modelName)
+                            put("max_tokens", 1500)
+                            put("temperature", 0.7)
+                            put("response_format", buildJsonObject { put("type", "json_object") })
+                            put("messages", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("role", "system")
+                                    put("content", systemPrompt)
+                                })
+                                add(buildJsonObject {
+                                    put("role", "user")
+                                    put("content", fullPrompt)
+                                })
+                            })
+                        }
+                    )
+                }.body()
+
+                val textContent = openRouterResp.choices.firstOrNull()?.message?.content ?: ""
+                val cleanJson = textContent.replace("```json", "").replace("```", "").trim()
+                if (cleanJson.isNotBlank()) {
+                    return json.decodeFromString<OpponentReplyDto>(cleanJson)
+                }
+            } catch (e: Throwable) {
+                println("OpenRouter API call failed for $modelName: ${e.message}")
+            }
+            return null
+        }
+
+        suspend fun callGemini(): OpponentReplyDto? {
+            if (geminiKey.isBlank()) return null
             try {
                 val response: GeminiResponse = client.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$geminiKey") {
                     contentType(ContentType.Application.Json)
@@ -131,39 +171,20 @@ class KtorGeminiService(private val defaultApiKey: String = "") {
             } catch (e: Throwable) {
                 println("Gemini API call failed: ${e.message}")
             }
+            return null
         }
 
-        // 2. Попытка запроса через OpenRouter (если есть ключ)
-        if (openRouterKey.isNotBlank()) {
-            try {
-                val openRouterResp: OpenRouterChatResponse = client.post("https://openrouter.ai/api/v1/chat/completions") {
-                    contentType(ContentType.Application.Json)
-                    header("Authorization", "Bearer $openRouterKey")
-                    setBody(
-                        buildJsonObject {
-                            put("model", "google/gemini-2.5-flash")
-                            put("messages", buildJsonArray {
-                                add(buildJsonObject {
-                                    put("role", "system")
-                                    put("content", systemPrompt)
-                                })
-                                add(buildJsonObject {
-                                    put("role", "user")
-                                    put("content", fullPrompt)
-                                })
-                            })
-                        }
-                    )
-                }.body()
+        val openRouterModel = AppSettings.openRouterModel.ifBlank { "google/gemini-2.5-flash" }
 
-                val textContent = openRouterResp.choices.firstOrNull()?.message?.content ?: ""
-                val cleanJson = textContent.replace("```json", "").replace("```", "").trim()
-                if (cleanJson.isNotBlank()) {
-                    return json.decodeFromString<OpponentReplyDto>(cleanJson)
-                }
-            } catch (e: Throwable) {
-                println("OpenRouter API call failed: ${e.message}")
-            }
+        // Попытка онлайн-генерации через провайдеры по приоритету
+        val generatedReply = if (preferredProvider == "openrouter") {
+            callOpenRouter(openRouterModel) ?: callOpenRouter("openrouter/auto") ?: callGemini()
+        } else {
+            callGemini() ?: callOpenRouter(openRouterModel) ?: callOpenRouter("openrouter/auto")
+        }
+
+        if (generatedReply != null) {
+            return generatedReply
         }
 
         // 3. Динамический интеллектуальный локальный движок (Smart Context Fallback)
@@ -183,6 +204,27 @@ class KtorGeminiService(private val defaultApiKey: String = "") {
     ): OpponentReplyDto {
         val lower = userMessage.lowercase().trim()
         val words = lower.split(Regex("\\s+")).filter { it.isNotBlank() }
+
+        val isRudeOrOffensive = listOf(
+            "долба", "хуй", "бля", "нахуй", "сука", "пидор", "мудак", "говно",
+            "идиот", "придурок", "дебил", "чмо", "слышь", "баран", "урод", "заткнись", "мразь", "тварь"
+        ).any { lower.contains(it) }
+
+        if (isRudeOrOffensive) {
+            val oppName = config.opponentName.ifBlank { "Оппонент" }
+            return OpponentReplyDto(
+                opponentReply = "Я требую соблюдать деловую этику и уважительный тон. Подобные выражения недопустимы на переговорах с топ-менеджментом ОЭЗ «Алабуга». Либо мы немедленно возвращаемся к профессиональному конструктивному диалогу, либо эти переговоры окончены.",
+                barsFeedback = "КРИТИЧЕСКИЙ СРЫВ! Оскорбление оппонента (${oppName}) рушит доверие и переговорную позицию. Немедленно извинись, сними напряжение и вернись к условиям соглашения!",
+                barsAnimation = "warn",
+                metricsDelta = MetricsDelta(trust = -25, tension = 35, dealReadiness = -20),
+                dynamicHints = listOf(
+                    "Приношу извинения за резкость. Давайте вернемся к предметным параметрам проекта.",
+                    "Эмоции в сторону. Предлагаю сфокусироваться на взаимовыгодных условиях аренды и мощностей.",
+                    "Признаю некорректность формулировки. Готовы зафиксировать 460 ₽/м² при встречном CAPEX 1.2 млрд ₽."
+                ),
+                isDealClosed = false
+            )
+        }
 
         // Проверка на базарный торг (голая цифра) или спам/слишком короткий ввод без B2B-контекста
         val isBareNumber = lower.matches(Regex("^[+\\-~]?\\s*\\d+(?:[.,]\\d+)?\\s*(?:[рp₽]|руб(?:лей|ля|ль)?(?:\\s*\\/\\s*м[²2]?)?)?\\.?$"))
@@ -290,26 +332,40 @@ class KtorGeminiService(private val defaultApiKey: String = "") {
         config: ScenarioConfig,
         metrics: NegotiationMetrics
     ): OpponentReplyDto {
-        val extractedNumbers = Regex("\\b\\d{2,6}\\b").findAll(lower).mapNotNull { it.value.toIntOrNull() }.toList()
-        val proposedPrice = extractedNumbers.firstOrNull { it in 300..700 }
-        val mentionsPower = lower.contains("110 кв") || lower.contains("мощнос") || lower.contains("энерг") || lower.contains("мвт")
-        val mentionsCapex = lower.contains("capex") || lower.contains("инвест") || lower.contains("млрд")
-        val mentionsGrace = lower.contains("каникул") || lower.contains("пусконалад") || lower.contains("месяц")
-        val mentionsTax = lower.contains("налог") || lower.contains("льгот") || lower.contains("0%")
+        val extractedNumbers = Regex("(\\d{2,6})(?:\\s*(?:[рp₽]|руб(?:лей|ля|ль)?))?", RegexOption.IGNORE_CASE)
+            .findAll(lower).mapNotNull { it.groupValues[1].toIntOrNull() }.toList()
+        val proposedPrice = extractedNumbers.firstOrNull { it in 200..1500 }
+        val mentionsPower = lower.contains("110 кв") || lower.contains("мощнос") || lower.contains("энерг") || lower.contains("8 мвт") || lower.contains("мвт")
+        val mentionsCapex = lower.contains("capex") || lower.contains("1.2 млрд") || lower.contains("млрд") || lower.contains("капекс") || lower.contains("инвестпакет") || lower.contains("объем инвестиций")
+        val mentionsGrace = lower.contains("каникул") || lower.contains("пусконалад") || lower.contains("4 месяц") || lower.contains("12 месяц")
+        val mentionsTax = lower.contains("налог") || lower.contains("льгот") || lower.contains("0%") || lower.contains("преференци")
 
         return when {
-            proposedPrice != null && proposedPrice >= 460 && (mentionsPower || mentionsCapex || mentionsTax) -> {
+            proposedPrice != null && proposedPrice >= 460 -> {
                 OpponentReplyDto(
-                    opponentReply = "Валерий внимательно изучил ваши расчеты... Смотрите, $proposedPrice ₽/м² — это выше нашего изначального бюджета в 300 ₽, но с учетом гарантии энергомощностей 8 МВт и налоговых преференций мы готовы пойти на этот компромисс. Давайте фиксировать в протоколе.",
+                    opponentReply = "Валерий внимательно изучил ваши расчеты: ставка $proposedPrice ₽/м² — это приемлемый базис для соглашения. Мы готовы зафиксировать эту ставку в соглашении о намерениях при встречном подтверждении 8 МВт по 1-й категории и 4 месяцев каникул под наш CAPEX 1.2 млрд ₽.",
                     barsFeedback = "Блестящая победа! Ты удержал красную линию BATNA ($proposedPrice ₽/м² >= 460) и связал условия с инфраструктурой ОЭЗ. Сделка на мази!",
                     barsAnimation = "win",
-                    metricsDelta = MetricsDelta(trust = 14, tension = -10, dealReadiness = 20),
+                    metricsDelta = MetricsDelta(trust = 15, tension = -12, dealReadiness = 22),
                     dynamicHints = listOf(
-                        "Фиксируем базовую ставку $proposedPrice ₽/м² в соглашении о намерениях.",
-                        "Утверждаем 4 месяца арендных каникул с момента передачи корпуса.",
+                        "Валерий, фиксируем базовую ставку $proposedPrice ₽/м² в соглашении о намерениях.",
+                        "Утверждаем 4 месяца арендных каникул с момента передачи производственного корпуса.",
                         "Резервируем 8 МВт по 1-й категории под встречное обязательство CAPEX 1.2 млрд ₽."
                     ),
-                    isDealClosed = metrics.dealReadiness >= 60
+                    isDealClosed = metrics.dealReadiness >= 55
+                )
+            }
+            proposedPrice != null && proposedPrice < 460 -> {
+                OpponentReplyDto(
+                    opponentReply = "Ставка $proposedPrice ₽/м² для нас абсолютно неприемлема — это ниже нашей планки окупаемости. Мы настаиваем на встречном шаге либо существенных компенсациях по инфраструктуре. Поднимайте ставку минимум до 460 ₽/м².",
+                    barsFeedback = "Оппонент отверг заниженную ставку ($proposedPrice ₽/м² < 460)! Удерживай планку BATNA от 460 ₽/м², обосновывая готовыми сетями 110 кВ.",
+                    barsAnimation = "warn",
+                    metricsDelta = MetricsDelta(trust = -6, tension = 10, dealReadiness = -5),
+                    dynamicHints = listOf(
+                        "Валерий, мы готовы зафиксировать 460 ₽/м² при встречном обязательном CAPEX 1.2 млрд ₽.",
+                        "Пакет резидента ОЭЗ дает экономию 140 млн ₽ в год, что полностью оправдывает ставку 460 ₽/м².",
+                        "Предлагаем утвердить 4 месяца каникул взамен на ускоренный монтаж оборудования."
+                    )
                 )
             }
             mentionsTax || mentionsPower -> {
@@ -327,7 +383,7 @@ class KtorGeminiService(private val defaultApiKey: String = "") {
             }
             mentionsGrace || mentionsCapex -> {
                 OpponentReplyDto(
-                    opponentReply = "Хорошо, если каникулы составляют строго 4 месяца, мы вынуждены форсировать монтаж оборудования. Мы согласны рассмотреть встречный шаг по ставке в 440–460 ₽/м². Что скажете по энерголимитам?",
+                    opponentReply = "Если каникулы на пусконаладку составят 4 месяца, мы вынуждены форсировать монтаж оборудования. Мы согласны рассмотреть встречный шаг по ставке в 440–460 ₽/м². Что скажете по энерголимитам 8 МВт?",
                     barsFeedback = "Позиции сторон сближаются! Держи планку 460 ₽/м² и подтверждай 8 МВт мощности.",
                     barsAnimation = "talk",
                     metricsDelta = MetricsDelta(trust = 8, tension = -4, dealReadiness = 10),
