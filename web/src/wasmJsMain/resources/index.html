@@ -175,6 +175,20 @@
             if (mv) mv.style.display = 'none';
         };
 
+        var lastRobotClickTime = 0;
+        function dispatchRobotClick() {
+            var now = Date.now();
+            if (now - lastRobotClickTime < 280) return;
+            lastRobotClickTime = now;
+            if (typeof window.onBarsRobotClick === 'function') {
+                try {
+                    window.onBarsRobotClick();
+                } catch (e) {
+                    console.warn("Robot click error:", e);
+                }
+            }
+        }
+
         // Fallback from mike.glb to bars.glb on error
         var mvElem = document.getElementById('bars-3d-model-viewer');
         if (mvElem) {
@@ -203,6 +217,11 @@
                 }
             });
 
+            mvElem.addEventListener('click', function(e) {
+                dispatchRobotClick();
+                sanitizeModelViewer(mvElem);
+            });
+
             // Click handling with drag suppression
             var isDown = false;
             var startX = 0, startY = 0;
@@ -219,11 +238,9 @@
                 isDown = false;
                 var dx = Math.abs(e.clientX - startX);
                 var dy = Math.abs(e.clientY - startY);
-                // If it's a tap/click (< 6px movement)
-                if (dx < 6 && dy < 6) {
-                    if (typeof window.onBarsRobotClick === 'function') {
-                        window.onBarsRobotClick();
-                    }
+                // If it's a tap/click (< 12px movement)
+                if (dx < 12 && dy < 12) {
+                    dispatchRobotClick();
                 }
                 sanitizeModelViewer(mvElem);
                 if (mvElem.blur) mvElem.blur();

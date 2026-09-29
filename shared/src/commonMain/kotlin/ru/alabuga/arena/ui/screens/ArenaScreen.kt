@@ -48,6 +48,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -995,32 +996,129 @@ private fun ArenaChatContent(
 ) {
     val coroutineScope = rememberCoroutineScope()
 
+    val arenaRobotPhrases = remember {
+        listOf(
+            "Оппонент с порога атакует ставку аренды! Не оправдывайся и держи BATNA (460 ₽/м²).",
+            "Хитрый ход инвестора! Предложи каникулы 10 месяцев взамен на долгосрочный контракт.",
+            "Напомни о готовых энергомощностях 8 МВт и льготах ОЭЗ — это наш главный козырь!",
+            "Оппонент начинает давить. Не уступай по CAPEX, держи переговоры в зоне ZOPA!",
+            "Блеф оппонента очевиден. Альтернативных площадок с таким подводом коммуникаций в ПФО нет!",
+            "Уверенная позиция! Закрепи договоренность по графику пусконаладки.",
+            "Следи за индикатором напряжения! Если накал превысит 80%, инвестор возьмет паузу.",
+            "Отличный аргумент! Оппонент снижает требования, дожимай финальные условия!"
+        )
+    }
+    var arenaPhraseIndex by remember { mutableStateOf(0) }
+    val arenaAnims = remember { listOf("wave", "talk", "nod", "bluff", "tilt", "jump") }
+    var arenaAnimIndex by remember { mutableStateOf(0) }
+    var currentArenaAnim by remember { mutableStateOf(robotAnimation) }
+
+    LaunchedEffect(robotAnimation) {
+        currentArenaAnim = robotAnimation
+    }
+
+    val handleArenaRobotTap: () -> Unit = {
+        arenaAnimIndex = (arenaAnimIndex + 1) % arenaAnims.size
+        currentArenaAnim = arenaAnims[arenaAnimIndex]
+        arenaPhraseIndex = (arenaPhraseIndex + 1) % arenaRobotPhrases.size
+    }
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         // 1. Окно прямого эфира оппонента (3D Робот Майк / Б.А.Р.С.)
         if (!showDebriefing && !showTimeTravel) {
-            val avatarHeight = if (isMobile) 130.dp else 280.dp
-            Box(
+            val avatarHeight = if (isMobile) 130.dp else 240.dp
+            Column(
                 modifier = if (isMobile) {
                     Modifier
                         .fillMaxWidth()
-                        .height(avatarHeight)
-                        .background(Color.Transparent)
+                        .wrapContentHeight()
                 } else {
                     Modifier
                         .fillMaxWidth()
-                        .weight(0.38f)
-                        .background(Color.Transparent)
+                        .weight(0.40f)
                 },
-                contentAlignment = Alignment.Center
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                BarsRobotView(
-                    animation = robotAnimation,
-                    modifier = Modifier.fillMaxSize(),
-                    height = avatarHeight
-                )
+                // ТАКТИЧЕСКИЙ БАББЛ РОБОТА В ПЕРЕГОВОРНОЙ
+                Surface(
+                    onClick = handleArenaRobotTap,
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFF0F172A).copy(alpha = 0.90f),
+                    border = BorderStroke(
+                        1.dp,
+                        Brush.linearGradient(
+                            listOf(Color(0xFF00F0FF).copy(alpha = 0.65f), Color(0xFF7B2CBF).copy(alpha = 0.65f))
+                        )
+                    ),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF00FFCC))
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🤖 Б.А.Р.С. • НАЖМИТЕ ДЛЯ СОВЕТА",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00F0FF),
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 0.6.sp
+                            )
+                            Text(
+                                text = arenaRobotPhrases[arenaPhraseIndex % arenaRobotPhrases.size],
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White,
+                                lineHeight = 15.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Box(
+                    modifier = if (isMobile) {
+                        Modifier
+                            .fillMaxWidth()
+                            .height(avatarHeight)
+                            .background(Color.Transparent)
+                    } else {
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .background(Color.Transparent)
+                    },
+                    contentAlignment = Alignment.Center
+                ) {
+                    BarsRobotView(
+                        animation = currentArenaAnim,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { handleArenaRobotTap() },
+                        height = avatarHeight,
+                        onClick = handleArenaRobotTap
+                    )
+                }
             }
         }
 
